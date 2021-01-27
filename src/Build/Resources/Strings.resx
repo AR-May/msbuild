@@ -1875,6 +1875,7 @@ Utilization:          {0} Average Utilization: {1:###.0}</value>
   </data>
   <data name="NoProjectCachePluginFoundInAssembly" xml:space="preserve">
     <value>MSB4270: No project cache plugins found in assembly "{0}". Expected one.</value>
+  </data>
   <data name="RarControllerReflectionError" xml:space="preserve">
     <value>Couldn't create an instance of IRarController for '{0}' type</value>
   </data>
