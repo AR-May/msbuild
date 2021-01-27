@@ -958,6 +958,7 @@ namespace Microsoft.Build.Tasks
         [Microsoft.Build.Framework.OutputAttribute]
         public Microsoft.Build.Framework.ITaskItem[] UnresolvedAssemblyConflicts { get { throw null; } }
         public bool UnresolveFrameworkAssembliesFromHigherFrameworks { get { throw null; } set { } }
+        public bool UseResolveAssemblyReferenceService { get { throw null; } set { } }
         public string WarnOrErrorOnTargetArchitectureMismatch { get { throw null; } set { } }
         public override bool Execute() { throw null; }
     }

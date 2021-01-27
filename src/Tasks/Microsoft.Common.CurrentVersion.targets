@@ -2220,6 +2220,7 @@ Copyright (C) Microsoft Corporation. All rights reserved.
         FindDependenciesOfExternallyResolvedReferences="$(FindDependenciesOfExternallyResolvedReferences)"
         ContinueOnError="$(ContinueOnError)"
         OutputUnresolvedAssemblyConflicts="$(ResolveAssemblyReferenceOutputUnresolvedAssemblyConflicts)"
+        UseResolveAssemblyReferenceService="$(UseResolveAssemblyReferenceService)"
         Condition="'@(Reference)'!='' or '@(_ResolvedProjectReferencePaths)'!='' or '@(_ExplicitReference)' != ''"
         >
 
