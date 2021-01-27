@@ -7,7 +7,6 @@ using Microsoft.Build.Eventing;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Shared;
 using Microsoft.Build.Tasks.ResolveAssemblyReferences.Contract;
-using StreamJsonRpc;
 
 namespace Microsoft.Build.Tasks.ResolveAssemblyReferences.Client
 {
@@ -61,10 +60,12 @@ namespace Microsoft.Build.Tasks.ResolveAssemblyReferences.Client
 
         private IResolveAssemblyReferenceTaskHandler GetRpcClient()
         {
-            ErrorUtilities.VerifyThrowInternalErrorUnreachable(_clientStream != null);
+            throw new NotImplementedException();
 
-            IJsonRpcMessageHandler handler = RpcUtils.GetRarMessageHandler(_clientStream);
-            return JsonRpc.Attach<IResolveAssemblyReferenceTaskHandler>(handler);
+            //TODO: REMOVE THE FUNC?
+            //ErrorUtilities.VerifyThrowInternalErrorUnreachable(_clientStream != null);
+            //IJsonRpcMessageHandler handler = RpcUtils.GetRarMessageHandler(_clientStream);
+            //return JsonRpc.Attach<IResolveAssemblyReferenceTaskHandler>(handler);
         }
 
         public void Dispose()
