@@ -12,9 +12,6 @@ using Microsoft.Build.Internal;
 using Microsoft.Build.Shared;
 using Microsoft.Build.Tasks.ResolveAssemblyReferences.Contract;
 using Microsoft.Build.Tasks.ResolveAssemblyReferences.Services;
-using Microsoft.VisualStudio.Threading;
-
-using StreamJsonRpc;
 
 #nullable enable
 namespace Microsoft.Build.Tasks.ResolveAssemblyReferences.Server
@@ -130,9 +127,14 @@ namespace Microsoft.Build.Tasks.ResolveAssemblyReferences.Server
             return 0;
         }
 
-        private async Task HandleClientAsync(Stream serverStream, CancellationToken cancellationToken = default)
+        private Task HandleClientAsync(Stream serverStream, CancellationToken cancellationToken = default)
+        //private async Task HandleClientAsync(Stream serverStream, CancellationToken cancellationToken = default)
         {
-            using JsonRpc server = GetRpcServer(serverStream, _resolveAssemblyReferenceTaskHandler);
+            throw new NotImplementedException();
+
+            //TODO: remove func?
+
+            /*using JsonRpc server = GetRpcServer(serverStream, _resolveAssemblyReferenceTaskHandler);
             server.StartListening();
 
             try
@@ -143,14 +145,18 @@ namespace Microsoft.Build.Tasks.ResolveAssemblyReferences.Server
             {
                 // Some problem with connection, let's ignore it.
                 // All other exceptions are issue though
-            }
+            }*/
         }
 
-        private JsonRpc GetRpcServer(Stream stream, IResolveAssemblyReferenceTaskHandler handler)
+        private void GetRpcServer(Stream stream, IResolveAssemblyReferenceTaskHandler handler)
+        //private JsonRpc GetRpcServer(Stream stream, IResolveAssemblyReferenceTaskHandler handler)
         {
-            IJsonRpcMessageHandler serverHandler = RpcUtils.GetRarMessageHandler(stream);
-            JsonRpc rpc = new JsonRpc(serverHandler, handler);
-            return rpc;
+            throw new NotImplementedException();
+
+            //TODO: remove the func
+            //IJsonRpcMessageHandler serverHandler = RpcUtils.GetRarMessageHandler(stream);
+            //JsonRpc rpc = new JsonRpc(serverHandler, handler);
+            //return rpc;
         }
 
         /// <summary>

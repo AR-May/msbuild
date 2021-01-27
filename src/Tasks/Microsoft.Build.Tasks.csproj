@@ -988,8 +988,6 @@
   <ItemGroup>
     <PackageReference Include="System.Collections.Immutable" />
     <PackageReference Include="System.Resources.Extensions" />
-    <PackageReference Include="StreamJsonRpc" />
-    <PackageReference Include="Newtonsoft.Json" />
   </ItemGroup>
 
   <!-- Tasks need to mimic redistributing the compilers, so add references to both full framework and .net core -->
@@ -1013,6 +1011,7 @@
     <PackageReference Include="System.Security.Cryptography.Pkcs" />
     <PackageReference Include="System.Security.Cryptography.Xml" />
     <PackageReference Include="System.Security.Permissions" />
+    <!-- maybe remove this -->
     <PackageReference Include="System.Security.Principal.Windows" />
     <PackageReference Include="System.Threading.Tasks.Dataflow" />
 
