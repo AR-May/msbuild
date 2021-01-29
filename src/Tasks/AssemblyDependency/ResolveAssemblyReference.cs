@@ -3024,34 +3024,46 @@ namespace Microsoft.Build.Tasks
         /// <returns>True if there was success.</returns>
         public override bool Execute()
         {
+            Log.LogMessage("HERE!!!");
+            Log.LogMessage(UseResolveAssemblyReferenceService.ToString());
             if (UseResolveAssemblyReferenceService && BuildEngine is IRarBuildEngine rarBuildEngine)
             {
+                Log.LogMessage("RARaaS");
                 using var client = new RarClient(rarBuildEngine);
 
                 var connected = client.Connect();
                 if (!connected)
                 {
+                    Log.LogMessage("RarCouldntConnect");
                     Log.LogMessageFromResources(MessageImportance.Low, "RarCouldntConnect");
                     bool nodeCreated = false;
                     try
                     {
+                        Log.LogMessage("Creating node");
                         nodeCreated = client.CreateNode();
                     }
                     catch (Exception e)
                     {
+                        Log.LogMessage("Creating node failed: " + e.Message);
                         Log.LogWarningFromException(e);
                     }
 
                     if (nodeCreated)
                     {
+                        Log.LogMessage("nodeCreated");
                         connected = client.Connect(5000);
                     }
                 }
 
                 if (connected)
                 {
+                    Log.LogMessage("Finally Connected");
                     // Client is connected to the RAR node, we can execute RAR task remotely
                     // return client.Execute(); // TODO: Let it do something.
+                }
+                else
+                {
+                    Log.LogMessage("Finally Not Connected");
                 }
             }
 

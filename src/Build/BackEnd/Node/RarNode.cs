@@ -15,6 +15,8 @@ using Microsoft.Build.Framework;
 using Microsoft.Build.Internal;
 using Microsoft.Build.Shared;
 
+//using Microsoft.Build.Tasks.ResolveAssemblyReferences.Server;
+
 namespace Microsoft.Build.Execution
 {
     public sealed class RarNode : INode
@@ -86,7 +88,10 @@ namespace Microsoft.Build.Execution
 
             Func<string, int?, int?, int, bool, NamedPipeServerStream> streamFactory = NamedPipeUtil.CreateNamedPipeServer;
             Func<Handshake, NamedPipeServerStream, int, bool> validateCallback = NamedPipeUtil.ValidateHandshake;
+            // !!TODO!!: error: rar controller constructor not found. (RAR\Server\RarController.cs)
             IRarController controller = Activator.CreateInstance(rarControllerType, pipeName, handshake, streamFactory, validateCallback, null) as IRarController;
+
+            //IRarController controller = new Microsoft.Build.Tasks.ResolveAssemblyReferences.Server.RarController(pipeName, handshake, streamFactory, validateCallback, null) as IRarController;
 
             ErrorUtilities.VerifyThrow(controller != null, ResourceUtilities.GetResourceString("RarControllerReflectionError"), RarControllerName);
             return controller;

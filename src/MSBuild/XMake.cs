@@ -2625,6 +2625,8 @@ namespace Microsoft.Build.CommandLine
                     }
                     else if (nodeModeNumber == 3)
                     {
+                        Console.ReadLine();
+                        //Thread.Sleep(30000);
                         var node = new RarNode(); 
                         // If FEATURE_NODE_REUSE is OFF, just validates that the switch is OK, and always returns False
                         bool nodeReuse = ProcessNodeReuseSwitch(commandLineSwitches[CommandLineSwitches.ParameterizedSwitch.NodeReuse]);
