@@ -16,6 +16,18 @@ using Microsoft.Build.Tasks.ResolveAssemblyReferences.Services;
 #nullable enable
 namespace Microsoft.Build.Tasks.ResolveAssemblyReferences.Server
 {
+    internal sealed class MyClassTest
+    {
+        private int _x;
+        internal MyClassTest(int x)
+        {
+            Console.WriteLine("cccc");
+            _x = x;
+        }
+
+        public MyClassTest(int x, int y, int z, int t) : this(x) { }
+    }
+
     internal sealed class RarController : IRarController
     {
         /// <summary>
@@ -62,21 +74,6 @@ namespace Microsoft.Build.Tasks.ResolveAssemblyReferences.Server
         /// </summary>
         private readonly TimeSpan Timeout = TimeSpan.FromMinutes(15);
 
-        public RarController(
-            string pipeName,
-            Handshake handshake,
-            Func<string, int?, int?, int, bool, NamedPipeServerStream> namedPipeServerFactory,
-            Func<Handshake, NamedPipeServerStream, int, bool> validateHandshakeCallback,
-            TimeSpan? timeout = null)
-            : this(pipeName,
-                  handshake,
-                  namedPipeServerFactory,
-                  validateHandshakeCallback,
-                  timeout: timeout,
-                  resolveAssemblyReferenceTaskHandler: new RarTaskHandler())
-        {
-        }
-
         internal RarController(
             string pipeName,
             Handshake handshake,
@@ -95,6 +92,32 @@ namespace Microsoft.Build.Tasks.ResolveAssemblyReferences.Server
             {
                 Timeout = timeout.Value;
             }
+        }
+
+        /*public RarController(
+            string pipeName,
+            Handshake handshake,
+            Func<string, int?, int?, int, bool, NamedPipeServerStream> namedPipeServerFactory,
+            Func<Handshake, NamedPipeServerStream, int, bool> validateHandshakeCallback)
+            : this(pipeName,
+                  handshake,
+                  namedPipeServerFactory,
+                  validateHandshakeCallback,
+                  resolveAssemblyReferenceTaskHandler: new RarTaskHandler(),
+                  timeout: null)
+        {
+        }
+*/
+#pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
+        public RarController(
+#pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
+            string pipeName,
+            Handshake handshake,
+            Func<string, int?, int?, int, bool, NamedPipeServerStream> streamFactory,
+            Func<Handshake, NamedPipeServerStream, int, bool> validateCallback)
+        {
+            _pipeName = "";
+            _handshake = new Handshake();
         }
 
         public async Task<int> StartAsync(CancellationToken cancellationToken = default)
