@@ -8,7 +8,6 @@ using System.Threading;
 using System.Threading.Tasks;
 
 using Microsoft.Build.Framework;
-using Microsoft.Build.Internal;
 using Microsoft.Build.Shared;
 using Microsoft.Build.Tasks.ResolveAssemblyReferences.Contract;
 using Microsoft.Build.Tasks.ResolveAssemblyReferences.Services;
@@ -29,12 +28,6 @@ namespace Microsoft.Build.Tasks.ResolveAssemblyReferences.Server
         private readonly string _pipeName;
 
         /// <summary>
-        /// Handshake used for validation of incoming connections
-        /// </summary>
-        private readonly Handshake _handshake;
-
-
-        /// <summary>
         /// Factory callback to NamedPipeUtils.CreateNamedPipeServer
         /// 1. arg: pipe name
         /// 2. arg: input buffer size
@@ -50,7 +43,7 @@ namespace Microsoft.Build.Tasks.ResolveAssemblyReferences.Server
         /// 2. arg: named pipe over which we should validate the handshake
         /// 3. arg: timeout for validation
         /// </summary>
-        private readonly Func<Handshake, NamedPipeServerStream, int, bool> _validateHandshakeCallback;
+        private readonly Func<NamedPipeServerStream, int, bool> _validateHandshakeCallback;
 
         /// <summary>
         /// Handler for all incoming tasks
@@ -62,14 +55,19 @@ namespace Microsoft.Build.Tasks.ResolveAssemblyReferences.Server
         /// </summary>
         private readonly TimeSpan Timeout = TimeSpan.FromMinutes(15);
 
+        /// <summary>
+        /// Constructor for <see cref="RarController"/>
+        /// </summary>
+        /// <param name="pipeName">Name of pipe over which all communication should go</param>
+        /// <param name="namedPipeServerFactory">Factory for named pipe used in connection</param>
+        /// <param name="validateHandshakeCallback">Callback to validation of connection</param>
+        /// <param name="timeout">Timeout which should be used for communication</param>
         public RarController(
             string pipeName,
-            Handshake handshake,
             Func<string, int?, int?, int, bool, NamedPipeServerStream> namedPipeServerFactory,
-            Func<Handshake, NamedPipeServerStream, int, bool> validateHandshakeCallback,
+            Func<NamedPipeServerStream, int, bool> validateHandshakeCallback,
             TimeSpan? timeout = null)
             : this(pipeName,
-                  handshake,
                   namedPipeServerFactory,
                   validateHandshakeCallback,
                   timeout: timeout,
@@ -79,14 +77,12 @@ namespace Microsoft.Build.Tasks.ResolveAssemblyReferences.Server
 
         internal RarController(
             string pipeName,
-            Handshake handshake,
             Func<string, int?, int?, int, bool, NamedPipeServerStream> namedPipeServerFactory,
-            Func<Handshake, NamedPipeServerStream, int, bool> validateHandshakeCallback,
+            Func<NamedPipeServerStream, int, bool> validateHandshakeCallback,
             IResolveAssemblyReferenceTaskHandler resolveAssemblyReferenceTaskHandler,
             TimeSpan? timeout = null)
         {
             _pipeName = pipeName;
-            _handshake = handshake;
             _namedPipeServerFactory = namedPipeServerFactory;
             _validateHandshakeCallback = validateHandshakeCallback;
             _resolveAssemblyReferenceTaskHandler = resolveAssemblyReferenceTaskHandler;
@@ -115,7 +111,7 @@ namespace Microsoft.Build.Tasks.ResolveAssemblyReferences.Server
                 NamedPipeServerStream serverStream = GetStream(_pipeName);
                 await serverStream.WaitForConnectionAsync(token).ConfigureAwait(false);
 
-                if (!_validateHandshakeCallback(_handshake, serverStream, ValidationTimeout))
+                if (!_validateHandshakeCallback(serverStream, ValidationTimeout))
                     continue;
 
                 // Connected! Refresh timeout for incoming request
