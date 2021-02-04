@@ -5,8 +5,6 @@ using System;
 using System.IO.Pipes;
 using Microsoft.Build.Eventing;
 using Microsoft.Build.Framework;
-using Microsoft.Build.Shared;
-using Microsoft.Build.Tasks.ResolveAssemblyReferences.Contract;
 
 namespace Microsoft.Build.Tasks.ResolveAssemblyReferences.Client
 {

@@ -127,32 +127,7 @@ namespace Microsoft.Build.Tasks.ResolveAssemblyReferences.Server
         //private async Task HandleClientAsync(Stream serverStream, CancellationToken cancellationToken = default)
         {
             throw new NotImplementedException();
-
-            //TODO: remove func?
-
-            /*using JsonRpc server = GetRpcServer(serverStream, _resolveAssemblyReferenceTaskHandler);
-            server.StartListening();
-
-            try
-            {
-                await server.Completion.WithCancellation(cancellationToken).ConfigureAwait(false);
-            }
-            catch (ConnectionLostException)
-            {
-                // Some problem with connection, let's ignore it.
-                // All other exceptions are issue though
-            }*/
-        }
-
-        private void GetRpcServer(Stream stream, IResolveAssemblyReferenceTaskHandler handler)
-        //private JsonRpc GetRpcServer(Stream stream, IResolveAssemblyReferenceTaskHandler handler)
-        {
-            throw new NotImplementedException();
-
-            //TODO: remove the func
-            //IJsonRpcMessageHandler serverHandler = RpcUtils.GetRarMessageHandler(stream);
-            //JsonRpc rpc = new JsonRpc(serverHandler, handler);
-            //return rpc;
+            //TODO: write listening for the requests using NamedPipes and BinaryFormatter.
         }
 
         /// <summary>
