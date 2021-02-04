@@ -39,7 +39,6 @@
         SYSLIB0011: Removing binary formatter will happen as part of a larger .NET-wide effort.
     -->
 
-    <!-- <NoWarn>$(NoWarn);NU1603;NU5105;NU5125;1701;1702;VSTHRD002;VSTHRD105;VSTHRD110;VSTHRD200</NoWarn> -->
     <NoWarn>$(NoWarn);NU1603;NU5105;NU5125;1701;1702;SYSLIB0011</NoWarn>
   </PropertyGroup>
 
