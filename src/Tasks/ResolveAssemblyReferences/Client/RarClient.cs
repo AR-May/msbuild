@@ -52,20 +52,7 @@ namespace Microsoft.Build.Tasks.ResolveAssemblyReferences.Client
         internal object Execute()
         {
             throw new NotImplementedException();
-            //using IResolveAssemblyReferenceTaskHandler client = GetRpcClient();
-
-            // TODO: Find out if there is any possibility of awaiting it.
-            //return client.GetNumber(parameter).GetAwaiter().GetResult();
-        }
-
-        private IResolveAssemblyReferenceTaskHandler GetRpcClient()
-        {
-            throw new NotImplementedException();
-
-            //TODO: REMOVE THE FUNC?
-            //ErrorUtilities.VerifyThrowInternalErrorUnreachable(_clientStream != null);
-            //IJsonRpcMessageHandler handler = RpcUtils.GetRarMessageHandler(_clientStream);
-            //return JsonRpc.Attach<IResolveAssemblyReferenceTaskHandler>(handler);
+            // TODO: write execution.
         }
 
         public void Dispose()
