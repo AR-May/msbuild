@@ -340,6 +340,9 @@
     <Compile Include="ResourceHandling\*.cs" />
     <Compile Include="ResolveAssemblyReferences\Client\RarClient.cs" />
     <Compile Include="ResolveAssemblyReferences\Contract\IResolveAssemblyReferenceTaskHandler.cs" />
+    <Compile Include="ResolveAssemblyReferences\Contract\ResolveAssemblyReferenceRequest.cs" />
+    <Compile Include="ResolveAssemblyReferences\Contract\ResolveAssemblyReferenceResponse.cs" />
+    <Compile Include="ResolveAssemblyReferences\Contract\ResolveAssemblyReferenceResult.cs" />
     <Compile Include="ResolveAssemblyReferences\Server\RarController.cs" />
     <Compile Include="ResolveAssemblyReferences\Services\RarTaskHandler.cs" />
     <Compile Include="ResolveAssemblyReferences\Server\ServerMutex.cs" />
