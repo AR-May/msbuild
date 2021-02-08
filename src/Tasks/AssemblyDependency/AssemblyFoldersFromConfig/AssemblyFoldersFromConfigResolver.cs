@@ -73,8 +73,9 @@ namespace Microsoft.Build.Tasks.AssemblyFoldersFromConfig
         /// <summary>
         /// Construct.
         /// </summary>
-        public AssemblyFoldersFromConfigResolver(string searchPathElement, GetAssemblyName getAssemblyName,
-            FileExists fileExists, GetAssemblyRuntimeVersion getRuntimeVersion, Version targetedRuntimeVesion,
+        public AssemblyFoldersFromConfigResolver(
+            string searchPathElement, GetAssemblyName getAssemblyName, FileExists fileExists,
+            GetAssemblyRuntimeVersion getRuntimeVersion, Version targetedRuntimeVesion,
             ProcessorArchitecture targetProcessorArchitecture, bool compareProcessorArchitecture,
             IBuildEngine buildEngine, TaskLoggingHelper log)
             : base(

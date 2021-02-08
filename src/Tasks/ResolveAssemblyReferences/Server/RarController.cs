@@ -8,7 +8,6 @@ using System.Threading;
 using System.Threading.Tasks;
 
 using Microsoft.Build.Framework;
-using Microsoft.Build.Internal;
 using Microsoft.Build.Shared;
 using Microsoft.Build.Tasks.ResolveAssemblyReferences.Contract;
 using Microsoft.Build.Tasks.ResolveAssemblyReferences.Services;
@@ -32,12 +31,6 @@ namespace Microsoft.Build.Tasks.ResolveAssemblyReferences.Server
         private readonly string _pipeName;
 
         /// <summary>
-        /// Handshake used for validation of incoming connections
-        /// </summary>
-        private readonly Handshake _handshake;
-
-
-        /// <summary>
         /// Factory callback to NamedPipeUtils.CreateNamedPipeServer
         /// 1. arg: pipe name
         /// 2. arg: input buffer size
@@ -45,7 +38,7 @@ namespace Microsoft.Build.Tasks.ResolveAssemblyReferences.Server
         /// 4. arg. number of allow clients
         /// 5. arg. add right to CreateNewInstance
         /// </summary>
-        private readonly Func<string, int?, int?, int, bool, NamedPipeServerStream> _namedPipeServerFactory;
+        private readonly Func<string, int?, int?, int, bool, Stream>? _streamFactory;
 
         /// <summary>
         /// Callback to validate the handshake.
@@ -53,7 +46,7 @@ namespace Microsoft.Build.Tasks.ResolveAssemblyReferences.Server
         /// 2. arg: named pipe over which we should validate the handshake
         /// 3. arg: timeout for validation
         /// </summary>
-        private readonly Func<Handshake, NamedPipeServerStream, int, bool> _validateHandshakeCallback;
+        private readonly Func<NamedPipeServerStream, int, bool> _validateHandshakeCallback;
 
         /// <summary>
         /// Handler for all incoming tasks
@@ -65,32 +58,36 @@ namespace Microsoft.Build.Tasks.ResolveAssemblyReferences.Server
         /// </summary>
         private readonly TimeSpan Timeout = TimeSpan.FromMinutes(15);
 
+        /// <summary>
+        /// Constructor for <see cref="RarController"/>
+        /// </summary>
+        /// <param name="pipeName">Name of pipe over which all communication should go</param>
+        /// <param name="streamFactory">Factory for stream used in connection</param>
+        /// <param name="validateHandshakeCallback">Callback to validation of connection</param>
+        /// <param name="timeout">Timeout which should be used for communication</param>
         public RarController(
             string pipeName,
-            Handshake handshake,
-            Func<string, int?, int?, int, bool, NamedPipeServerStream> namedPipeServerFactory,
-            Func<Handshake, NamedPipeServerStream, int, bool> validateHandshakeCallback,
+            Func<string, int?, int?, int, bool, Stream> streamFactory,
+            Func<NamedPipeServerStream, int, bool> validateHandshakeCallback,
             TimeSpan? timeout = null)
             : this(pipeName,
-                  handshake,
-                  namedPipeServerFactory,
+                  streamFactory,
                   validateHandshakeCallback,
                   timeout: timeout,
-                  resolveAssemblyReferenceTaskHandler: new RarTaskHandler())
+                  resolveAssemblyReferenceTaskHandler:
+                      new ResolveAssemblyReferenceHandler())
         {
         }
 
         internal RarController(
             string pipeName,
-            Handshake handshake,
-            Func<string, int?, int?, int, bool, NamedPipeServerStream> namedPipeServerFactory,
-            Func<Handshake, NamedPipeServerStream, int, bool> validateHandshakeCallback,
+            Func<string, int?, int?, int, bool, Stream> streamFactory,
+            Func<NamedPipeServerStream, int, bool> validateHandshakeCallback,
             IResolveAssemblyReferenceTaskHandler resolveAssemblyReferenceTaskHandler,
             TimeSpan? timeout = null)
         {
             _pipeName = pipeName;
-            _handshake = handshake;
-            _namedPipeServerFactory = namedPipeServerFactory;
+            _streamFactory = streamFactory;
             _validateHandshakeCallback = validateHandshakeCallback;
             _resolveAssemblyReferenceTaskHandler = resolveAssemblyReferenceTaskHandler;
 
@@ -115,10 +112,9 @@ namespace Microsoft.Build.Tasks.ResolveAssemblyReferences.Server
             while (!token.IsCancellationRequested)
             {
                 // server will dispose stream too.
-                NamedPipeServerStream serverStream = GetStream(_pipeName);
-                await serverStream.WaitForConnectionAsync(token).ConfigureAwait(false);
+                Stream? serverStream = await ConnectAsync(token).ConfigureAwait(false);
 
-                if (!_validateHandshakeCallback(_handshake, serverStream, ValidationTimeout))
+                if (serverStream == null)
                     continue;
 
                 // Connected! Refresh timeout for incoming request
@@ -130,9 +126,31 @@ namespace Microsoft.Build.Tasks.ResolveAssemblyReferences.Server
             return 0;
         }
 
-        private async Task HandleClientAsync(Stream serverStream, CancellationToken cancellationToken = default)
+        private async Task<Stream?> ConnectAsync(CancellationToken cancellationToken = default)
         {
-            using JsonRpc server = GetRpcServer(serverStream, _resolveAssemblyReferenceTaskHandler);
+            Stream serverStream = GetStream(_pipeName);
+
+            if (!(serverStream is NamedPipeServerStream pipeServerStream))
+            {
+                return serverStream;
+            }
+
+            await pipeServerStream.WaitForConnectionAsync(cancellationToken).ConfigureAwait(false);
+
+            if (_validateHandshakeCallback(pipeServerStream, ValidationTimeout))
+            {
+                return pipeServerStream;
+            }
+
+            // We couldn't validate connection, so don't use this connection at all.
+            pipeServerStream.Dispose();
+            return null;
+
+        }
+
+        internal async Task HandleClientAsync(Stream serverStream, CancellationToken cancellationToken = default)
+        {
+            JsonRpc server = GetRpcServer(serverStream, _resolveAssemblyReferenceTaskHandler);
             server.StartListening();
 
             try
@@ -157,11 +175,11 @@ namespace Microsoft.Build.Tasks.ResolveAssemblyReferences.Server
         /// Instantiates an endpoint to act as a client
         /// </summary>
         /// <param name="pipeName">The name of the pipe to which we should connect.</param>
-        private NamedPipeServerStream GetStream(string pipeName)
+        private Stream GetStream(string pipeName)
         {
-            ErrorUtilities.VerifyThrow(_namedPipeServerFactory != null, "Stream factory is not set");
+            ErrorUtilities.VerifyThrow(_streamFactory != null, "Stream factory is not set");
 
-            return _namedPipeServerFactory!(pipeName,
+            return _streamFactory!(pipeName,
                 null, // Use default size
                 null, // Use default size
                 NamedPipeServerStream.MaxAllowedServerInstances,

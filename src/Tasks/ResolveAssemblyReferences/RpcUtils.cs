@@ -2,18 +2,30 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.IO;
-
+using MessagePack;
 using Nerdbank.Streams;
 using StreamJsonRpc;
 
-#nullable enable
 namespace Microsoft.Build.Tasks.ResolveAssemblyReferences
 {
     internal static class RpcUtils
     {
+        private readonly static IFormatterResolver _resolver;
+        private readonly static MessagePackSerializerOptions _options;
+
+        static RpcUtils()
+        {
+            _resolver = ResolveAssemblyReferneceResolver.Instance;
+            _options = MessagePackSerializerOptions.Standard.WithResolver(_resolver);
+        }
+
         internal static IJsonRpcMessageHandler GetRarMessageHandler(Stream stream)
         {
-            return new LengthHeaderMessageHandler(stream.UsePipe(), new MessagePackFormatter());
+            MessagePackFormatter formatter = new MessagePackFormatter();
+
+            formatter.SetMessagePackSerializerOptions(_options);
+
+            return new LengthHeaderMessageHandler(stream.UsePipe(), formatter);
         }
     }
 }

@@ -2,7 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System;
-using System.IO.Pipes;
+using System.IO;
 using Microsoft.Build.Eventing;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Shared;
@@ -18,7 +18,7 @@ namespace Microsoft.Build.Tasks.ResolveAssemblyReferences.Client
         /// </summary>
         private const int DefaultConnectionTimeout = 300;
         private readonly IRarBuildEngine _rarBuildEngine;
-        private NamedPipeClientStream _clientStream;
+        private Stream _clientStream;
 
         public RarClient(IRarBuildEngine rarBuildEngine)
         {
@@ -33,9 +33,9 @@ namespace Microsoft.Build.Tasks.ResolveAssemblyReferences.Client
                 return true;
 
             string pipeName = _rarBuildEngine.GetRarPipeName();
-
+              
             MSBuildEventSource.Log.ResolveAssemblyReferenceNodeConnectStart();
-            NamedPipeClientStream stream = _rarBuildEngine.GetRarClientStream(pipeName, timeout);
+            Stream stream = _rarBuildEngine.GetRarClientStream(pipeName, timeout);
             MSBuildEventSource.Log.ResolveAssemblyReferenceNodeConnectStop();
 
             if (stream == null)
@@ -50,21 +50,27 @@ namespace Microsoft.Build.Tasks.ResolveAssemblyReferences.Client
             return _rarBuildEngine.CreateRarNode();
         }
 
-        internal object Execute()
+        internal ResolveAssemblyReferenceResult Execute(ResolveAssemblyReferenceRequest request)
         {
-            throw new NotImplementedException();
-            //using IResolveAssemblyReferenceTaskHandler client = GetRpcClient();
-
+            var client = GetRpcClient();
+            client.StartListening();
             // TODO: Find out if there is any possibility of awaiting it.
-            //return client.GetNumber(parameter).GetAwaiter().GetResult();
+            try
+            {
+                return client.InvokeAsync<ResolveAssemblyReferenceResult>(nameof(IResolveAssemblyReferenceTaskHandler.ExecuteAsync), request).GetAwaiter().GetResult();
+            }
+            catch (ConnectionLostException e)
+            {
+                throw new InternalErrorException("Request failed", e);
+            }
         }
 
-        private IResolveAssemblyReferenceTaskHandler GetRpcClient()
+        private JsonRpc GetRpcClient()
         {
             ErrorUtilities.VerifyThrowInternalErrorUnreachable(_clientStream != null);
 
             IJsonRpcMessageHandler handler = RpcUtils.GetRarMessageHandler(_clientStream);
-            return JsonRpc.Attach<IResolveAssemblyReferenceTaskHandler>(handler);
+            return new JsonRpc(handler);
         }
 
         public void Dispose()

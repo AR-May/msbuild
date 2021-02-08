@@ -2,11 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System;
-using System.CodeDom;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Pipes;
-using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -38,11 +36,12 @@ namespace Microsoft.Build.Execution
         public NodeEngineShutdownReason Run(bool nodeReuse, bool lowPriority, out Exception shutdownException, CancellationToken cancellationToken = default)
         {
             shutdownException = null;
-            using CancellationTokenSource cts = new CancellationTokenSource();
+            using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             string pipeName = CommunicationsUtilities.GetRarPipeName(nodeReuse, lowPriority);
             Handshake handshake = NodeProviderOutOfProc.GetHandshake(enableNodeReuse: nodeReuse,
                                                                      enableLowPriority: lowPriority, specialNode: true);
 
+            CommunicationsUtilities.Trace("RAR node name: {0}", pipeName);
             IRarController controller = GetController(pipeName, handshake);
 
             Task<int> rarTask = controller.StartAsync(cts.Token);
@@ -60,10 +59,9 @@ namespace Microsoft.Build.Execution
                 // - node lifetime expires
                 index = Task.WaitAny(new Task[] { msBuildShutdown, rarTask }, cts.Token);
             }
-            catch (OperationCanceledException e)
+            catch (OperationCanceledException)
             {
-                shutdownException = e;
-                return NodeEngineShutdownReason.Error;
+                return NodeEngineShutdownReason.BuildComplete;
             }
 
             cts.Cancel();
@@ -84,9 +82,10 @@ namespace Microsoft.Build.Execution
         {
             Type rarControllerType = Type.GetType(RarControllerName);
 
-            Func<string, int?, int?, int, bool, NamedPipeServerStream> streamFactory = NamedPipeUtil.CreateNamedPipeServer;
-            Func<Handshake, NamedPipeServerStream, int, bool> validateCallback = NamedPipeUtil.ValidateHandshake;
-            IRarController controller = Activator.CreateInstance(rarControllerType, pipeName, handshake, streamFactory, validateCallback, null) as IRarController;
+            Func<string, int?, int?, int, bool, Stream> streamFactory = NamedPipeUtil.CreateNamedPipeServer;
+            Func<NamedPipeServerStream, int, bool> validateCallback = (pipeStream, timeout) => NamedPipeUtil.ValidateHandshake(handshake, pipeStream, timeout);
+
+            IRarController controller = Activator.CreateInstance(rarControllerType, pipeName, streamFactory, validateCallback, null) as IRarController;
 
             ErrorUtilities.VerifyThrow(controller != null, ResourceUtilities.GetResourceString("RarControllerReflectionError"), RarControllerName);
             return controller;

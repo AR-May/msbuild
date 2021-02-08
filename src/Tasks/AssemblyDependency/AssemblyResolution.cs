@@ -117,6 +117,7 @@ namespace Microsoft.Build.Tasks
         /// <param name="getRuntimeVersion"></param>
         /// <param name="targetedRuntimeVersion"></param>
         /// <param name="getAssemblyPathInGac"></param>
+        /// <param name="getRootedPath"></param>
         /// <param name="log"></param>
         /// <returns></returns>
 #else
@@ -134,6 +135,7 @@ namespace Microsoft.Build.Tasks
         /// <param name="getRuntimeVersion"></param>
         /// <param name="targetedRuntimeVersion"></param>
         /// <param name="getAssemblyPathInGac"></param>
+        /// <param name="getRootedPath"></param>
         /// <param name="log"></param>
         /// <returns></returns>
 #endif
@@ -155,6 +157,7 @@ namespace Microsoft.Build.Tasks
             GetAssemblyRuntimeVersion getRuntimeVersion,
             Version targetedRuntimeVersion,
             GetAssemblyPathInGac getAssemblyPathInGac,
+            GetRootedPath getRootedPath,
             TaskLoggingHelper log
         )
         {
@@ -168,7 +171,7 @@ namespace Microsoft.Build.Tasks
                 // HintPath property.
                 if (String.Equals(basePath, AssemblyResolutionConstants.hintPathSentinel, StringComparison.OrdinalIgnoreCase))
                 {
-                    resolvers[p] = new HintPathResolver(searchPaths[p], getAssemblyName, fileExists, getRuntimeVersion, targetedRuntimeVersion);
+                    resolvers[p] = new HintPathResolver(searchPaths[p], getAssemblyName, fileExists, getRuntimeVersion, getRootedPath, targetedRuntimeVersion);
                 }
                 else if (String.Equals(basePath, AssemblyResolutionConstants.frameworkPathSentinel, StringComparison.OrdinalIgnoreCase))
                 {
@@ -220,6 +223,7 @@ namespace Microsoft.Build.Tasks
             FileExists fileExists,
             GetAssemblyName getAssemblyName,
             GetAssemblyRuntimeVersion getRuntimeVersion,
+            GetRootedPath getRootedPath,
             Version targetedRuntimeVersion
         )
         {

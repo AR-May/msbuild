@@ -435,6 +435,18 @@ namespace Microsoft.Build.Eventing
         {
             WriteEvent(57);
         }
+
+        [Event(58)]
+        internal void ResolveAssemblyReferenceServiceRequestStart()
+        {
+            WriteEvent(58);
+        }
+
+        [Event(59)]
+        internal void ResolveAssemblyReferenceServiceRequestStop()
+        {
+            WriteEvent(59);
+        }
         #endregion
     }
 }

@@ -17,6 +17,7 @@ using Microsoft.Build.Framework;
 using Microsoft.Build.Shared;
 using Microsoft.Build.Tasks.AssemblyDependency;
 using Microsoft.Build.Tasks.ResolveAssemblyReferences.Client;
+using Microsoft.Build.Tasks.ResolveAssemblyReferences.Contract;
 using Microsoft.Build.Utilities;
 
 using FrameworkNameVersioning = System.Runtime.Versioning.FrameworkName;
@@ -933,6 +934,133 @@ namespace Microsoft.Build.Tasks
         /// </summary>
         [Output]
         public ITaskItem[] UnresolvedAssemblyConflicts => _unresolvedConflicts.ToArray();
+
+        internal ResolveAssemblyReferenceRequest ResolveAssemblyReferenceInput
+        {
+            get => new ResolveAssemblyReferenceRequest
+            {
+                AllowedAssemblyExtensions = AllowedAssemblyExtensions,
+                AllowedRelatedFileExtensions = AllowedRelatedFileExtensions,
+                AppConfigFile = AppConfigFile,
+                Assemblies = Assemblies,
+                AssemblyFiles = AssemblyFiles,
+                AutoUnify = AutoUnify,
+                CandidateAssemblyFiles = CandidateAssemblyFiles,
+                CopyLocalDependenciesWhenParentReferenceInGac = CopyLocalDependenciesWhenParentReferenceInGac,
+                DoNotCopyLocalIfInGac = DoNotCopyLocalIfInGac,
+                FindDependencies = FindDependencies,
+                FindDependenciesOfExternallyResolvedReferences = FindDependenciesOfExternallyResolvedReferences,
+                FindRelatedFiles = FindRelatedFiles,
+                FindSatellites = FindSatellites,
+                FindSerializationAssemblies = FindSerializationAssemblies,
+                FullFrameworkAssemblyTables = FullFrameworkAssemblyTables,
+                FullFrameworkFolders = FullFrameworkFolders,
+                FullTargetFrameworkSubsetNames = FullTargetFrameworkSubsetNames,
+                IgnoreDefaultInstalledAssemblySubsetTables = IgnoreDefaultInstalledAssemblySubsetTables,
+                IgnoreDefaultInstalledAssemblyTables = IgnoreDefaultInstalledAssemblyTables,
+                IgnoreTargetFrameworkAttributeVersionMismatch = IgnoreTargetFrameworkAttributeVersionMismatch,
+                IgnoreVersionForFrameworkReferences = IgnoreVersionForFrameworkReferences,
+                InstalledAssemblySubsetTables = InstalledAssemblySubsetTables,
+                InstalledAssemblyTables = InstalledAssemblyTables,
+                LatestTargetFrameworkDirectories = LatestTargetFrameworkDirectories,
+                ProfileName = ProfileName,
+                ResolvedSDKReferences = ResolvedSDKReferences,
+                SearchPaths = SearchPaths,
+                Silent = Silent,
+                StateFile = StateFile,
+                SupportsBindingRedirectGeneration = SupportsBindingRedirectGeneration,
+                TargetedRuntimeVersion = TargetedRuntimeVersion,
+                TargetFrameworkDirectories = TargetFrameworkDirectories,
+                TargetFrameworkMoniker = TargetFrameworkMoniker,
+                TargetFrameworkMonikerDisplayName = TargetFrameworkMonikerDisplayName,
+                TargetFrameworkSubsets = TargetFrameworkSubsets,
+                TargetFrameworkVersion = TargetFrameworkVersion,
+                TargetProcessorArchitecture = TargetProcessorArchitecture,
+                UnresolveFrameworkAssembliesFromHigherFrameworks = UnresolveFrameworkAssembliesFromHigherFrameworks,
+                UseResolveAssemblyReferenceService = UseResolveAssemblyReferenceService,
+                WarnOrErrorOnTargetArchitectureMismatch = WarnOrErrorOnTargetArchitectureMismatch,
+                AssemblyInformationCacheOutputPath = AssemblyInformationCacheOutputPath,
+                AssemblyInformationCachePaths = AssemblyInformationCachePaths,
+                CurrentPath = Directory.GetCurrentDirectory()
+            };
+            set
+            {
+                AllowedAssemblyExtensions = value.AllowedAssemblyExtensions;
+                AllowedRelatedFileExtensions = value.AllowedRelatedFileExtensions;
+                AppConfigFile = value.AppConfigFile;
+                Assemblies = value.Assemblies;
+                AssemblyFiles = value.AssemblyFiles;
+                AutoUnify = value.AutoUnify;
+                CandidateAssemblyFiles = value.CandidateAssemblyFiles;
+                CopyLocalDependenciesWhenParentReferenceInGac = value.CopyLocalDependenciesWhenParentReferenceInGac;
+                DoNotCopyLocalIfInGac = value.DoNotCopyLocalIfInGac;
+                FindDependencies = value.FindDependencies;
+                FindDependenciesOfExternallyResolvedReferences = value.FindDependenciesOfExternallyResolvedReferences;
+                FindRelatedFiles = value.FindRelatedFiles;
+                FindSatellites = value.FindSatellites;
+                FindSerializationAssemblies = value.FindSerializationAssemblies;
+                FullFrameworkAssemblyTables = value.FullFrameworkAssemblyTables;
+                FullFrameworkFolders = value.FullFrameworkFolders;
+                FullTargetFrameworkSubsetNames = value.FullTargetFrameworkSubsetNames;
+                IgnoreDefaultInstalledAssemblySubsetTables = value.IgnoreDefaultInstalledAssemblySubsetTables;
+                IgnoreDefaultInstalledAssemblyTables = value.IgnoreDefaultInstalledAssemblyTables;
+                IgnoreTargetFrameworkAttributeVersionMismatch = value.IgnoreTargetFrameworkAttributeVersionMismatch;
+                IgnoreVersionForFrameworkReferences = value.IgnoreVersionForFrameworkReferences;
+                InstalledAssemblySubsetTables = value.InstalledAssemblySubsetTables;
+                InstalledAssemblyTables = value.InstalledAssemblyTables;
+                LatestTargetFrameworkDirectories = value.LatestTargetFrameworkDirectories;
+                ProfileName = value.ProfileName;
+                ResolvedSDKReferences = value.ResolvedSDKReferences;
+                SearchPaths = value.SearchPaths;
+                Silent = value.Silent;
+                StateFile = value.StateFile;
+                SupportsBindingRedirectGeneration = value.SupportsBindingRedirectGeneration;
+                TargetedRuntimeVersion = value.TargetedRuntimeVersion;
+                TargetFrameworkDirectories = value.TargetFrameworkDirectories;
+                TargetFrameworkMoniker = value.TargetFrameworkMoniker;
+                TargetFrameworkMonikerDisplayName = value.TargetFrameworkMonikerDisplayName;
+                TargetFrameworkSubsets = value.TargetFrameworkSubsets;
+                TargetFrameworkVersion = value.TargetFrameworkVersion;
+                TargetProcessorArchitecture = value.TargetProcessorArchitecture;
+                UnresolveFrameworkAssembliesFromHigherFrameworks = value.UnresolveFrameworkAssembliesFromHigherFrameworks;
+                UseResolveAssemblyReferenceService = value.UseResolveAssemblyReferenceService;
+                WarnOrErrorOnTargetArchitectureMismatch = value.WarnOrErrorOnTargetArchitectureMismatch;
+                AssemblyInformationCacheOutputPath = value.AssemblyInformationCacheOutputPath;
+                AssemblyInformationCachePaths = value.AssemblyInformationCachePaths;
+            }
+        }
+
+        internal ResolveAssemblyReferenceResponse ResolveAssemblyReferenceOutput
+        {
+            get => new ResolveAssemblyReferenceResponse
+            {
+                CopyLocalFiles = CopyLocalFiles,
+                DependsOnNETStandard = DependsOnNETStandard,
+                DependsOnSystemRuntime = DependsOnSystemRuntime,
+                FilesWritten = FilesWritten,
+                RelatedFiles = RelatedFiles,
+                ResolvedDependencyFiles = ResolvedDependencyFiles,
+                ResolvedFiles = ResolvedFiles,
+                SatelliteFiles = SatelliteFiles,
+                ScatterFiles = ScatterFiles,
+                SerializationAssemblyFiles = SerializationAssemblyFiles,
+                SuggestedRedirects = SuggestedRedirects,
+            };
+            set
+            {
+                _copyLocalFiles = value.CopyLocalFiles;
+                DependsOnNETStandard = value.DependsOnNETStandard;
+                DependsOnSystemRuntime = value.DependsOnSystemRuntime;
+                _filesWritten = new List<ITaskItem>(value.FilesWritten);
+                _relatedFiles = value.RelatedFiles;
+                _resolvedDependencyFiles =  value.ResolvedDependencyFiles;
+                _resolvedFiles =  value.ResolvedFiles;
+                _satelliteFiles =  value.SatelliteFiles;
+                _scatterFiles =  value.ScatterFiles;
+                _serializationAssemblyFiles =  value.SerializationAssemblyFiles;
+                _suggestedRedirects =  value.SuggestedRedirects;
+            }
+        }
 
         #endregion
         #region Logging
@@ -1950,6 +2078,7 @@ namespace Microsoft.Build.Tasks
         /// <param name="getAssemblyPathInGac">Delegate to get assembly path in the GAC.</param>
         /// <param name="isWinMDFile">Delegate used for checking whether it is a WinMD file.</param>
         /// <param name="readMachineTypeFromPEHeader">Delegate use to read machine type from PE Header</param>
+        /// <param name="getRootedPath">Delegate which converts relative path to absolute one</param>
         /// <returns>True if there was success.</returns>
 #else
         /// <summary>
@@ -1965,6 +2094,7 @@ namespace Microsoft.Build.Tasks
         /// <param name="getAssemblyPathInGac">Delegate to get assembly path in the GAC.</param>
         /// <param name="isWinMDFile">Delegate used for checking whether it is a WinMD file.</param>
         /// <param name="readMachineTypeFromPEHeader">Delegate use to read machine type from PE Header</param>
+        /// <param name="getRootedPath"></param>
         /// <returns>True if there was success.</returns>
 #endif
         internal bool Execute
@@ -1985,9 +2115,13 @@ namespace Microsoft.Build.Tasks
 #endif
             GetAssemblyPathInGac getAssemblyPathInGac,
             IsWinMDFile isWinMDFile,
-            ReadMachineTypeFromPEHeader readMachineTypeFromPEHeader
+            ReadMachineTypeFromPEHeader readMachineTypeFromPEHeader,
+            GetRootedPath getRootedPath = null
         )
         {
+            // Make this default option
+            getRootedPath ??= FileUtilities.NormalizePath;
+
             bool success = true;
             MSBuildEventSource.Log.RarOverallStart();
             {
@@ -2204,6 +2338,7 @@ namespace Microsoft.Build.Tasks
                         openBaseKey,
 #endif
                         getRuntimeVersion,
+                        getRootedPath,
                         targetedRuntimeVersion,
                         _projectTargetFramework,
                         frameworkMoniker,
@@ -3051,7 +3186,12 @@ namespace Microsoft.Build.Tasks
                 if (connected)
                 {
                     // Client is connected to the RAR node, we can execute RAR task remotely
-                    // return client.Execute(); // TODO: Let it do something.
+                    MSBuildEventSource.Log.ResolveAssemblyReferenceServiceRequestStart();
+                    ResolveAssemblyReferenceResult result = client.Execute(ResolveAssemblyReferenceInput);
+                    MSBuildEventSource.Log.ResolveAssemblyReferenceServiceRequestStop();
+                    ResolveAssemblyReferenceOutput = result.Response;
+                    LogEvents(result.BuildEvents);
+                    return result.TaskResult;
                 }
             }
 
@@ -3077,6 +3217,74 @@ namespace Microsoft.Build.Tasks
             );
         }
 
+        private void LogEvents(IEnumerable<BuildEventArgs> buildEventArgs)
+        {
+            if (buildEventArgs == null)
+            {
+                return;
+            }
+
+            foreach (LazyFormattedBuildEventArgs buildEvent in buildEventArgs)
+            {
+                switch (buildEvent)
+                {
+                    case CustomBuildEventArgs customBuildEvent:
+                        BuildEngine.LogCustomEvent(customBuildEvent);
+                        break;
+                    case BuildErrorEventArgs buildErrorEvent:
+                        BuildEngine.LogErrorEvent(buildErrorEvent);
+                        break;
+                    case BuildMessageEventArgs buildMessageEvent:
+                        BuildEngine.LogMessageEvent(buildMessageEvent);
+                        break;
+                    case BuildWarningEventArgs buildWarningEvent:
+                        BuildEngine.LogWarningEvent(buildWarningEvent);
+                        break;
+                    default:
+                        ErrorUtilities.ThrowInternalError("Unexpected build event"); 
+                        break;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Execute task. This method is intended to be used from a RAR as a Service node.
+        /// </summary>
+        /// <param name="input">Required input to the task</param>
+        /// <returns>If task was executed successfully</returns>
+        internal ResolveAssemblyReferenceResult Execute(ResolveAssemblyReferenceRequest input)
+        {
+            ErrorUtilities.VerifyThrowArgumentNull(input, nameof(input));
+
+            // Prepare environment
+            ResolveAssemblyReferenceInput = input;
+            // Since this method should be run from RAR node, we prevent it from creating loop.
+            UseResolveAssemblyReferenceService = false;
+
+            bool result = Execute
+            (
+                new FileExists(p => FileUtilities.FileExistsNoThrow(p)),
+                new DirectoryExists(p => FileUtilities.DirectoryExistsNoThrow(p)),
+                new GetDirectories(Directory.GetDirectories),
+                new GetAssemblyName(AssemblyNameExtension.GetAssemblyNameEx),
+                new GetAssemblyMetadata(AssemblyInformation.GetAssemblyMetadata),
+#if FEATURE_WIN32_REGISTRY
+                new GetRegistrySubKeyNames(RegistryHelper.GetSubKeyNames),
+                new GetRegistrySubKeyDefaultValue(RegistryHelper.GetDefaultValue),
+#endif
+                new GetLastWriteTime(NativeMethodsShared.GetLastWriteFileUtcTime),
+                new GetAssemblyRuntimeVersion(AssemblyInformation.GetRuntimeVersion),
+#if FEATURE_WIN32_REGISTRY
+                new OpenBaseKey(RegistryHelper.OpenBaseKey),
+#endif
+                new GetAssemblyPathInGac(GetAssemblyPathInGac),
+                new IsWinMDFile(AssemblyInformation.IsWinMDFile),
+                new ReadMachineTypeFromPEHeader(ReferenceTable.ReadMachineTypeFromPEHeader),
+                path => FileUtilities.NormalizePath(Path.IsPathRooted(path) ? string.Empty : input.CurrentPath, path)
+            );
+
+            return new ResolveAssemblyReferenceResult(result, ResolveAssemblyReferenceOutput);
+        }
         #endregion
     }
 }
