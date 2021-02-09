@@ -177,6 +177,11 @@ namespace Microsoft.Build.BackEnd
         /// Message sent from back to a node when an SDK has been resolved.
         /// </summary>
         ResolveSdkResponse,
+
+        /// <summary>
+        /// Message sent to a RAR node.
+        /// </summary>
+        ResolveAssemblyReferenceRequest,
     }
     #endregion
 

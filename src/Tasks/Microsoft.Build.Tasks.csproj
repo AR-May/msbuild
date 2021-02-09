@@ -208,6 +208,18 @@
     <Compile Include="..\Shared\CommunicationsUtilities.cs">
       <ExcludeFromStyleCop>true</ExcludeFromStyleCop>
     </Compile>
+    <Compile Include="..\Shared\INodePacket.cs">
+      <ExcludeFromStyleCop>true</ExcludeFromStyleCop>
+    </Compile>
+    <Compile Include="..\Shared\ITranslator.cs">
+      <ExcludeFromStyleCop>true</ExcludeFromStyleCop>
+    </Compile>
+    <Compile Include="..\Shared\ITranslatable.cs">
+      <ExcludeFromStyleCop>true</ExcludeFromStyleCop>
+    </Compile>
+    <Compile Include="..\Shared\TaskParameter.cs">
+      <ExcludeFromStyleCop>true</ExcludeFromStyleCop>
+    </Compile>
     <Compile Include="..\Shared\XMakeAttributes.cs">
       <ExcludeFromStyleCop>true</ExcludeFromStyleCop>
     </Compile>

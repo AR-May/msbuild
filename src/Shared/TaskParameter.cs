@@ -168,7 +168,7 @@ namespace Microsoft.Build.BackEnd
         /// <summary>
         /// Constructor for deserialization
         /// </summary>
-        private TaskParameter()
+        public TaskParameter()
         {
         }
 
