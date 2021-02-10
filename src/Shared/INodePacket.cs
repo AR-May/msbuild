@@ -182,6 +182,11 @@ namespace Microsoft.Build.BackEnd
         /// Message sent to a RAR node.
         /// </summary>
         ResolveAssemblyReferenceRequest,
+
+        /// <summary>
+        /// Message sent from a RAR node.
+        /// </summary>
+        ResolveAssemblyReferenceResponse,
     }
     #endregion
 
