@@ -199,6 +199,96 @@ namespace Microsoft.Build.Tasks.ResolveAssemblyReferences.Contract
             Translate(translator);
         }
 
+        public ResolveAssemblyReferenceRequest(
+            string[] allowedAssemblyExtensions,
+            string[] allowedRelatedFileExtensions,
+            string appConfigFile,
+            TaskParameter assemblies,
+            TaskParameter assemblyFiles,
+            bool autoUnify,
+            string[] candidateAssemblyFiles,
+            bool copyLocalDependenciesWhenParentReferenceInGac,
+            bool doNotCopyLocalIfInGac,
+            bool findDependencies,
+            bool findDependenciesOfExternallyResolvedReferences,
+            bool findRelatedFiles,
+            bool findSatellites,
+            bool findSerializationAssemblies,
+            TaskParameter fullFrameworkAssemblyTables,
+            string[] fullFrameworkFolders,
+            string[] fullTargetFrameworkSubsetNames,
+            bool ignoreDefaultInstalledAssemblySubsetTables,
+            bool ignoreDefaultInstalledAssemblyTables,
+            bool ignoreTargetFrameworkAttributeVersionMismatch,
+            bool ignoreVersionForFrameworkReferences,
+            TaskParameter installedAssemblySubsetTables,
+            TaskParameter installedAssemblyTables,
+            string[] latestTargetFrameworkDirectories,
+            string profileName,
+            TaskParameter resolvedSDKReferences,
+            string[] searchPaths,
+            bool silent,
+            string stateFile,
+            bool supportsBindingRedirectGeneration,
+            string targetedRuntimeVersion,
+            string[] targetFrameworkDirectories,
+            string targetFrameworkMoniker, string
+            targetFrameworkMonikerDisplayName,
+            string[] targetFrameworkSubsets,
+            string targetFrameworkVersion,
+            string targetProcessorArchitecture,
+            bool unresolveFrameworkAssembliesFromHigherFrameworks,
+            bool useResolveAssemblyReferenceService,
+            string warnOrErrorOnTargetArchitectureMismatch,
+            string currentPath,
+            string assemblyInformationCacheOutputPath,
+            TaskParameter assemblyInformationCachePaths)
+        {
+            _allowedAssemblyExtensions = allowedAssemblyExtensions;
+            _allowedRelatedFileExtensions = allowedRelatedFileExtensions;
+            _appConfigFile = appConfigFile;
+            _assemblies = assemblies;
+            _assemblyFiles = assemblyFiles;
+            _autoUnify = autoUnify;
+            _candidateAssemblyFiles = candidateAssemblyFiles;
+            _copyLocalDependenciesWhenParentReferenceInGac = copyLocalDependenciesWhenParentReferenceInGac;
+            _doNotCopyLocalIfInGac = doNotCopyLocalIfInGac;
+            _findDependencies = findDependencies;
+            _findDependenciesOfExternallyResolvedReferences = findDependenciesOfExternallyResolvedReferences;
+            _findRelatedFiles = findRelatedFiles;
+            _findSatellites = findSatellites;
+            _findSerializationAssemblies = findSerializationAssemblies;
+            _fullFrameworkAssemblyTables = fullFrameworkAssemblyTables;
+            _fullFrameworkFolders = fullFrameworkFolders;
+            _fullTargetFrameworkSubsetNames = fullTargetFrameworkSubsetNames;
+            _ignoreDefaultInstalledAssemblySubsetTables = ignoreDefaultInstalledAssemblySubsetTables;
+            _ignoreDefaultInstalledAssemblyTables = ignoreDefaultInstalledAssemblyTables;
+            _ignoreTargetFrameworkAttributeVersionMismatch = ignoreTargetFrameworkAttributeVersionMismatch;
+            _ignoreVersionForFrameworkReferences = ignoreVersionForFrameworkReferences;
+            _installedAssemblySubsetTables = installedAssemblySubsetTables;
+            _installedAssemblyTables = installedAssemblyTables;
+            _latestTargetFrameworkDirectories = latestTargetFrameworkDirectories;
+            _profileName = profileName;
+            _resolvedSDKReferences = resolvedSDKReferences;
+            _searchPaths = searchPaths;
+            _silent = silent;
+            _stateFile = stateFile;
+            _supportsBindingRedirectGeneration = supportsBindingRedirectGeneration;
+            _targetedRuntimeVersion = targetedRuntimeVersion;
+            _targetFrameworkDirectories = targetFrameworkDirectories;
+            _targetFrameworkMoniker = targetFrameworkMoniker;
+            _targetFrameworkMonikerDisplayName = targetFrameworkMonikerDisplayName;
+            _targetFrameworkSubsets = targetFrameworkSubsets;
+            _targetFrameworkVersion = targetFrameworkVersion;
+            _targetProcessorArchitecture = targetProcessorArchitecture;
+            _unresolveFrameworkAssembliesFromHigherFrameworks = unresolveFrameworkAssembliesFromHigherFrameworks;
+            _useResolveAssemblyReferenceService = useResolveAssemblyReferenceService;
+            _warnOrErrorOnTargetArchitectureMismatch = warnOrErrorOnTargetArchitectureMismatch;
+            _currentPath = currentPath;
+            _assemblyInformationCacheOutputPath = assemblyInformationCacheOutputPath;
+            _assemblyInformationCachePaths = assemblyInformationCachePaths;
+        }
+
 
         #region INodePacket Members
 

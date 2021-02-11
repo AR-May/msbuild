@@ -10,9 +10,9 @@ namespace Microsoft.Build.Tasks.ResolveAssemblyReferences.Contract
     {
         private TaskParameter _copyLocalFiles;
 
-        public string _dependsOnNETStandard;
+        private string _dependsOnNETStandard;
 
-        public string _dependsOnSystemRuntime;
+        private string _dependsOnSystemRuntime;
 
         private TaskParameter _filesWritten;
 
@@ -64,6 +64,32 @@ namespace Microsoft.Build.Tasks.ResolveAssemblyReferences.Contract
         private ResolveAssemblyReferenceResponse(ITranslator translator)
         {
             Translate(translator);
+        }
+
+        public ResolveAssemblyReferenceResponse(
+            TaskParameter copyLocalFiles,
+            string dependsOnNETStandard,
+            string dependsOnSystemRuntime,
+            TaskParameter filesWritten,
+            TaskParameter relatedFiles,
+            TaskParameter resolvedDependencyFiles,
+            TaskParameter resolvedFiles,
+            TaskParameter satelliteFiles,
+            TaskParameter scatterFiles,
+            TaskParameter serializationAssemblyFiles,
+            TaskParameter suggestedRedirects)
+        {
+            _copyLocalFiles = copyLocalFiles;
+            _dependsOnNETStandard = dependsOnNETStandard;
+            _dependsOnSystemRuntime = dependsOnSystemRuntime;
+            _filesWritten = filesWritten;
+            _relatedFiles = relatedFiles;
+            _resolvedDependencyFiles = resolvedDependencyFiles;
+            _resolvedFiles = resolvedFiles;
+            _satelliteFiles = satelliteFiles;
+            _scatterFiles = scatterFiles;
+            _serializationAssemblyFiles = serializationAssemblyFiles;
+            _suggestedRedirects = suggestedRedirects;
         }
 
         #region INodePacket Members

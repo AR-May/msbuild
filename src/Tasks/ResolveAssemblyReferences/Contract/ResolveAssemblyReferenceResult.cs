@@ -43,6 +43,16 @@ namespace Microsoft.Build.Tasks.ResolveAssemblyReferences.Contract
             Translate(translator);
         }
 
+        public ResolveAssemblyReferenceResult(
+            bool taskResult,
+            ResolveAssemblyReferenceResponse response,
+            List<BuildEventArgs> buildEvents)
+        {
+            _taskResult = taskResult;
+            _response = response;
+            _buildEvents = buildEvents;
+        }
+
         #region INodePacket Members
 
         public void Translate(ITranslator translator)
