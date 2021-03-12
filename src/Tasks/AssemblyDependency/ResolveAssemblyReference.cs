@@ -10,6 +10,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Threading;
 using System.Xml.Linq;
 
 using Microsoft.Build.Eventing;
@@ -1982,7 +1983,21 @@ namespace Microsoft.Build.Tasks
             ReadMachineTypeFromPEHeader readMachineTypeFromPEHeader
         )
         {
-            bool success = true;
+            bool success = false;
+            Mutex mutex = new Mutex(false, "MSBUILD-RAR-mutex");
+            try
+            {
+                // acquire the mutex
+                mutex.WaitOne();
+            }
+            catch
+            {
+                return false;
+            }
+            success = true;
+            mutex.ReleaseMutex();
+
+
             MSBuildEventSource.Log.RarOverallStart();
             {
                 try
@@ -2269,7 +2284,7 @@ namespace Microsoft.Build.Tasks
                     IReadOnlyCollection<DependentAssembly> allRemappedAssemblies = CombineRemappedAssemblies(appConfigRemappedAssemblies, autoUnifiedRemappedAssemblies);
                     List<DependentAssembly> idealAssemblyRemappings = autoUnifiedRemappedAssemblies;
                     List<AssemblyNameReference> idealAssemblyRemappingsIdentities = autoUnifiedRemappedAssemblyReferences;
-                    bool shouldRerunClosure = autoUnifiedRemappedAssemblies?.Count > 0  || excludedReferencesExist;
+                    bool shouldRerunClosure = autoUnifiedRemappedAssemblies?.Count > 0 || excludedReferencesExist;
 
                     if (!AutoUnify || !FindDependencies || shouldRerunClosure)
                     {
