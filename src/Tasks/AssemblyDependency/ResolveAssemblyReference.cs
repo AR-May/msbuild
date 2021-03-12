@@ -10,6 +10,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Threading;
 using System.Xml.Linq;
 
 using Microsoft.Build.Eventing;
@@ -1982,6 +1983,17 @@ namespace Microsoft.Build.Tasks
             ReadMachineTypeFromPEHeader readMachineTypeFromPEHeader
         )
         {
+            Mutex mutex = new Mutex(false, "MSBUILD-RAR-mutex");
+            try
+            {
+                // acquire the mutex
+                mutex.WaitOne();
+            }
+            catch
+            {
+                return false;
+            }
+
             bool success = true;
             MSBuildEventSource.Log.RarOverallStart();
             {
@@ -1998,6 +2010,7 @@ namespace Microsoft.Build.Tasks
                         {
                             // The exception doesn't contain the bad value, so log it ourselves
                             Log.LogErrorWithCodeFromResources("ResolveAssemblyReference.InvalidParameter", "TargetFrameworkMoniker", _targetedFrameworkMoniker, String.Empty);
+                            mutex.ReleaseMutex();
                             return false;
                         }
                     }
@@ -2009,6 +2022,7 @@ namespace Microsoft.Build.Tasks
 
                     if (!VerifyInputConditions())
                     {
+                        mutex.ReleaseMutex();
                         return false;
                     }
 
@@ -2160,6 +2174,7 @@ namespace Microsoft.Build.Tasks
                         catch (AppConfigException e)
                         {
                             Log.LogErrorWithCodeFromResources(null, e.FileName, e.Line, e.Column, 0, 0, "ResolveAssemblyReference.InvalidAppConfig", AppConfigFile, e.Message);
+                            mutex.ReleaseMutex();
                             return false;
                         }
                     }
@@ -2249,6 +2264,7 @@ namespace Microsoft.Build.Tasks
                         catch (InvalidOperationException e)
                         {
                             Log.LogErrorWithCodeFromResources("ResolveAssemblyReference.ProblemDeterminingFrameworkMembership", e.Message);
+                            mutex.ReleaseMutex();
                             return false;
                         }
 
@@ -2287,6 +2303,7 @@ namespace Microsoft.Build.Tasks
                         catch (InvalidOperationException e)
                         {
                             Log.LogErrorWithCodeFromResources("ResolveAssemblyReference.ProblemDeterminingFrameworkMembership", e.Message);
+                            mutex.ReleaseMutex();
                             return false;
                         }
 
@@ -2454,6 +2471,7 @@ namespace Microsoft.Build.Tasks
                         }
                     }
                     MSBuildEventSource.Log.RarOverallStop();
+                    mutex.ReleaseMutex();
                     return success && !Log.HasLoggedErrors;
                 }
                 catch (ArgumentException e)
@@ -2472,6 +2490,7 @@ namespace Microsoft.Build.Tasks
 
             MSBuildEventSource.Log.RarOverallStop();
 
+            mutex.ReleaseMutex();
             return success && !Log.HasLoggedErrors;
         }
 
