@@ -1,6 +1,8 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System;
+
 namespace Microsoft.Build.Tasks
 {
     /// <summary>
@@ -48,5 +50,48 @@ namespace Microsoft.Build.Tasks
         /// Special AssemblyFoldersFromConfig indicator.  May be passed in where SearchPaths are taken. 
         /// </summary>
         public const string assemblyFoldersFromConfigSentinel = "{assemblyfoldersfromconfig:";
+
+        public static bool IsAssemblyResolutionConstant(string searchPath)
+        {
+            if (String.Equals(searchPath, AssemblyResolutionConstants.hintPathSentinel, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+            else if (String.Equals(searchPath, AssemblyResolutionConstants.frameworkPathSentinel, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+            else if (String.Equals(searchPath, AssemblyResolutionConstants.rawFileNameSentinel, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+            else if (String.Equals(searchPath, AssemblyResolutionConstants.candidateAssemblyFilesSentinel, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+            // TODO: not sure about that "#if FEATURE_GAC", do we need it?
+#if FEATURE_GAC
+            else if (String.Equals(searchPath, AssemblyResolutionConstants.gacSentinel, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+#endif
+            else if (String.Equals(searchPath, AssemblyResolutionConstants.assemblyFoldersSentinel, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+#if FEATURE_WIN32_REGISTRY
+            // Check for AssemblyFoldersEx sentinel.
+            else if (0 == String.Compare(searchPath, 0, AssemblyResolutionConstants.assemblyFoldersExSentinel, 0, AssemblyResolutionConstants.assemblyFoldersExSentinel.Length, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+#endif
+            else if (0 == String.Compare(searchPath, 0, AssemblyResolutionConstants.assemblyFoldersFromConfigSentinel, 0, AssemblyResolutionConstants.assemblyFoldersFromConfigSentinel.Length, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+            return false;
+        }
     }
 }
