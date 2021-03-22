@@ -886,6 +886,9 @@ namespace Microsoft.Build.Tasks
             get { return _suggestedRedirects; }
         }
 
+
+        //TODO : move the below from here to all private filds location.
+
         /// <summary>
         /// Storage for names of all files writen to disk.
         /// </summary>
@@ -1993,6 +1996,11 @@ namespace Microsoft.Build.Tasks
             {
                 try
                 {
+                    if (_concurrencyExecutionContext != null)
+                    {
+                        ApplyExecutionContext();
+                    }
+
                     FrameworkNameVersioning frameworkMoniker = null;
                     if (!String.IsNullOrEmpty(_targetedFrameworkMoniker))
                     {
@@ -3052,5 +3060,85 @@ namespace Microsoft.Build.Tasks
         {
             _concurrencyExecutionContext = executionContext;
         }
+
+        void ApplyExecutionContext(ref string path)
+        {
+            path = String.IsNullOrEmpty(path) ? path : Path.Combine(_concurrencyExecutionContext.StartupDirectory, path);
+        }
+
+        void ApplyExecutionContextToItemSpecProperty(ITaskItem[] array)
+        {
+            for (int i = 0; i < array.Length; i++)
+            {
+                ApplyExecutionContext(ref array[i].ItemSpec);
+                //array[i].ItemSpec = String.IsNullOrEmpty(array[i].ItemSpec) ? array[i].ItemSpec : Path.Combine(_concurrencyExecutionContext.StartupDirectory, array[i].ItemSpec);
+            }
+        }
+
+        void ApplyExecutionContextToInputs()
+        {
+            // Absolutize paths for all inputs
+            if (!String.IsNullOrEmpty(_concurrencyExecutionContext.StartupDirectory))
+            {
+                //private ITaskItem[] _installedAssemblyTables = Array.Empty<TaskItem>(); -- check
+                ApplyExecutionContextToItemSpecProperty(_installedAssemblyTables);
+
+                //private ITaskItem[] _installedAssemblySubsetTables = Array.Empty<TaskItem>(); -- check
+                ApplyExecutionContextToItemSpecProperty(_installedAssemblySubsetTables);
+
+                //private ITaskItem[] _fullFrameworkAssemblyTables = Array.Empty<TaskItem>(); --check
+                ApplyExecutionContextToItemSpecProperty(_fullFrameworkAssemblyTables);
+
+                //private ITaskItem[] _resolvedSDKReferences = Array.Empty<TaskItem>(); --check
+                ApplyExecutionContextToItemSpecProperty(_resolvedSDKReferences);
+                
+                //private string[] _candidateAssemblyFiles = Array.Empty<string>(); --todo, i see local files in the project directory there
+                for (int i = 0; i < _candidateAssemblyFiles.Length; i++)
+                {
+                    ApplyExecutionContext(ref _candidateAssemblyFiles[i]);
+                }
+
+                //private string[] _targetFrameworkDirectories = Array.Empty<string>(); --check ? nothing says it could not be relative
+                for (int i = 0; i < _targetFrameworkDirectories.Length; i++)
+                {
+                    ApplyExecutionContext(ref _targetFrameworkDirectories[i]);
+                }
+
+                //private string[] _searchPaths = Array.Empty<string>(); -- done
+                for (int i = 0; i < _searchPaths.Length; i++)
+                {
+                    if (AssemblyResolutionConstants.IsAssemblyResolutionConstant(_searchPaths[i]))
+                    {
+                        ApplyExecutionContext(ref _searchPaths[i]);
+                    }
+                }
+
+                //private string _appConfigFile = null; --check ? nothing says it could not be relative
+                ApplyExecutionContext(ref _appConfigFile);
+                
+                //private string[] _targetFrameworkSubsets = Array.Empty<string>(); -- no? that's names from target framework directory?
+                //private string[] _fullTargetFrameworkSubsetNames = Array.Empty<string>(); -- no? that's names from target framework directory?
+
+
+                //private string _stateFile = null; -- done
+                ApplyExecutionContext(ref _stateFile);
+
+                //private string[] _fullFrameworkFolders = Array.Empty<string>(); -- in unit tests I saw relative paths
+                for (int i = 0; i < _fullFrameworkFolders.Length; i++)
+                {
+                    ApplyExecutionContext(ref _fullFrameworkFolders[i]);
+                }
+
+                //private string[] _latestTargetFrameworkDirectories = Array.Empty<string>(); -- nothing says it could not be relative
+                for (int i = 0; i < _latestTargetFrameworkDirectories.Length; i++)
+                {
+                    ApplyExecutionContext(ref _latestTargetFrameworkDirectories[i]);
+                }
+
+                //private Dictionary<string, MessageImportance> _showAssemblyFoldersExLocations = new Dictionary<string, MessageImportance>(StringComparer.OrdinalIgnoreCase); -- no, only full path added to the dictoinary
+
+            }
+        }
+         
     }
 }
