@@ -242,6 +242,8 @@ namespace Microsoft.Build.Tasks
         ///
         ///     System, Version=2.0.3500.0, Culture=neutral, PublicKeyToken=b77a5c561934e089
         ///
+        /// or (full ? TODO - check) path to the assembly.
+        ///
         /// These names will be resolved into full paths and all dependencies will be found.
         ///
         /// Optional attributes are:
@@ -2933,7 +2935,7 @@ namespace Microsoft.Build.Tasks
         private void FilterBySubtypeAndTargetFramework()
         {
             var assembliesLeft = new List<ITaskItem>();
-            foreach (ITaskItem assembly in Assemblies)
+            foreach (ITaskItem assembly in _assemblyNames)
             {
                 string subType = assembly.GetMetadata(ItemMetadataNames.subType);
                 if (!string.IsNullOrEmpty(subType))
