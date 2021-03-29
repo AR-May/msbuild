@@ -6,6 +6,7 @@ using System.IO;
 using System.Reflection;
 using System.Collections.Generic;
 using Microsoft.Build.Shared;
+using Microsoft.Build.Framework;
 
 namespace Microsoft.Build.Tasks
 {
@@ -50,9 +51,23 @@ namespace Microsoft.Build.Tasks
         protected bool compareProcessorArchitecture;
 
         /// <summary>
+        /// Execution context: current directory, culture, etc.
+        /// </summary>
+        protected TaskExecutionContext executionContext;
+
+        /// <summary>
         /// Construct.
         /// </summary>
-        protected Resolver(string searchPathElement, GetAssemblyName getAssemblyName, FileExists fileExists, GetAssemblyRuntimeVersion getRuntimeVersion, Version targetedRuntimeVesion, ProcessorArchitecture targetedProcessorArchitecture, bool compareProcessorArchitecture)
+        protected Resolver(
+            string searchPathElement,
+            GetAssemblyName getAssemblyName,
+            FileExists fileExists,
+            GetAssemblyRuntimeVersion getRuntimeVersion,
+            Version targetedRuntimeVesion,
+            ProcessorArchitecture targetedProcessorArchitecture,
+            bool compareProcessorArchitecture,
+            TaskExecutionContext executionContext
+        )
         {
             this.searchPathElement = searchPathElement;
             this.getAssemblyName = getAssemblyName;
@@ -61,6 +76,7 @@ namespace Microsoft.Build.Tasks
             this.targetedRuntimeVersion = targetedRuntimeVesion;
             this.targetProcessorArchitecture = targetedProcessorArchitecture;
             this.compareProcessorArchitecture = compareProcessorArchitecture;
+            this.executionContext = executionContext;
         }
 
         /// <summary>

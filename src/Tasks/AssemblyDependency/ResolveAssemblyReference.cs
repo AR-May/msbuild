@@ -2230,7 +2230,8 @@ namespace Microsoft.Build.Tasks
                         _warnOrErrorOnTargetArchitectureMismatch,
                         _ignoreTargetFrameworkAttributeVersionMismatch,
                         _unresolveFrameworkAssembliesFromHigherFrameworks,
-                        assemblyMetadataCache
+                        assemblyMetadataCache,
+                        _concurrencyExecutionContext
                         );
 
                     dependencyTable.FindDependenciesOfExternallyResolvedReferences = FindDependenciesOfExternallyResolvedReferences;
@@ -3065,11 +3066,6 @@ namespace Microsoft.Build.Tasks
             _concurrencyExecutionContext = executionContext;
         }
 
-        void ApplyCurrentDirectoryToPath(ref string path)
-        {
-            path = String.IsNullOrEmpty(path) ? path : Path.Combine(_concurrencyExecutionContext.StartupDirectory, path);
-        }
-
         void AddCurrentDirectoryToItemSpecProperty(ITaskItem[] array)
         {
             for (int i = 0; i < array.Length; i++)
@@ -3088,13 +3084,13 @@ namespace Microsoft.Build.Tasks
                 //_candidateAssemblyFiles could be relative paths to files in the project directory
                 for (int i = 0; i < _candidateAssemblyFiles.Length; i++)
                 {
-                    ApplyCurrentDirectoryToPath(ref _candidateAssemblyFiles[i]);
+                    _candidateAssemblyFiles[i] = _concurrencyExecutionContext.MapStartupDirectory(_candidateAssemblyFiles[i]);
                 }
 
                 //_targetFrameworkDirectories - nothing says it could not be relative
                 for (int i = 0; i < _targetFrameworkDirectories.Length; i++)
                 {
-                    ApplyCurrentDirectoryToPath(ref _targetFrameworkDirectories[i]);
+                    _targetFrameworkDirectories[i] = _concurrencyExecutionContext.MapStartupDirectory(_targetFrameworkDirectories[i]);
                 }
 
                 //_searchPaths could be relative. We need to absolutize them if they are not AssemblyResolutionConstants.
@@ -3102,26 +3098,26 @@ namespace Microsoft.Build.Tasks
                 {
                     if (!AssemblyResolutionConstants.IsAssemblyResolutionConstant(_searchPaths[i]))
                     {
-                        ApplyCurrentDirectoryToPath(ref _searchPaths[i]);
+                        //ApplyCurrentDirectoryToPath(ref _searchPaths[i]);
                     }
                 }
 
                 //_appConfigFile - nothing says it could not be relative
-                ApplyCurrentDirectoryToPath(ref _appConfigFile);
-                
+                _appConfigFile = _concurrencyExecutionContext.MapStartupDirectory(_appConfigFile);
+
                 //_stateFile is usually relative
-                ApplyCurrentDirectoryToPath(ref _stateFile);
+                _stateFile = _concurrencyExecutionContext.MapStartupDirectory(_stateFile);
 
                 //_fullFrameworkFolders - in unit tests I saw relative paths
                 for (int i = 0; i < _fullFrameworkFolders.Length; i++)
                 {
-                    ApplyCurrentDirectoryToPath(ref _fullFrameworkFolders[i]);
+                    _fullFrameworkFolders[i] = _concurrencyExecutionContext.MapStartupDirectory(_fullFrameworkFolders[i]);
                 }
 
                 //_latestTargetFrameworkDirectories - nothing says it could not be relative
                 for (int i = 0; i < _latestTargetFrameworkDirectories.Length; i++)
                 {
-                    ApplyCurrentDirectoryToPath(ref _latestTargetFrameworkDirectories[i]);
+                    _latestTargetFrameworkDirectories[i] = _concurrencyExecutionContext.MapStartupDirectory(_latestTargetFrameworkDirectories[i]);
                 }
             }
         }
