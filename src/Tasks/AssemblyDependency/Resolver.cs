@@ -126,7 +126,7 @@ namespace Microsoft.Build.Tasks
         {
             get
             {
-                return _fullSearchPath ?? (_fullSearchPath = executionContext.MapStartupDirectory(_fullSearchPath)) ;
+                return _fullSearchPath ?? (_fullSearchPath = executionContext.GetFullPath(_fullSearchPath));
             }
         }
 

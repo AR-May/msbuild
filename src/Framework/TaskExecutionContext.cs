@@ -36,7 +36,7 @@ namespace Microsoft.Build.Framework
         /// </summary>
         /// <param name="path">Relative or absolute path.</param>
         /// <returns></returns>
-        public string MapStartupDirectory(string path)
+        public string GetFullPath(string path)
         {
             if (String.IsNullOrEmpty(StartupDirectory) || String.IsNullOrEmpty(path))
             {

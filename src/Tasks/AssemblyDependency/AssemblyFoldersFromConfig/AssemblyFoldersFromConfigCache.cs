@@ -40,6 +40,7 @@ namespace Microsoft.Build.Tasks.AssemblyFoldersFromConfig
             }
             else
             {
+                // TODO: absolutization
                 _filesInDirectories = assemblyFoldersFromConfig.AsParallel()
                     .Where(assemblyFolder => FileUtilities.DirectoryExistsNoThrow(assemblyFolder.DirectoryPath))
                     .SelectMany(

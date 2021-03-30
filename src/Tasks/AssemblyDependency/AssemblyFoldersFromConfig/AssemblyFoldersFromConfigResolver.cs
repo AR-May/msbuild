@@ -104,7 +104,7 @@ namespace Microsoft.Build.Tasks.AssemblyFoldersFromConfig
                 _targetRuntimeVersion = match.Groups["TARGETRUNTIMEVERSION"].Value.Trim();
 
                 _assemblyFolderConfigFile = match.Groups["ASSEMBLYFOLDERCONFIGFILE"].Value.Trim();
-                _assemblyFolderConfigFile = executionContext.MapStartupDirectory(_assemblyFolderConfigFile);
+                _assemblyFolderConfigFile = executionContext.GetFullPath(_assemblyFolderConfigFile);
 
                 if (_targetRuntimeVersion.Length != 0)
                 {
@@ -117,7 +117,7 @@ namespace Microsoft.Build.Tasks.AssemblyFoldersFromConfig
                     _wasMatch = true;
 
                     bool useCache = Environment.GetEnvironmentVariable("MSBUILDDISABLEASSEMBLYFOLDERSEXCACHE") == null;
-                    string key = "6f7de854-47fe-4ae2-9cfe-9b33682abd91" + searchPathElement;
+                    string key = _assemblyFolderConfigFile + "6f7de854-47fe-4ae2-9cfe-9b33682abd91" + _targetRuntimeVersion;
                     
                     if (useCache && _buildEngine != null)
                     {

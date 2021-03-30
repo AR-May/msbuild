@@ -3082,13 +3082,13 @@ namespace Microsoft.Build.Tasks
             //_candidateAssemblyFiles could be relative paths to files in the project directory
             for (int i = 0; i < _candidateAssemblyFiles.Length; i++)
             {
-                _candidateAssemblyFiles[i] = _concurrencyExecutionContext.MapStartupDirectory(_candidateAssemblyFiles[i]);
+                _candidateAssemblyFiles[i] = _concurrencyExecutionContext.GetFullPath(_candidateAssemblyFiles[i]);
             }
 
             //_targetFrameworkDirectories - nothing says it could not be relative
             for (int i = 0; i < _targetFrameworkDirectories.Length; i++)
             {
-                _targetFrameworkDirectories[i] = _concurrencyExecutionContext.MapStartupDirectory(_targetFrameworkDirectories[i]);
+                _targetFrameworkDirectories[i] = _concurrencyExecutionContext.GetFullPath(_targetFrameworkDirectories[i]);
             }
 
             //_searchPaths could be relative. We need to absolutize them if they are not AssemblyResolutionConstants.
@@ -3102,21 +3102,21 @@ namespace Microsoft.Build.Tasks
             }
 
             //_appConfigFile - nothing says it could not be relative
-            _appConfigFile = _concurrencyExecutionContext.MapStartupDirectory(_appConfigFile);
+            _appConfigFile = _concurrencyExecutionContext.GetFullPath(_appConfigFile);
 
             //_stateFile is usually relative
-            _stateFile = _concurrencyExecutionContext.MapStartupDirectory(_stateFile);
+            _stateFile = _concurrencyExecutionContext.GetFullPath(_stateFile);
 
             //_fullFrameworkFolders - in unit tests I saw relative paths
             for (int i = 0; i < _fullFrameworkFolders.Length; i++)
             {
-                _fullFrameworkFolders[i] = _concurrencyExecutionContext.MapStartupDirectory(_fullFrameworkFolders[i]);
+                _fullFrameworkFolders[i] = _concurrencyExecutionContext.GetFullPath(_fullFrameworkFolders[i]);
             }
 
             //_latestTargetFrameworkDirectories - nothing says it could not be relative
             for (int i = 0; i < _latestTargetFrameworkDirectories.Length; i++)
             {
-                _latestTargetFrameworkDirectories[i] = _concurrencyExecutionContext.MapStartupDirectory(_latestTargetFrameworkDirectories[i]);
+                _latestTargetFrameworkDirectories[i] = _concurrencyExecutionContext.GetFullPath(_latestTargetFrameworkDirectories[i]);
             }
 
         }
