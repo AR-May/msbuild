@@ -115,6 +115,22 @@ namespace Microsoft.Build.Tasks
         public string SearchPath => searchPathElement;
 
         /// <summary>
+        /// Full path for searchPathElement, in case it is a file path.
+        /// </summary>
+        private string _fullSearchPath;
+
+        /// <summary>
+        /// The full path (i.e. path after applying the execution context) in case searchPathElement is a file path.
+        /// </summary>
+        public string FullSearchPath
+        {
+            get
+            {
+                return _fullSearchPath ?? (_fullSearchPath = executionContext.MapStartupDirectory(_fullSearchPath)) ;
+            }
+        }
+
+        /// <summary>
         /// Resolve a single file.
         /// </summary>
         /// <returns>True if the file was a match, false otherwise.</returns>

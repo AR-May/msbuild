@@ -3092,6 +3092,7 @@ namespace Microsoft.Build.Tasks
             }
 
             //_searchPaths could be relative. We need to absolutize them if they are not AssemblyResolutionConstants.
+            // For constants we need to replace it in resolvers.
             for (int i = 0; i < _searchPaths.Length; i++)
             {
                 if (!AssemblyResolutionConstants.IsAssemblyResolutionConstant(_searchPaths[i]))
