@@ -61,8 +61,8 @@ namespace Microsoft.Build.Tasks
             foundPath = null;
             userRequestedSpecificFile = false;
 
-            // Resolve to the given path.
-            string resolvedPath = ResolveFromDirectory(assemblyName, isPrimaryProjectReference, wantSpecificVersion, executableExtensions, searchPathElement, assembliesConsideredAndRejected);
+            string directory = FullSearchPath;
+            string resolvedPath = ResolveFromDirectory(assemblyName, isPrimaryProjectReference, wantSpecificVersion, executableExtensions, directory, assembliesConsideredAndRejected);
             if (resolvedPath != null)
             {
                 foundPath = resolvedPath;

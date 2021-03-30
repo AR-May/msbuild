@@ -102,7 +102,9 @@ namespace Microsoft.Build.Tasks.AssemblyFoldersFromConfig
             if (match.Success)
             {
                 _targetRuntimeVersion = match.Groups["TARGETRUNTIMEVERSION"].Value.Trim();
+
                 _assemblyFolderConfigFile = match.Groups["ASSEMBLYFOLDERCONFIGFILE"].Value.Trim();
+                _assemblyFolderConfigFile = executionContext.MapStartupDirectory(_assemblyFolderConfigFile);
 
                 if (_targetRuntimeVersion.Length != 0)
                 {
