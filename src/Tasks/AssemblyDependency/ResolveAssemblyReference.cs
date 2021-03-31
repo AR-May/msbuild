@@ -3078,15 +3078,6 @@ namespace Microsoft.Build.Tasks
         void ApplyExecutionContextToInputs()
         {
 
-            // think about search paths.
-            for (int i = 0; i < _searchPaths.Length; i++)
-            {
-                if (!AssemblyResolutionConstants.IsAssemblyResolutionConstant(_searchPaths[i]))
-                {
-                    //ApplyCurrentDirectoryToPath(ref _searchPaths[i]);
-                }
-            }
-
             for (int i = 0; i < _candidateAssemblyFiles.Length; i++)
             {
                 _candidateAssemblyFiles[i] = _concurrencyExecutionContext.GetFullPath(_candidateAssemblyFiles[i]);
@@ -3109,6 +3100,28 @@ namespace Microsoft.Build.Tasks
 
             _appConfigFile = _concurrencyExecutionContext.GetFullPath(_appConfigFile);
             _stateFile = _concurrencyExecutionContext.GetFullPath(_stateFile);
+
+            for (int i = 0; i < _installedAssemblyTables.Length; i++)
+            {
+                // TODO: check if it could be URI.
+                // It is said that it's on disk in docu, but code does not prohibit URI.
+                _installedAssemblyTables[i].ItemSpec = _concurrencyExecutionContext.GetFullPath(_installedAssemblyTables[i].ItemSpec);
+            }
+
+            for (int i = 0; i < _installedAssemblySubsetTables.Length; i++)
+            {
+                _installedAssemblySubsetTables[i].ItemSpec = _concurrencyExecutionContext.GetFullPath(_installedAssemblySubsetTables[i].ItemSpec);
+            }
+
+            for (int i = 0; i < _fullFrameworkAssemblyTables.Length; i++)
+            {
+                _fullFrameworkAssemblyTables[i].ItemSpec = _concurrencyExecutionContext.GetFullPath(_fullFrameworkAssemblyTables[i].ItemSpec);
+            }
+
+            for (int i = 0; i < _resolvedSDKReferences.Length; i++)
+            {
+                _resolvedSDKReferences[i].ItemSpec = _concurrencyExecutionContext.GetFullPath(_resolvedSDKReferences[i].ItemSpec);
+            }
         }
 
     }
