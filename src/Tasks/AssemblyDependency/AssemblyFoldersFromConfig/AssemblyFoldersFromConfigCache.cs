@@ -2,6 +2,7 @@ using System;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
+using Microsoft.Build.Framework;
 using Microsoft.Build.Shared;
 
 namespace Microsoft.Build.Tasks.AssemblyFoldersFromConfig
@@ -27,12 +28,18 @@ namespace Microsoft.Build.Tasks.AssemblyFoldersFromConfig
         private readonly bool _useOriginalFileExists;
 
         /// <summary>
+        /// Execution context: current directory, culture, etc.
+        /// </summary>
+        private readonly TaskExecutionContext _executionContext;
+
+        /// <summary>
         /// Constructor
         /// </summary>
-        internal AssemblyFoldersFromConfigCache(AssemblyFoldersFromConfig assemblyFoldersFromConfig, FileExists fileExists)
+        internal AssemblyFoldersFromConfigCache(AssemblyFoldersFromConfig assemblyFoldersFromConfig, FileExists fileExists, TaskExecutionContext executionContext)
         {
             AssemblyFoldersFromConfig = assemblyFoldersFromConfig;
             _fileExists = fileExists;
+            _executionContext = executionContext;
 
             if (Environment.GetEnvironmentVariable("MSBUILDDISABLEASSEMBLYFOLDERSEXCACHE") != null)
             {
@@ -40,12 +47,11 @@ namespace Microsoft.Build.Tasks.AssemblyFoldersFromConfig
             }
             else
             {
-                // TODO: absolutization
-                _filesInDirectories = assemblyFoldersFromConfig.AsParallel()
-                    .Where(assemblyFolder => FileUtilities.DirectoryExistsNoThrow(assemblyFolder.DirectoryPath))
+                _filesInDirectories = assemblyFoldersFromConfig.Select(assemblyFolder => _executionContext.GetFullPath(assemblyFolder.DirectoryPath)).AsParallel()
+                    .Where(directoryPath => FileUtilities.DirectoryExistsNoThrow(directoryPath))
                     .SelectMany(
-                        assemblyFolder =>
-                            Directory.GetFiles(assemblyFolder.DirectoryPath, "*.*", SearchOption.TopDirectoryOnly))
+                        directoryPath =>
+                            Directory.GetFiles(directoryPath, "*.*", SearchOption.TopDirectoryOnly))
                     .ToImmutableHashSet(StringComparer.OrdinalIgnoreCase);
             }
         }

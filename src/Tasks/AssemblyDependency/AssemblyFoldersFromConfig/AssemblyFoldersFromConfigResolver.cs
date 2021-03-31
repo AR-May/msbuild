@@ -134,7 +134,7 @@ namespace Microsoft.Build.Tasks.AssemblyFoldersFromConfig
                         try
                         {
                             AssemblyFoldersFromConfig assemblyFolders = new AssemblyFoldersFromConfig(_assemblyFolderConfigFile, _targetRuntimeVersion, targetProcessorArchitecture);
-                            _assemblyFoldersCache = new AssemblyFoldersFromConfigCache(assemblyFolders, fileExists);
+                            _assemblyFoldersCache = new AssemblyFoldersFromConfigCache(assemblyFolders, fileExists, executionContext);
                             if (useCache)
                             {
                                 _buildEngine?.RegisterTaskObject(key, _assemblyFoldersCache, RegisteredTaskObjectLifetime.Build, true /* dispose early ok*/);
