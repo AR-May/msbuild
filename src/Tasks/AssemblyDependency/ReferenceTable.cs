@@ -1353,7 +1353,7 @@ namespace Microsoft.Build.Tasks
             {
                 if (!Path.IsPathRooted(resolvedPath))
                 {
-                    resolvedPath = Path.GetFullPath(resolvedPath);
+                    resolvedPath = Path.GetFullPath(_executionContext.GetFullPath(resolvedPath));
                 }
 
                 reference.FullPath = resolvedPath;

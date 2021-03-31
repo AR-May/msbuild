@@ -65,8 +65,7 @@ namespace Microsoft.Build.Tasks
             if (rawFileNameCandidate is object)
             {  
 
-                // TODO: uncomment, (from AssemblyNames) 
-                //rawFileNameCandidate = executionContext.GetFullPath(rawFileNameCandidate);
+                rawFileNameCandidate = executionContext.GetFullPath(rawFileNameCandidate);
 
                 // {RawFileName} was passed in.
                 if (fileExists(rawFileNameCandidate))
