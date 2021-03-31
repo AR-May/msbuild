@@ -113,6 +113,13 @@ namespace Microsoft.Build.Tasks
         private bool _unresolveFrameworkAssembliesFromHigherFrameworks = false;
 
         /// <summary>
+        /// Storage for names of all files writen to disk.
+        /// </summary>
+        private List<ITaskItem> _filesWritten = new List<ITaskItem>();
+
+        private TaskExecutionContext _concurrencyExecutionContext;
+
+        /// <summary>
         /// If set to true, it forces to unresolve framework assemblies with versions higher or equal the version of the target framework, regardless of the target framework
         /// </summary>
         public bool UnresolveFrameworkAssembliesFromHigherFrameworks
@@ -780,6 +787,16 @@ namespace Microsoft.Build.Tasks
         }
 
         /// <summary>
+        /// Execution context used when task is supposed to run concurrently in multiple threads.
+        /// If null hosting process do not run this task concurrently and set it execution context on process level.
+        /// </summary>
+        public TaskExecutionContext ConcurrencyExecutionContext
+        {
+            get { return _concurrencyExecutionContext; }
+            set { _concurrencyExecutionContext = value; }
+        }
+
+        /// <summary>
         /// This is a list of all primary references resolved to full paths.
         ///     bool CopyLocal - whether the given reference should be copied to the output directory.
         ///     string FusionName - the fusion name for this dependency.
@@ -887,20 +904,6 @@ namespace Microsoft.Build.Tasks
         {
             get { return _suggestedRedirects; }
         }
-
-
-        //TODO : move the below from here to all private filds location.
-
-        /// <summary>
-        /// Storage for names of all files writen to disk.
-        /// </summary>
-        private List<ITaskItem> _filesWritten = new List<ITaskItem>();
-
-        /// <summary>
-        /// Execution context used when task is supposed to run concurrently in multiple threads.
-        /// If null hosting process do not run this task concurrently and set it execution context on process level.
-        /// </summary>
-        private TaskExecutionContext _concurrencyExecutionContext;
 
         /// <summary>
         /// The names of all files written to disk.
@@ -1995,9 +1998,13 @@ namespace Microsoft.Build.Tasks
         {
             bool success = true;
 
-            if (_concurrencyExecutionContext != null)
+            if (_concurrencyExecutionContext is object)
             {
                 ApplyExecutionContextToInputs();
+            }
+            else
+            {
+                _concurrencyExecutionContext = new TaskExecutionContext();
             }
 
             MSBuildEventSource.Log.RarOverallStart();
