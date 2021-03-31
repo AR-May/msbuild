@@ -3077,22 +3077,8 @@ namespace Microsoft.Build.Tasks
         
         void ApplyExecutionContextToInputs()
         {
-            // Absolutize paths for all string inputs
 
-            //_candidateAssemblyFiles could be relative paths to files in the project directory
-            for (int i = 0; i < _candidateAssemblyFiles.Length; i++)
-            {
-                _candidateAssemblyFiles[i] = _concurrencyExecutionContext.GetFullPath(_candidateAssemblyFiles[i]);
-            }
-
-            //_targetFrameworkDirectories - nothing says it could not be relative
-            for (int i = 0; i < _targetFrameworkDirectories.Length; i++)
-            {
-                _targetFrameworkDirectories[i] = _concurrencyExecutionContext.GetFullPath(_targetFrameworkDirectories[i]);
-            }
-
-            //_searchPaths could be relative. We need to absolutize them if they are not AssemblyResolutionConstants.
-            // For constants we need to replace it in resolvers.
+            // think about search paths.
             for (int i = 0; i < _searchPaths.Length; i++)
             {
                 if (!AssemblyResolutionConstants.IsAssemblyResolutionConstant(_searchPaths[i]))
@@ -3101,24 +3087,28 @@ namespace Microsoft.Build.Tasks
                 }
             }
 
-            //_appConfigFile - nothing says it could not be relative
-            _appConfigFile = _concurrencyExecutionContext.GetFullPath(_appConfigFile);
+            for (int i = 0; i < _candidateAssemblyFiles.Length; i++)
+            {
+                _candidateAssemblyFiles[i] = _concurrencyExecutionContext.GetFullPath(_candidateAssemblyFiles[i]);
+            }
 
-            //_stateFile is usually relative
-            _stateFile = _concurrencyExecutionContext.GetFullPath(_stateFile);
+            for (int i = 0; i < _targetFrameworkDirectories.Length; i++)
+            {
+                _targetFrameworkDirectories[i] = _concurrencyExecutionContext.GetFullPath(_targetFrameworkDirectories[i]);
+            }
 
-            //_fullFrameworkFolders - in unit tests I saw relative paths
             for (int i = 0; i < _fullFrameworkFolders.Length; i++)
             {
                 _fullFrameworkFolders[i] = _concurrencyExecutionContext.GetFullPath(_fullFrameworkFolders[i]);
             }
 
-            //_latestTargetFrameworkDirectories - nothing says it could not be relative
             for (int i = 0; i < _latestTargetFrameworkDirectories.Length; i++)
             {
                 _latestTargetFrameworkDirectories[i] = _concurrencyExecutionContext.GetFullPath(_latestTargetFrameworkDirectories[i]);
             }
 
+            _appConfigFile = _concurrencyExecutionContext.GetFullPath(_appConfigFile);
+            _stateFile = _concurrencyExecutionContext.GetFullPath(_stateFile);
         }
 
     }
