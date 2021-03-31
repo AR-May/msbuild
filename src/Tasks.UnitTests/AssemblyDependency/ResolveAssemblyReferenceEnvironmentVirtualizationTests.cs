@@ -21,7 +21,6 @@ namespace Microsoft.Build.UnitTests.ResolveAssemblyReference_Tests
         private readonly string _test_assembly_name;
         private readonly string _test_assembly_path;
 
-
         public ResolveAssemblyReferenceEnvironmentVirtualizationTests(ITestOutputHelper output)
         {
             Environment.SetEnvironmentVariable("MSBUILDDISABLEASSEMBLYFOLDERSEXCACHE", "1");
@@ -117,7 +116,6 @@ namespace Microsoft.Build.UnitTests.ResolveAssemblyReference_Tests
                 new TaskItem(_test_assembly_name)
             };
             rarTask.SearchPaths = new string[] {
-                Path.GetDirectoryName(typeof(object).Module.FullyQualifiedName),
                 "{AssemblyFolders}",
                 "{HintPathFromItem}",
                 "{RawFileName}",
