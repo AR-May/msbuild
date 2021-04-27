@@ -231,6 +231,24 @@ namespace Microsoft.Build.Eventing
             WriteEvent(28);
         }
 
+        [Event(59, Keywords = Keywords.All | Keywords.PerformanceLog)]
+        public void RarHittingCache(string path, string hitType, string projectString)
+        {
+            WriteEvent(59, path, hitType, projectString);
+        }
+
+        [Event(63, Keywords = Keywords.All | Keywords.PerformanceLog)]
+        public void RarHittingIOTimeStart(string path, string hitType, string projectString)
+        {
+            WriteEvent(63, path, hitType, projectString);
+        }
+
+        [Event(64, Keywords = Keywords.All | Keywords.PerformanceLog)]
+        public void RarHittingIOTimeStop(string path, string hitType, string projectString)
+        {
+            WriteEvent(64, path, hitType, projectString);
+        }
+
         /// <summary>
         /// Call this method to notify listeners of information relevant to identifying a list of files that correspond to an item with a wildcard.
         /// </summary>

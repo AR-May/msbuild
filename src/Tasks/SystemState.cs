@@ -16,6 +16,8 @@ using Microsoft.Build.Shared.FileSystem;
 using Microsoft.Build.Tasks.AssemblyDependency;
 using Microsoft.Build.Utilities;
 
+using Microsoft.Build.Eventing;
+
 namespace Microsoft.Build.Tasks
 {
     /// <summary>
@@ -108,6 +110,8 @@ namespace Microsoft.Build.Tasks
         /// Cached delegate
         /// </summary>
         private GetAssemblyRuntimeVersion getAssemblyRuntimeVersion;
+
+        public string projectString;
 
         /// <summary>
         /// Class that holds the current file state.
@@ -470,10 +474,25 @@ namespace Microsoft.Build.Tasks
         {
             if (!instanceLocalLastModifiedCache.TryGetValue(path, out DateTime lastModified))
             {
+                MSBuildEventSource.Log.RarHittingIOTimeStart(path, "GetAndCacheLastModified", projectString);
                 lastModified = getLastWriteTime(path);
+                MSBuildEventSource.Log.RarHittingIOTimeStop(path, "GetAndCacheLastModified", projectString);
                 instanceLocalLastModifiedCache[path] = lastModified;
             }
+            MSBuildEventSource.Log.RarHittingCache(path, "GetAndCacheLastModified", projectString);
+            return lastModified;
+        }
 
+        private DateTime GetAndCacheLastModifiedFE(string path)
+        {
+            if (!instanceLocalLastModifiedCache.TryGetValue(path, out DateTime lastModified))
+            {
+                MSBuildEventSource.Log.RarHittingIOTimeStart(path, "GetAndCacheLastModifiedFE", projectString);
+                lastModified = getLastWriteTime(path);
+                MSBuildEventSource.Log.RarHittingIOTimeStop(path, "GetAndCacheLastModifiedFE", projectString);
+                instanceLocalLastModifiedCache[path] = lastModified;
+            }
+            MSBuildEventSource.Log.RarHittingCache(path, "GetAndCacheLastModifiedFE", projectString);
             return lastModified;
         }
 
@@ -524,7 +543,9 @@ namespace Microsoft.Build.Tasks
             FileState fileState = GetFileState(path);
             if (fileState.Assembly == null)
             {
+                MSBuildEventSource.Log.RarHittingIOTimeStart(path, "GetAssemblyName", projectString);
                 fileState.Assembly = getAssemblyName(path);
+                MSBuildEventSource.Log.RarHittingIOTimeStop(path, "GetAssemblyName", projectString);
 
                 // Certain assemblies, like mscorlib may not have metadata.
                 // Avoid continuously calling getAssemblyName on these files by 
@@ -534,6 +555,10 @@ namespace Microsoft.Build.Tasks
                     fileState.Assembly = AssemblyNameExtension.UnnamedAssembly;
                 }
                 isDirty = true;
+            }
+            else
+            {
+                MSBuildEventSource.Log.RarHittingCache(path, "GetAssemblyName", projectString);
             }
 
             if (fileState.Assembly.IsUnnamedAssembly)
@@ -553,8 +578,14 @@ namespace Microsoft.Build.Tasks
             FileState fileState = GetFileState(path);
             if (String.IsNullOrEmpty(fileState.RuntimeVersion))
             {
+                MSBuildEventSource.Log.RarHittingIOTimeStart(path, "GetRuntimeVersion", projectString);
                 fileState.RuntimeVersion = getAssemblyRuntimeVersion(path);
+                MSBuildEventSource.Log.RarHittingIOTimeStop(path, "GetRuntimeVersion", projectString);
                 isDirty = true;
+            }
+            else
+            {
+                MSBuildEventSource.Log.RarHittingCache(path, "GetRuntimeVersion", projectString);
             }
 
             return fileState.RuntimeVersion;
@@ -581,6 +612,7 @@ namespace Microsoft.Build.Tasks
             FileState fileState = GetFileState(path);
             if (fileState.dependencies == null)
             {
+                MSBuildEventSource.Log.RarHittingIOTimeStart(path, "GetAssemblyMetadata", projectString);
                 getAssemblyMetadata
                 (
                     path,
@@ -589,8 +621,13 @@ namespace Microsoft.Build.Tasks
                     out fileState.scatterFiles,
                     out fileState.frameworkName
                  );
+                MSBuildEventSource.Log.RarHittingIOTimeStop(path, "GetAssemblyMetadata", projectString);
 
                 isDirty = true;
+            }
+            else
+            {
+                MSBuildEventSource.Log.RarHittingCache(path, "GetAssemblyMetadata", projectString);
             }
 
             dependencies = fileState.dependencies;
@@ -681,10 +718,13 @@ namespace Microsoft.Build.Tasks
                 instanceLocalDirectories.TryGetValue(path, out string[] cached);
                 if (cached == null)
                 {
+                    MSBuildEventSource.Log.RarHittingIOTimeStart(path, "GetDirectories", projectString);
                     string[] directories = getDirectories(path, pattern);
+                    MSBuildEventSource.Log.RarHittingIOTimeStop(path, "GetDirectories", projectString);
                     instanceLocalDirectories[path] = directories;
                     return directories;
                 }
+                MSBuildEventSource.Log.RarHittingCache(path, "GetDirectories", projectString);
                 return cached;
             }
 
@@ -692,7 +732,11 @@ namespace Microsoft.Build.Tasks
             // that this is an unoptimized path.
             Debug.Assert(false, "Using slow-path in SystemState.GetDirectories, was this intentional?");
 
-            return getDirectories(path, pattern);
+            MSBuildEventSource.Log.RarHittingIOTimeStart(path, "GetDirectories", projectString);
+            string [] res = getDirectories(path, pattern);
+            MSBuildEventSource.Log.RarHittingIOTimeStop(path, "GetDirectories", projectString);
+
+            return res;
         }
 
         /// <summary>
@@ -702,7 +746,7 @@ namespace Microsoft.Build.Tasks
         /// <returns>True if the file exists.</returns>
         private bool FileExists(string path)
         {
-            DateTime lastModified = GetAndCacheLastModified(path);
+            DateTime lastModified = GetAndCacheLastModifiedFE(path);
             return FileTimestampIndicatesFileExists(lastModified);
         }
 
@@ -721,10 +765,13 @@ namespace Microsoft.Build.Tasks
         {
             if (instanceLocalDirectoryExists.TryGetValue(path, out bool flag))
             {
+                MSBuildEventSource.Log.RarHittingCache(path, "DirectoryExists", projectString);
                 return flag;
             }
 
+            MSBuildEventSource.Log.RarHittingIOTimeStart(path, "DirectoryExists", projectString);
             bool exists = directoryExists(path);
+            MSBuildEventSource.Log.RarHittingIOTimeStop(path, "DirectoryExists", projectString);
             instanceLocalDirectoryExists[path] = exists;
             return exists;
         }

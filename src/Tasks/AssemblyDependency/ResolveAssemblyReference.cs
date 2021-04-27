@@ -2015,6 +2015,8 @@ namespace Microsoft.Build.Tasks
             {
                 _cache = new SystemState();
             }
+
+            _cache.projectString = _stateFile;
         }
 
         /// <summary>
