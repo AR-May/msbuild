@@ -204,6 +204,7 @@ namespace Microsoft.Build.Evaluation
 
                     // Do not expand properties as they have been already expanded by the lazy evaluator upon item operation construction.
                     // Prior to lazy evaluation ExpanderOptions.ExpandAll was used.
+
                     const ExpanderOptions metadataExpansionOptions = ExpanderOptions.ExpandAll;
 
                     needToExpandMetadata ??= NeedToExpandMetadataForEachItem(metadata, out _);
@@ -276,24 +277,26 @@ namespace Microsoft.Build.Evaluation
                         // many items (either by semicolon or wildcards)
                         // and that item also has the same piece/s of metadata for each item.
                         _itemFactory.SetMetadata(metadataList, itemBatchingContexts.Select(i => i.OperationItem));
-
+                        
                         // End of legal area for metadata expressions.
                         _expander.Metadata = null;
                     }
+
+                }
+            }
+
+            internal static IEnumerable<string> EnumerateMetadataValueAndCondition(ImmutableList<ProjectMetadataElement> metadata)
+            {
+                foreach (var metadataElement in metadata)
+                {
+                    yield return metadataElement.Value;
+                    yield return metadataElement.Condition;
                 }
             }
 
             protected bool NeedToExpandMetadataForEachItem(ImmutableList<ProjectMetadataElement> metadata, out ItemsAndMetadataPair itemsAndMetadataFound)
             {
-                List<string> values = new List<string>(metadata.Count * 2);
-
-                foreach (var metadataElement in metadata)
-                {
-                    values.Add(metadataElement.Value);
-                    values.Add(metadataElement.Condition);
-                }
-
-                itemsAndMetadataFound = ExpressionShredder.GetReferencedItemNamesAndMetadata(values);
+                itemsAndMetadataFound = ExpressionShredder.GetReferencedItemNamesAndMetadata(EnumerateMetadataValueAndCondition(metadata));
 
                 bool needToExpandMetadataForEachItem = false;
 
