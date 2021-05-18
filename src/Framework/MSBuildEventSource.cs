@@ -423,6 +423,42 @@ namespace Microsoft.Build.Eventing
         {
             WriteEvent(55, size);
         }
+
+        [Event(56, Keywords = Keywords.All)]
+        public void DecorateItemsWithMetadataStart()
+        {
+            WriteEvent(56);
+        }
+
+        [Event(57, Keywords = Keywords.All)]
+        public void DecorateItemsWithMetadataStop()
+        {
+            WriteEvent(57);
+        }
+
+        [Event(58, Keywords = Keywords.All)]
+        public void DecorateItemsWithMetadataSetMetadata1Start()
+        {
+            WriteEvent(58);
+        }
+
+        [Event(59, Keywords = Keywords.All)]
+        public void DecorateItemsWithMetadataSetMetadata1Stop()
+        {
+            WriteEvent(59);
+        }
+
+        [Event(60, Keywords = Keywords.All)]
+        public void DecorateItemsWithMetadataSetMetadata2Start(string metadataString)
+        {
+            WriteEvent(60, metadataString);
+        }
+
+        [Event(61, Keywords = Keywords.All)]
+        public void DecorateItemsWithMetadataSetMetadata2Stop(string metadataString)
+        {
+            WriteEvent(61, metadataString);
+        }
         #endregion
     }
 }

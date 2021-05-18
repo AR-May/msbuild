@@ -205,6 +205,7 @@ namespace Microsoft.Build.Evaluation
                     // Do not expand properties as they have been already expanded by the lazy evaluator upon item operation construction.
                     // Prior to lazy evaluation ExpanderOptions.ExpandAll was used.
 
+                    MSBuildEventSource.Log.DecorateItemsWithMetadataStart();
                     const ExpanderOptions metadataExpansionOptions = ExpanderOptions.ExpandAll;
 
                     needToExpandMetadata ??= NeedToExpandMetadataForEachItem(metadata, out _);
@@ -224,7 +225,9 @@ namespace Microsoft.Build.Evaluation
 
                                 string evaluatedValue = _expander.ExpandIntoStringLeaveEscaped(metadataElement.Value, metadataExpansionOptions, metadataElement.Location);
 
+                                MSBuildEventSource.Log.DecorateItemsWithMetadataSetMetadata1Start();
                                 itemContext.OperationItem.SetMetadata(metadataElement, FileUtilities.MaybeAdjustFilePath(evaluatedValue, metadataElement.ContainingProject.DirectoryPath));
+                                MSBuildEventSource.Log.DecorateItemsWithMetadataSetMetadata1Stop();
                             }
                         }
 
@@ -276,12 +279,20 @@ namespace Microsoft.Build.Evaluation
                         // This is valuable in the case where one item element evaluates to
                         // many items (either by semicolon or wildcards)
                         // and that item also has the same piece/s of metadata for each item.
+                        string metadataString = "";
+                        foreach (var metadataElem in metadataList)
+                        {
+                            metadataString += metadataElem.Key.Name + ", " + metadataElem.Key.Condition + ", " + metadataElem.Value + "; ";
+                        }
+                        MSBuildEventSource.Log.DecorateItemsWithMetadataSetMetadata2Start(metadataString);
                         _itemFactory.SetMetadata(metadataList, itemBatchingContexts.Select(i => i.OperationItem));
-                        
+                        MSBuildEventSource.Log.DecorateItemsWithMetadataSetMetadata2Stop(metadataString);
+
                         // End of legal area for metadata expressions.
                         _expander.Metadata = null;
                     }
 
+                    MSBuildEventSource.Log.DecorateItemsWithMetadataStop();
                 }
             }
 
