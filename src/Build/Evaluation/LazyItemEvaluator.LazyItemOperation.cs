@@ -218,6 +218,7 @@ namespace Microsoft.Build.Evaluation
 
                             foreach (var metadataElement in metadata)
                             {
+                                MSBuildEventSource.Log.DecorateItemsWithMetadataInTheLoop();
                                 if (!EvaluateCondition(metadataElement.Condition, metadataElement, metadataExpansionOptions, ParserOptions.AllowAll, _expander, _lazyEvaluator))
                                 {
                                     continue;
@@ -225,9 +226,7 @@ namespace Microsoft.Build.Evaluation
 
                                 string evaluatedValue = _expander.ExpandIntoStringLeaveEscaped(metadataElement.Value, metadataExpansionOptions, metadataElement.Location);
 
-                                MSBuildEventSource.Log.DecorateItemsWithMetadataSetMetadata1Start();
                                 itemContext.OperationItem.SetMetadata(metadataElement, FileUtilities.MaybeAdjustFilePath(evaluatedValue, metadataElement.ContainingProject.DirectoryPath));
-                                MSBuildEventSource.Log.DecorateItemsWithMetadataSetMetadata1Stop();
                             }
                         }
 
@@ -279,15 +278,13 @@ namespace Microsoft.Build.Evaluation
                         // This is valuable in the case where one item element evaluates to
                         // many items (either by semicolon or wildcards)
                         // and that item also has the same piece/s of metadata for each item.
-                        string metadataString = "";
-                        foreach (var metadataElem in metadataList)
-                        {
-                            metadataString += metadataElem.Key.Name + ", " + metadataElem.Key.Condition + ", " + metadataElem.Value + "; ";
-                        }
-                        MSBuildEventSource.Log.DecorateItemsWithMetadataSetMetadata2Start(metadataString);
+                        //string metadataString = "";
+                        //foreach (var metadataElem in metadataList)
+                        //{
+                        //    metadataString += metadataElem.Key.Name + ", " + metadataElem.Key.Condition + ", " + metadataElem.Value + "; ";
+                        //}
                         _itemFactory.SetMetadata(metadataList, itemBatchingContexts.Select(i => i.OperationItem));
-                        MSBuildEventSource.Log.DecorateItemsWithMetadataSetMetadata2Stop(metadataString);
-
+                        
                         // End of legal area for metadata expressions.
                         _expander.Metadata = null;
                     }

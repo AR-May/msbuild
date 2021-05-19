@@ -449,15 +449,21 @@ namespace Microsoft.Build.Eventing
         }
 
         [Event(60, Keywords = Keywords.All)]
-        public void DecorateItemsWithMetadataSetMetadata2Start(string metadataString)
+        public void DecorateItemsWithMetadataSetMetadata2Start()
         {
-            WriteEvent(60, metadataString);
+            WriteEvent(60);
         }
 
         [Event(61, Keywords = Keywords.All)]
-        public void DecorateItemsWithMetadataSetMetadata2Stop(string metadataString)
+        public void DecorateItemsWithMetadataSetMetadata2Stop()
         {
-            WriteEvent(61, metadataString);
+            WriteEvent(61);
+        }
+
+        [Event(62, Keywords = Keywords.All)]
+        public void DecorateItemsWithMetadataInTheLoop()
+        {
+            WriteEvent(62);
         }
         #endregion
     }
