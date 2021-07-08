@@ -60,6 +60,8 @@ namespace Microsoft.Build.Evaluation
             return _cache.GetOrAdd(projectFile, key =>
             {
                 ProjectRootElement rootElement = openFunc(key, this);
+                AddEntry(rootElement);
+
                 ErrorUtilities.VerifyThrowInternalNull(rootElement, "projectRootElement");
                 ErrorUtilities.VerifyThrow(rootElement.FullPath.Equals(key, StringComparison.OrdinalIgnoreCase),
                     "Got project back with incorrect path");
