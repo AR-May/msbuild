@@ -13,6 +13,12 @@ using System.Threading.Tasks;
 using Microsoft.Build.Shared.FileSystem;
 using Microsoft.Build.Utilities;
 
+#if FEATURE_MSIOREDIST
+using Microsoft.IO.Enumeration;
+#endif
+// TODO for .NET Standard 2.1 and higher.
+// using System.IO.Enumeration; 
+
 namespace Microsoft.Build.Shared
 {
     /// <summary>
@@ -242,9 +248,24 @@ namespace Microsoft.Build.Shared
             path = FileUtilities.FixFilePath(path);
             switch (entityType)
             {
-                case FileSystemEntity.Files: return GetAccessibleFiles(fileSystem, path, pattern, projectDirectory, stripProjectDirectory);
-                case FileSystemEntity.Directories: return GetAccessibleDirectories(fileSystem, path, pattern);
-                case FileSystemEntity.FilesAndDirectories: return GetAccessibleFilesAndDirectories(fileSystem,path, pattern);
+                case FileSystemEntity.Files:
+#if FEATURE_MSIOREDIST
+                    return GetAccessibleFilesRedist(fileSystem, path, pattern, projectDirectory, stripProjectDirectory);
+#else
+                    return GetAccessibleFiles(fileSystem, path, pattern, projectDirectory, stripProjectDirectory);
+#endif
+                case FileSystemEntity.Directories:
+#if FEATURE_MSIOREDIST
+                    return GetAccessibleDirectoriesRedist(fileSystem, path, pattern);
+#else
+                    return GetAccessibleDirectories(fileSystem, path, pattern);
+#endif
+                case FileSystemEntity.FilesAndDirectories:
+#if FEATURE_MSIOREDIST
+                    return GetAccessibleFilesAndDirectoriesRedist(fileSystem,path, pattern);
+#else
+                    return GetAccessibleFilesAndDirectories(fileSystem,path, pattern);
+#endif
                 default:
                     ErrorUtilities.VerifyThrow(false, "Unexpected filesystem entity type.");
                     break;
@@ -441,6 +462,188 @@ namespace Microsoft.Build.Shared
                 return Array.Empty<string>();
             }
         }
+
+#if FEATURE_MSIOREDIST
+
+        /// <summary>
+        /// Returns an enumerable of file system entries matching the specified search criteria. Inaccessible or non-existent file
+        /// system entries are skipped.
+        /// </summary>
+        /// <param name="path"></param>
+        /// <param name="pattern"></param>
+        /// <param name="fileSystem">The file system abstraction to use that implements file system operations</param>
+        /// <returns>An enumerable of matching file system entries (can be empty).</returns>
+        private static IReadOnlyList<string> GetAccessibleFilesAndDirectoriesRedist(IFileSystem fileSystem, string path, string pattern)
+        {
+            if (fileSystem.DirectoryExists(path))
+            {
+                try
+                {
+                    //FileSystemEnumerable<Tuple<string, string>>.FindPredicate? shouldIncludePredicate = ShouldEnforceMatching(pattern)
+                    //    ? (ref FileSystemEntry entry) => IsMatch(Path.GetFileName(entry.ToFullPath()), pattern)
+                    //    : null;
+
+                    var enumeration = new FileSystemEnumerable<Tuple<string, string>>(
+                        directory: path,
+                        transform: (ref FileSystemEntry entry) => new Tuple<string, string>(entry.Directory.ToString(), entry.FileName.ToString())
+                    )
+                    {
+                        ShouldIncludePredicate = ShouldEnforceMatching(pattern) ? (ref FileSystemEntry entry) => IsMatch(Path.GetFileName(entry.ToFullPath()), pattern) : null
+                    };
+
+                    List<string> entries = new List<string>();
+                    foreach (var entry in enumeration)
+                    {
+                        entries.Add(Path.Combine(entry.Item1, entry.Item2));
+                    }
+                    return entries;
+                }
+                // for OS security
+                catch (UnauthorizedAccessException)
+                {
+                    // do nothing
+                }
+                // for code access security
+                catch (System.Security.SecurityException)
+                {
+                    // do nothing
+                }
+            }
+
+            return Array.Empty<string>();
+        }
+        
+        /// <summary>
+        /// Same as Directory.EnumerateFiles(...) except that files that
+        /// aren't accessible are skipped instead of throwing an exception.
+        /// 
+        /// Other exceptions are passed through.
+        /// </summary>
+        /// <param name="path">The path.</param>
+        /// <param name="filespec">The pattern.</param>
+        /// <param name="projectDirectory">The project directory</param>
+        /// <param name="stripProjectDirectory"></param>
+        /// <param name="fileSystem">The file system abstraction to use that implements file system operations</param>
+        /// <returns>Files that can be accessed.</returns>
+        private static IReadOnlyList<string> GetAccessibleFilesRedist
+        (
+            IFileSystem fileSystem,
+            string path,
+            string filespec,     // can be null
+            string projectDirectory,
+            bool stripProjectDirectory
+        )
+        {
+            try
+            {
+                // look in current directory if no path specified
+                string dir = ((path.Length == 0) ? s_thisDirectory : path);
+
+                //FileSystemEnumerable<Tuple<string, string>>.FindPredicate? shouldIncludePredicate = ShouldEnforceMatching(filespec)
+                //        ? (ref FileSystemEntry entry) => !entry.IsDirectory && IsMatch(Path.GetFileName(entry.ToFullPath()), filespec)
+                //        : (ref FileSystemEntry entry) => !entry.IsDirectory;
+
+                var enumeration = new FileSystemEnumerable<Tuple<string, string>>(
+                    directory: dir,
+                    transform: (ref FileSystemEntry entry) => new Tuple<string, string>(entry.Directory.ToString(), entry.FileName.ToString())
+                )
+                {
+                    ShouldIncludePredicate = ShouldEnforceMatching(filespec)
+                            ? (ref FileSystemEntry entry) => !entry.IsDirectory && IsMatch(Path.GetFileName(entry.ToFullPath()), filespec)
+                            : (ref FileSystemEntry entry) => !entry.IsDirectory
+                };
+
+                List<string> entries = new List<string>();
+                foreach (var entry in enumeration)
+                {
+                    entries.Add(Path.Combine(entry.Item1, entry.Item2));
+                }
+
+                if (stripProjectDirectory)
+                {
+                    entries = RemoveProjectDirectory(entries as IEnumerable<string>, projectDirectory).ToList();
+                }
+                else if (!path.StartsWith(s_thisDirectory, StringComparison.Ordinal))
+                {
+                    entries = RemoveInitialDotSlash(entries as IEnumerable<string>).ToList();
+                }
+                return entries;
+            }
+            catch (System.Security.SecurityException)
+            {
+                // For code access security.
+                return Array.Empty<string>();
+            }
+            catch (System.UnauthorizedAccessException)
+            {
+                // For OS security.
+                return Array.Empty<string>();
+            }
+        }
+
+        /// <summary>
+        /// Same as Directory.EnumerateDirectories(...) except that files that
+        /// aren't accessible are skipped instead of throwing an exception.
+        /// 
+        /// Other exceptions are passed through.
+        /// </summary>
+        /// <param name="path">The path.</param>
+        /// <param name="pattern">Pattern to match</param>
+        /// <param name="fileSystem">The file system abstraction to use that implements file system operations</param>
+        /// <returns>Accessible directories.</returns>
+        private static IReadOnlyList<string> GetAccessibleDirectoriesRedist
+        (
+            IFileSystem fileSystem,
+            string path,
+            string pattern
+        )
+        {
+            try
+            {
+                // look in current directory if no path specified
+                string dir = ((path.Length == 0) ? s_thisDirectory : path);
+
+                //FileSystemEnumerable<Tuple<string, string>>.FindPredicate? shouldIncludePredicate = ShouldEnforceMatching(pattern)
+                //        ? (ref FileSystemEntry entry) => entry.IsDirectory && IsMatch(Path.GetFileName(entry.ToFullPath()), pattern)
+                //        : (ref FileSystemEntry entry) => entry.IsDirectory;
+
+                var enumeration = new FileSystemEnumerable<Tuple<string, string>>(
+                    directory: dir,
+                    transform: (ref FileSystemEntry entry) => new Tuple<string, string>(entry.Directory.ToString(), entry.FileName.ToString())
+                )
+                {
+                    ShouldIncludePredicate = ShouldEnforceMatching(pattern)
+                            ? (ref FileSystemEntry entry) => entry.IsDirectory && IsMatch(Path.GetFileName(entry.ToFullPath()), pattern)
+                            : (ref FileSystemEntry entry) => entry.IsDirectory
+                };
+
+                List<string> entries = new List<string>();
+                foreach (var entry in enumeration)
+                {
+                    entries.Add(Path.Combine(entry.Item1, entry.Item2));
+                }
+                
+                if (!path.StartsWith(s_thisDirectory, StringComparison.Ordinal))
+                {
+                    entries = RemoveInitialDotSlash(entries as IEnumerable<string>).ToList();
+                }
+
+                return entries;
+            }
+            catch (System.Security.SecurityException)
+            {
+                // For code access security.
+                return Array.Empty<string>();
+            }
+            catch (System.UnauthorizedAccessException)
+            {
+                // For OS security.
+                return Array.Empty<string>();
+            }
+        }
+
+#endif
+
 
         /// <summary>
         /// Given a path name, get its long version.

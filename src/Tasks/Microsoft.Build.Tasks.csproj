@@ -989,6 +989,8 @@
   <ItemGroup>
     <PackageReference Include="System.Collections.Immutable" />
     <PackageReference Include="System.Resources.Extensions" />
+
+    <PackageReference Include="Microsoft.IO.Redist" Condition="'$(FeatureMSIORedist)' == 'true'" />
   </ItemGroup>
 
   <!-- Tasks need to mimic redistributing the compilers, so add references to both full framework and .net core -->

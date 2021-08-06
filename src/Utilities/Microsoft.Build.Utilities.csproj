@@ -23,6 +23,8 @@
 
     <PackageReference Include="System.Collections.Immutable" />
     <PackageReference Include="System.Configuration.ConfigurationManager" />
+
+    <PackageReference Include="Microsoft.IO.Redist" Condition="'$(FeatureMSIORedist)' == 'true'" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFrameworkIdentifier)' != '.NETStandard'">
