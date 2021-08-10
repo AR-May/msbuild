@@ -429,6 +429,20 @@ namespace Microsoft.Build.Eventing
         {
             WriteEvent(57, result);
         }
+
+        [Event(58, Keywords = Keywords.All)]
+        public void GetAccessibleFilesOrDirectoriesStart()
+        {
+            WriteEvent(58);
+        }
+
+        [Event(59, Keywords = Keywords.All)]
+        public void GetAccessibleFilesOrDirectoriesStop()
+        {
+            WriteEvent(59);
+        }
+
+
         #endregion
     }
 }

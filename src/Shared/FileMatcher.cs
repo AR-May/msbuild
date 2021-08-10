@@ -12,6 +12,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Build.Shared.FileSystem;
 using Microsoft.Build.Utilities;
+using Microsoft.Build.Eventing;
 
 #if FEATURE_MSIOREDIST
 using EnumerationOptions = Microsoft.IO.EnumerationOptions;
@@ -295,11 +296,15 @@ namespace Microsoft.Build.Shared
             {
                 try
                 {
-                    return (ShouldEnforceMatching(pattern)
+                    MSBuildEventSource.Log.GetAccessibleFilesOrDirectoriesStart();
+                    var result = (ShouldEnforceMatching(pattern)
                         ? fileSystem.EnumerateFileSystemEntries(path, pattern)
                             .Where(o => IsMatch(Path.GetFileName(o), pattern))
                         : fileSystem.EnumerateFileSystemEntries(path, pattern)
                         ).ToArray();
+
+                    MSBuildEventSource.Log.GetAccessibleFilesOrDirectoriesStop();
+                    return result;
                 }
                 // for OS security
                 catch (UnauthorizedAccessException)
@@ -366,6 +371,7 @@ namespace Microsoft.Build.Shared
         {
             try
             {
+                MSBuildEventSource.Log.GetAccessibleFilesOrDirectoriesStart();
                 // look in current directory if no path specified
                 string dir = ((path.Length == 0) ? s_thisDirectory : path);
 
@@ -399,7 +405,10 @@ namespace Microsoft.Build.Shared
                     files = RemoveInitialDotSlash(files);
                 }
 
-                return files.ToArray();
+                var result = files.ToArray();
+
+                MSBuildEventSource.Log.GetAccessibleFilesOrDirectoriesStop();
+                return result;
             }
             catch (System.Security.SecurityException)
             {
@@ -432,6 +441,7 @@ namespace Microsoft.Build.Shared
         {
             try
             {
+                MSBuildEventSource.Log.GetAccessibleFilesOrDirectoriesStart();
                 IEnumerable<string> directories = null;
 
                 if (pattern == null)
@@ -457,7 +467,10 @@ namespace Microsoft.Build.Shared
                     directories = RemoveInitialDotSlash(directories);
                 }
 
-                return directories.ToArray();
+                var result = directories.ToArray();
+
+                MSBuildEventSource.Log.GetAccessibleFilesOrDirectoriesStop();
+                return result;
             }
             catch (System.Security.SecurityException)
             {
@@ -490,6 +503,7 @@ namespace Microsoft.Build.Shared
             {
                 try
                 {
+                    MSBuildEventSource.Log.GetAccessibleFilesOrDirectoriesStart();
                     var enumeration = new FileSystemEnumerable<string>(
                         directory: path,
                         transform: (ref FileSystemEntry entry) => entry.FileName.ToString(),
@@ -503,6 +517,7 @@ namespace Microsoft.Build.Shared
 
                     IReadOnlyList<string> entries = enumeration.Select(x => Path.Combine(path, x)).ToList();
 
+                    MSBuildEventSource.Log.GetAccessibleFilesOrDirectoriesStop();
                     return entries;
                 }
                 // for OS security
@@ -543,6 +558,8 @@ namespace Microsoft.Build.Shared
         {
             try
             {
+                MSBuildEventSource.Log.GetAccessibleFilesOrDirectoriesStart();
+
                 // look in current directory if no path specified
                 string dir = ((path.Length == 0) ? s_thisDirectory : path);
 
@@ -574,6 +591,7 @@ namespace Microsoft.Build.Shared
                     entries = enumeration.ToList();
                 }
 
+                MSBuildEventSource.Log.GetAccessibleFilesOrDirectoriesStop();
                 return entries;
             }
             catch (System.Security.SecurityException)
@@ -607,6 +625,7 @@ namespace Microsoft.Build.Shared
         {
             try
             {
+                MSBuildEventSource.Log.GetAccessibleFilesOrDirectoriesStart();
                 // look in current directory if no path specified
                 string dir = ((path.Length == 0) ? s_thisDirectory : path);
 
@@ -633,6 +652,7 @@ namespace Microsoft.Build.Shared
                     entries = enumeration.ToList();
                 }
 
+                MSBuildEventSource.Log.GetAccessibleFilesOrDirectoriesStop();
                 return entries;
             }
             catch (System.Security.SecurityException)
