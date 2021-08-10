@@ -14,6 +14,7 @@ using Microsoft.Build.Shared.FileSystem;
 using Microsoft.Build.Utilities;
 
 #if FEATURE_MSIOREDIST
+using EnumerationOptions = Microsoft.IO.EnumerationOptions;
 using Microsoft.IO.Enumeration;
 #endif
 // TODO for .NET Standard 2.1 and higher.
@@ -246,30 +247,37 @@ namespace Microsoft.Build.Shared
         private static IReadOnlyList<string> GetAccessibleFileSystemEntries(IFileSystem fileSystem, FileSystemEntity entityType, string path, string pattern, string projectDirectory, bool stripProjectDirectory)
         {
             path = FileUtilities.FixFilePath(path);
+
+#if FEATURE_MSIOREDIST
             switch (entityType)
             {
                 case FileSystemEntity.Files:
-#if FEATURE_MSIOREDIST
                     return GetAccessibleFilesRedist(fileSystem, path, pattern, projectDirectory, stripProjectDirectory);
-#else
-                    return GetAccessibleFiles(fileSystem, path, pattern, projectDirectory, stripProjectDirectory);
-#endif
                 case FileSystemEntity.Directories:
-#if FEATURE_MSIOREDIST
                     return GetAccessibleDirectoriesRedist(fileSystem, path, pattern);
-#else
-                    return GetAccessibleDirectories(fileSystem, path, pattern);
-#endif
                 case FileSystemEntity.FilesAndDirectories:
-#if FEATURE_MSIOREDIST
-                    return GetAccessibleFilesAndDirectoriesRedist(fileSystem,path, pattern);
-#else
-                    return GetAccessibleFilesAndDirectories(fileSystem,path, pattern);
-#endif
+                    return GetAccessibleFilesAndDirectoriesRedist(fileSystem, path, pattern);
                 default:
                     ErrorUtilities.VerifyThrow(false, "Unexpected filesystem entity type.");
                     break;
             }
+
+#else
+            switch (entityType)
+            {
+                case FileSystemEntity.Files:
+                    return GetAccessibleFiles(fileSystem, path, pattern, projectDirectory, stripProjectDirectory);
+                case FileSystemEntity.Directories:
+                    return GetAccessibleDirectories(fileSystem, path, pattern);
+                case FileSystemEntity.FilesAndDirectories:
+                    return GetAccessibleFilesAndDirectories(fileSystem,path, pattern);
+
+                default:
+                    ErrorUtilities.VerifyThrow(false, "Unexpected filesystem entity type.");
+                    break;
+            }
+#endif
+
             return Array.Empty<string>();
         }
 
@@ -473,29 +481,28 @@ namespace Microsoft.Build.Shared
         /// <param name="pattern"></param>
         /// <param name="fileSystem">The file system abstraction to use that implements file system operations</param>
         /// <returns>An enumerable of matching file system entries (can be empty).</returns>
-        private static IReadOnlyList<string> GetAccessibleFilesAndDirectoriesRedist(IFileSystem fileSystem, string path, string pattern)
+        private static IReadOnlyList<string> GetAccessibleFilesAndDirectoriesRedist(
+            IFileSystem fileSystem,
+            string path,
+            string pattern)
         {
             if (fileSystem.DirectoryExists(path))
             {
                 try
                 {
-                    //FileSystemEnumerable<Tuple<string, string>>.FindPredicate? shouldIncludePredicate = ShouldEnforceMatching(pattern)
-                    //    ? (ref FileSystemEntry entry) => IsMatch(Path.GetFileName(entry.ToFullPath()), pattern)
-                    //    : null;
-
-                    var enumeration = new FileSystemEnumerable<Tuple<string, string>>(
+                    var enumeration = new FileSystemEnumerable<string>(
                         directory: path,
-                        transform: (ref FileSystemEntry entry) => new Tuple<string, string>(entry.Directory.ToString(), entry.FileName.ToString())
+                        transform: (ref FileSystemEntry entry) => entry.FileName.ToString(),
+                        options: new EnumerationOptions { AttributesToSkip = FileAttributes.System }
                     )
                     {
-                        ShouldIncludePredicate = ShouldEnforceMatching(pattern) ? (ref FileSystemEntry entry) => IsMatch(Path.GetFileName(entry.ToFullPath()), pattern) : null
+                        ShouldIncludePredicate = ShouldEnforceMatching(pattern)
+                            ? (ref FileSystemEntry entry) => IsMatch(entry.FileName.ToString(), pattern)
+                            : null
                     };
 
-                    List<string> entries = new List<string>();
-                    foreach (var entry in enumeration)
-                    {
-                        entries.Add(Path.Combine(entry.Item1, entry.Item2));
-                    }
+                    IReadOnlyList<string> entries = enumeration.Select(x => Path.Combine(path, x)).ToList();
+
                     return entries;
                 }
                 // for OS security
@@ -539,32 +546,27 @@ namespace Microsoft.Build.Shared
                 // look in current directory if no path specified
                 string dir = ((path.Length == 0) ? s_thisDirectory : path);
 
-                //FileSystemEnumerable<Tuple<string, string>>.FindPredicate? shouldIncludePredicate = ShouldEnforceMatching(filespec)
-                //        ? (ref FileSystemEntry entry) => !entry.IsDirectory && IsMatch(Path.GetFileName(entry.ToFullPath()), filespec)
-                //        : (ref FileSystemEntry entry) => !entry.IsDirectory;
+                if (stripProjectDirectory && dir.StartsWith(projectDirectory, StringComparison.Ordinal))
+                {
+                    dir = RemoveProjectDirectoryFromPath(dir, projectDirectory, IsDirectorySeparator(projectDirectory[projectDirectory.Length - 1]));
+                }
 
-                var enumeration = new FileSystemEnumerable<Tuple<string, string>>(
+                var enumeration = new FileSystemEnumerable<string>(
                     directory: dir,
-                    transform: (ref FileSystemEntry entry) => new Tuple<string, string>(entry.Directory.ToString(), entry.FileName.ToString())
+                    transform: (ref FileSystemEntry entry) => entry.FileName.ToString(),
+                    options: new EnumerationOptions { AttributesToSkip = FileAttributes.System }
                 )
                 {
                     ShouldIncludePredicate = ShouldEnforceMatching(filespec)
-                            ? (ref FileSystemEntry entry) => !entry.IsDirectory && IsMatch(Path.GetFileName(entry.ToFullPath()), filespec)
+                            ? (ref FileSystemEntry entry) => !entry.IsDirectory && IsMatch(entry.FileName.ToString(), filespec)
                             : (ref FileSystemEntry entry) => !entry.IsDirectory
                 };
 
-                List<string> entries = new List<string>();
-                foreach (var entry in enumeration)
-                {
-                    entries.Add(Path.Combine(entry.Item1, entry.Item2));
-                }
+                IReadOnlyList<string> entries = enumeration.Select(x => Path.Combine(dir, x)).ToList();
 
-                if (stripProjectDirectory)
+                if (!stripProjectDirectory && !path.StartsWith(s_thisDirectory, StringComparison.Ordinal))
                 {
-                    entries = RemoveProjectDirectory(entries as IEnumerable<string>, projectDirectory).ToList();
-                }
-                else if (!path.StartsWith(s_thisDirectory, StringComparison.Ordinal))
-                {
+                    // TODO: think about not adding s_thisDirectory as a dir to the path in the first place so we will not need to remove it.
                     entries = RemoveInitialDotSlash(entries as IEnumerable<string>).ToList();
                 }
                 return entries;
@@ -603,28 +605,22 @@ namespace Microsoft.Build.Shared
                 // look in current directory if no path specified
                 string dir = ((path.Length == 0) ? s_thisDirectory : path);
 
-                //FileSystemEnumerable<Tuple<string, string>>.FindPredicate? shouldIncludePredicate = ShouldEnforceMatching(pattern)
-                //        ? (ref FileSystemEntry entry) => entry.IsDirectory && IsMatch(Path.GetFileName(entry.ToFullPath()), pattern)
-                //        : (ref FileSystemEntry entry) => entry.IsDirectory;
-
-                var enumeration = new FileSystemEnumerable<Tuple<string, string>>(
+                var enumeration = new FileSystemEnumerable<string>(
                     directory: dir,
-                    transform: (ref FileSystemEntry entry) => new Tuple<string, string>(entry.Directory.ToString(), entry.FileName.ToString())
+                    transform: (ref FileSystemEntry entry) => entry.FileName.ToString(),
+                    options: new EnumerationOptions { AttributesToSkip = FileAttributes.System }
                 )
                 {
                     ShouldIncludePredicate = ShouldEnforceMatching(pattern)
-                            ? (ref FileSystemEntry entry) => entry.IsDirectory && IsMatch(Path.GetFileName(entry.ToFullPath()), pattern)
+                            ? (ref FileSystemEntry entry) => entry.IsDirectory && IsMatch(entry.FileName.ToString(), pattern)
                             : (ref FileSystemEntry entry) => entry.IsDirectory
                 };
 
-                List<string> entries = new List<string>();
-                foreach (var entry in enumeration)
-                {
-                    entries.Add(Path.Combine(entry.Item1, entry.Item2));
-                }
-                
+                IReadOnlyList<string> entries = enumeration.Select(x => Path.Combine(dir, x)).ToList();
+
                 if (!path.StartsWith(s_thisDirectory, StringComparison.Ordinal))
                 {
+                    // TODO: think about not adding s_thisDirectory as a dir to the path in the first place so we will not need to remove it.
                     entries = RemoveInitialDotSlash(entries as IEnumerable<string>).ToList();
                 }
 
@@ -930,6 +926,46 @@ namespace Microsoft.Build.Shared
         {
             return c == Path.DirectorySeparatorChar || c == Path.AltDirectorySeparatorChar;
         }
+
+        /// <summary>
+        /// Removes the current directory from a path converting the file back to relative path 
+        /// </summary>
+        /// <param name="path">Path to remove current directory from.</param>
+        /// <param name="projectDirectory"></param>
+        /// <param name="directoryLastCharIsSeparator"> Whether the next char after the project directory is a slash.</param>
+        internal static string RemoveProjectDirectoryFromPath
+        (
+            string path,
+            string projectDirectory,
+            bool directoryLastCharIsSeparator
+        )
+        {
+            if (path.StartsWith(projectDirectory, StringComparison.Ordinal))
+            {
+                // If the project directory did not end in a slash we need to check to see if the next char in the path is a slash
+                if (!directoryLastCharIsSeparator)
+                {
+                    //If the next char after the project directory is not a slash, skip this path
+                    if (path.Length <= projectDirectory.Length || !IsDirectorySeparator(path[projectDirectory.Length]))
+                    {
+                        return path;
+                    } else
+                    {
+                        return path.Substring(projectDirectory.Length + 1);
+                    }
+                }
+                else
+                {
+                    return path.Substring(projectDirectory.Length);
+                }
+            }
+            else
+            {
+                return path;
+            }
+        }
+
+
         /// <summary>
         /// Removes the current directory converting the file back to relative path 
         /// </summary>
@@ -944,28 +980,7 @@ namespace Microsoft.Build.Shared
             bool directoryLastCharIsSeparator = IsDirectorySeparator(projectDirectory[projectDirectory.Length - 1]);
             foreach (string path in paths)
             {
-                if (path.StartsWith(projectDirectory, StringComparison.Ordinal))
-                {
-                    // If the project directory did not end in a slash we need to check to see if the next char in the path is a slash
-                    if (!directoryLastCharIsSeparator)
-                    {
-                        //If the next char after the project directory is not a slash, skip this path
-                        if (path.Length <= projectDirectory.Length || !IsDirectorySeparator(path[projectDirectory.Length]))
-                        {
-                            yield return path;
-                            continue;
-                        }
-                        yield return path.Substring(projectDirectory.Length + 1);
-                    }
-                    else
-                    {
-                        yield return path.Substring(projectDirectory.Length);
-                    }
-                }
-                else
-                {
-                    yield return path;
-                }
+                yield return RemoveProjectDirectoryFromPath(path, projectDirectory, directoryLastCharIsSeparator);
             }
         }
 
