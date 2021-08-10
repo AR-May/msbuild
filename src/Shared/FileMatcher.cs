@@ -562,13 +562,18 @@ namespace Microsoft.Build.Shared
                             : (ref FileSystemEntry entry) => !entry.IsDirectory
                 };
 
-                IReadOnlyList<string> entries = enumeration.Select(x => Path.Combine(dir, x)).ToList();
-
-                if (!stripProjectDirectory && !path.StartsWith(s_thisDirectory, StringComparison.Ordinal))
+                IReadOnlyList<string> entries;
+                if (path.Length != 0)
                 {
-                    // TODO: think about not adding s_thisDirectory as a dir to the path in the first place so we will not need to remove it.
-                    entries = RemoveInitialDotSlash(entries as IEnumerable<string>).ToList();
+                    entries = enumeration.Select(x => Path.Combine(dir, x)).ToList();
                 }
+                else
+                {
+                    // IDE expects just the filename if it is in the current directory, without ".\", so not append it.
+                    // But only if the path requested didn't itself contain a ".\".
+                    entries = enumeration.ToList();
+                }
+
                 return entries;
             }
             catch (System.Security.SecurityException)
@@ -616,12 +621,16 @@ namespace Microsoft.Build.Shared
                             : (ref FileSystemEntry entry) => entry.IsDirectory
                 };
 
-                IReadOnlyList<string> entries = enumeration.Select(x => Path.Combine(dir, x)).ToList();
-
-                if (!path.StartsWith(s_thisDirectory, StringComparison.Ordinal))
+                IReadOnlyList<string> entries;
+                if (path.Length != 0)
                 {
-                    // TODO: think about not adding s_thisDirectory as a dir to the path in the first place so we will not need to remove it.
-                    entries = RemoveInitialDotSlash(entries as IEnumerable<string>).ToList();
+                    entries = enumeration.Select(x => Path.Combine(dir, x)).ToList();
+                }
+                else
+                {
+                    // IDE expects just the filename if it is in the current directory, without ".\", so not append it.
+                    // But only if the path requested didn't itself contain a ".\".
+                    entries = enumeration.ToList();
                 }
 
                 return entries;
