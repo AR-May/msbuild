@@ -17,6 +17,7 @@ using Microsoft.Build.Eventing;
 #if FEATURE_MSIOREDIST
 using EnumerationOptions = Microsoft.IO.EnumerationOptions;
 using Microsoft.IO.Enumeration;
+using Directory = Microsoft.IO.Directory;
 #endif
 // TODO for .NET Standard 2.1 and higher.
 // using System.IO.Enumeration; 
@@ -484,7 +485,152 @@ namespace Microsoft.Build.Shared
             }
         }
 
+
 #if FEATURE_MSIOREDIST
+        private static IReadOnlyList<string> GetAccessibleFilesAndDirectories2(IFileSystem fileSystem, string path, string pattern)
+        {
+            if (fileSystem.DirectoryExists(path))
+            {
+                try
+                {
+                    MSBuildEventSource.Log.GetAccessibleFilesOrDirectoriesStart();
+                    var result = (ShouldEnforceMatching(pattern)
+                        ? Microsoft.IO.Directory.EnumerateFileSystemEntries(path, pattern)
+                            .Where(o => IsMatch(Path.GetFileName(o), pattern))
+                        : Microsoft.IO.Directory.EnumerateFileSystemEntries(path, pattern)
+                        ).ToArray();
+
+                    MSBuildEventSource.Log.GetAccessibleFilesOrDirectoriesStop();
+                    return result;
+                }
+                // for OS security
+                catch (UnauthorizedAccessException)
+                {
+                    // do nothing
+                }
+                // for code access security
+                catch (System.Security.SecurityException)
+                {
+                    // do nothing
+                }
+            }
+
+            return Array.Empty<string>();
+        }
+
+        private static IReadOnlyList<string> GetAccessibleFiles2
+        (
+            IFileSystem fileSystem,
+            string path,
+            string filespec,     // can be null
+            string projectDirectory,
+            bool stripProjectDirectory
+        )
+        {
+            try
+            {
+                MSBuildEventSource.Log.GetAccessibleFilesOrDirectoriesStart();
+                // look in current directory if no path specified
+                string dir = ((path.Length == 0) ? s_thisDirectory : path);
+
+                // get all files in specified directory, unless a file-spec has been provided
+                IEnumerable<string> files;
+                if (filespec == null)
+                {
+                    files = Microsoft.IO.Directory.EnumerateFiles(dir);
+                }
+                else
+                {
+                    files = Microsoft.IO.Directory.EnumerateFiles(dir, filespec);
+                    if (ShouldEnforceMatching(filespec))
+                    {
+                        files = files.Where(o => IsMatch(Path.GetFileName(o), filespec));
+                    }
+                }
+                // If the Item is based on a relative path we need to strip
+                // the current directory from the front
+                if (stripProjectDirectory)
+                {
+                    files = RemoveProjectDirectory(files, projectDirectory);
+                }
+                // Files in the current directory are coming back with a ".\"
+                // prepended to them.  We need to remove this; it breaks the
+                // IDE, which expects just the filename if it is in the current
+                // directory.  But only do this if the original path requested
+                // didn't itself contain a ".\".
+                else if (!path.StartsWith(s_thisDirectory, StringComparison.Ordinal))
+                {
+                    files = RemoveInitialDotSlash(files);
+                }
+
+                var result = files.ToArray();
+
+                MSBuildEventSource.Log.GetAccessibleFilesOrDirectoriesStop();
+                return result;
+            }
+            catch (System.Security.SecurityException)
+            {
+                // For code access security.
+                return Array.Empty<string>();
+            }
+            catch (System.UnauthorizedAccessException)
+            {
+                // For OS security.
+                return Array.Empty<string>();
+            }
+        }
+        private static IReadOnlyList<string> GetAccessibleDirectories2
+        (
+            IFileSystem fileSystem,
+            string path,
+            string pattern
+        )
+        {
+            try
+            {
+                MSBuildEventSource.Log.GetAccessibleFilesOrDirectoriesStart();
+                IEnumerable<string> directories = null;
+
+                if (pattern == null)
+                {
+                    directories = Microsoft.IO.Directory.EnumerateDirectories((path.Length == 0) ? s_thisDirectory : path);
+                }
+                else
+                {
+                    directories = Microsoft.IO.Directory.EnumerateDirectories((path.Length == 0) ? s_thisDirectory : path, pattern);
+                    if (ShouldEnforceMatching(pattern))
+                    {
+                        directories = directories.Where(o => IsMatch(Path.GetFileName(o), pattern));
+                    }
+                }
+
+                // Subdirectories in the current directory are coming back with a ".\"
+                // prepended to them.  We need to remove this; it breaks the
+                // IDE, which expects just the filename if it is in the current
+                // directory.  But only do this if the original path requested
+                // didn't itself contain a ".\".
+                if (!path.StartsWith(s_thisDirectory, StringComparison.Ordinal))
+                {
+                    directories = RemoveInitialDotSlash(directories);
+                }
+
+                var result = directories.ToArray();
+
+                MSBuildEventSource.Log.GetAccessibleFilesOrDirectoriesStop();
+                return result;
+            }
+            catch (System.Security.SecurityException)
+            {
+                // For code access security.
+                return Array.Empty<string>();
+            }
+            catch (System.UnauthorizedAccessException)
+            {
+                // For OS security.
+                return Array.Empty<string>();
+            }
+        }
+
 
         /// <summary>
         /// Returns an enumerable of file system entries matching the specified search criteria. Inaccessible or non-existent file
@@ -506,16 +652,16 @@ namespace Microsoft.Build.Shared
                     MSBuildEventSource.Log.GetAccessibleFilesOrDirectoriesStart();
                     var enumeration = new FileSystemEnumerable<string>(
                         directory: path,
-                        transform: (ref FileSystemEntry entry) => entry.FileName.ToString(),
+                        transform: (ref FileSystemEntry entry) => Path.Combine(path, entry.FileName.ToString()),
                         options: new EnumerationOptions { AttributesToSkip = FileAttributes.System }
                     )
                     {
-                        ShouldIncludePredicate = ShouldEnforceMatching(pattern)
+                        ShouldIncludePredicate = !(pattern == null || IsAllFilesWildcard(pattern))
                             ? (ref FileSystemEntry entry) => IsMatch(entry.FileName.ToString(), pattern)
                             : null
                     };
 
-                    IReadOnlyList<string> entries = enumeration.Select(x => Path.Combine(path, x)).ToList();
+                    IReadOnlyList<string> entries = enumeration.ToList();
 
                     MSBuildEventSource.Log.GetAccessibleFilesOrDirectoriesStop();
                     return entries;
@@ -570,27 +716,19 @@ namespace Microsoft.Build.Shared
 
                 var enumeration = new FileSystemEnumerable<string>(
                     directory: dir,
-                    transform: (ref FileSystemEntry entry) => entry.FileName.ToString(),
+                    // IDE expects just the filename if it is in the current directory, without ".\", so not append it.
+                    // But only if the path requested didn't itself contain a ".\".
+                    transform: (ref FileSystemEntry entry) => (path.Length != 0) ? Path.Combine(dir, entry.FileName.ToString()) : entry.FileName.ToString(),
                     options: new EnumerationOptions { AttributesToSkip = FileAttributes.System }
                 )
                 {
-                    ShouldIncludePredicate = ShouldEnforceMatching(filespec)
+                    ShouldIncludePredicate = !(filespec == null || IsAllFilesWildcard(filespec))
                             ? (ref FileSystemEntry entry) => !entry.IsDirectory && IsMatch(entry.FileName.ToString(), filespec)
                             : (ref FileSystemEntry entry) => !entry.IsDirectory
                 };
 
-                IReadOnlyList<string> entries;
-                if (path.Length != 0)
-                {
-                    entries = enumeration.Select(x => Path.Combine(dir, x)).ToList();
-                }
-                else
-                {
-                    // IDE expects just the filename if it is in the current directory, without ".\", so not append it.
-                    // But only if the path requested didn't itself contain a ".\".
-                    entries = enumeration.ToList();
-                }
-
+                IReadOnlyList<string> entries = enumeration.ToList();
+                
                 MSBuildEventSource.Log.GetAccessibleFilesOrDirectoriesStop();
                 return entries;
             }
@@ -631,27 +769,19 @@ namespace Microsoft.Build.Shared
 
                 var enumeration = new FileSystemEnumerable<string>(
                     directory: dir,
-                    transform: (ref FileSystemEntry entry) => entry.FileName.ToString(),
+                    // IDE expects just the filename if it is in the current directory, without ".\", so not append it.
+                    // But only if the path requested didn't itself contain a ".\".
+                    transform: (ref FileSystemEntry entry) => (path.Length != 0) ? Path.Combine(dir, entry.FileName.ToString()) : entry.FileName.ToString(),
                     options: new EnumerationOptions { AttributesToSkip = FileAttributes.System }
                 )
                 {
-                    ShouldIncludePredicate = ShouldEnforceMatching(pattern)
+                    ShouldIncludePredicate = !(pattern == null || IsAllFilesWildcard(pattern))
                             ? (ref FileSystemEntry entry) => entry.IsDirectory && IsMatch(entry.FileName.ToString(), pattern)
                             : (ref FileSystemEntry entry) => entry.IsDirectory
                 };
 
-                IReadOnlyList<string> entries;
-                if (path.Length != 0)
-                {
-                    entries = enumeration.Select(x => Path.Combine(dir, x)).ToList();
-                }
-                else
-                {
-                    // IDE expects just the filename if it is in the current directory, without ".\", so not append it.
-                    // But only if the path requested didn't itself contain a ".\".
-                    entries = enumeration.ToList();
-                }
-
+                IReadOnlyList<string> entries = enumeration.ToList();
+                
                 MSBuildEventSource.Log.GetAccessibleFilesOrDirectoriesStop();
                 return entries;
             }
