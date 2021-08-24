@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Microsoft.Build.Eventing;
 using Microsoft.Build.Utilities;
 using System;
 using System.Collections.Generic;
@@ -41,35 +42,47 @@ namespace Microsoft.Build.Shared.FileSystem
 
         public virtual IEnumerable<string> EnumerateFiles(string path, string searchPattern, SearchOption searchOption)
         {
-#if FEATURE_MSIOREDIST
-            return ChangeWaves.AreFeaturesEnabled(ChangeWaves.Wave17_0)
-                    ? Microsoft.IO.Directory.EnumerateFiles(path, searchPattern, (Microsoft.IO.SearchOption)searchOption)
-                    : Directory.EnumerateFiles(path, searchPattern, searchOption);
+            MSBuildEventSource.Log.EnumerateFilesOrDirectoriesStart();
+#if FEATURE_MSIOREDIST1
+            var result = //ChangeWaves.AreFeaturesEnabled(ChangeWaves.Wave17_0)
+                         //?
+                    Microsoft.IO.Directory.EnumerateFiles(path, searchPattern, (Microsoft.IO.SearchOption)searchOption);
+                    //: Directory.EnumerateFiles(path, searchPattern, searchOption);
 #else
-            return Directory.EnumerateFiles(path, searchPattern, searchOption);
+            var result =  Directory.EnumerateFiles(path, searchPattern, searchOption);
 #endif
+            MSBuildEventSource.Log.EnumerateFilesOrDirectoriesStop();
+            return result;
         }
 
         public virtual IEnumerable<string> EnumerateDirectories(string path, string searchPattern, SearchOption searchOption)
         {
-#if FEATURE_MSIOREDIST
-            return ChangeWaves.AreFeaturesEnabled(ChangeWaves.Wave17_0)
-                    ? Microsoft.IO.Directory.EnumerateDirectories(path, searchPattern, (Microsoft.IO.SearchOption)searchOption)
-                    : Directory.EnumerateDirectories(path, searchPattern, searchOption);
+            MSBuildEventSource.Log.EnumerateFilesOrDirectoriesStart();
+#if FEATURE_MSIOREDIST1
+            var result = //ChangeWaves.AreFeaturesEnabled(ChangeWaves.Wave17_0)
+                         //?
+                    Microsoft.IO.Directory.EnumerateDirectories(path, searchPattern, (Microsoft.IO.SearchOption)searchOption);
+                    //: Directory.EnumerateDirectories(path, searchPattern, searchOption);
 #else
-            return Directory.EnumerateDirectories(path, searchPattern, searchOption);
+            var result = Directory.EnumerateDirectories(path, searchPattern, searchOption);
 #endif
+            MSBuildEventSource.Log.EnumerateFilesOrDirectoriesStop();
+            return result;
         }
 
         public virtual IEnumerable<string> EnumerateFileSystemEntries(string path, string searchPattern, SearchOption searchOption)
         {
-#if FEATURE_MSIOREDIST
-            return ChangeWaves.AreFeaturesEnabled(ChangeWaves.Wave17_0)
-                    ? Microsoft.IO.Directory.EnumerateFileSystemEntries(path, searchPattern, (Microsoft.IO.SearchOption)searchOption)
-                    : Directory.EnumerateFileSystemEntries(path, searchPattern, searchOption);
+            MSBuildEventSource.Log.EnumerateFilesOrDirectoriesStart();
+#if FEATURE_MSIOREDIST1
+            var result =// ChangeWaves.AreFeaturesEnabled(ChangeWaves.Wave17_0)
+                        //?
+                    Microsoft.IO.Directory.EnumerateFileSystemEntries(path, searchPattern, (Microsoft.IO.SearchOption)searchOption);
+                    //: Directory.EnumerateFileSystemEntries(path, searchPattern, searchOption);
 #else
-            return Directory.EnumerateFileSystemEntries(path, searchPattern, searchOption);
+            var result = Directory.EnumerateFileSystemEntries(path, searchPattern, searchOption);
 #endif
+            MSBuildEventSource.Log.EnumerateFilesOrDirectoriesStop();
+            return result;
         }
 
         public FileAttributes GetAttributes(string path)
