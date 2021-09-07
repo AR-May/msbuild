@@ -16,6 +16,7 @@ using Microsoft.Win32.SafeHandles;
 
 using FILETIME = System.Runtime.InteropServices.ComTypes.FILETIME;
 using Microsoft.Build.Utilities;
+using Microsoft.Build.Eventing;
 
 namespace Microsoft.Build.Shared
 {
@@ -1079,6 +1080,8 @@ namespace Microsoft.Build.Shared
         /// </remarks>
         internal static DateTime GetLastWriteFileUtcTime(string fullPath)
         {
+            MSBuildEventSource.Log.GetLastWriteFileUtcTimeStart(fullPath);
+
             DateTime fileModifiedTime = DateTime.MinValue;
 
             if (IsWindows)
@@ -1103,13 +1106,17 @@ namespace Microsoft.Build.Shared
                     }
                 }
 
+                MSBuildEventSource.Log.GetLastWriteFileUtcTimeStop(fullPath);
                 return fileModifiedTime;
             }
             else
             {
-                return File.Exists(fullPath)
+                var res = File.Exists(fullPath)
                         ? File.GetLastWriteTimeUtc(fullPath)
                         : DateTime.MinValue;
+
+                MSBuildEventSource.Log.GetLastWriteFileUtcTimeStop(fullPath);
+                return res;
             }
         }
 
