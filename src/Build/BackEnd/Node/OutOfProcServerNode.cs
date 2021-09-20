@@ -10,6 +10,7 @@ using System.Threading;
 using Microsoft.Build.BackEnd;
 using Microsoft.Build.Shared;
 using Microsoft.Build.Internal;
+using System.Diagnostics;
 
 namespace Microsoft.Build.Execution
 {
@@ -73,7 +74,7 @@ namespace Microsoft.Build.Execution
             _shutdownEvent = new ManualResetEvent(false);
             _packetFactory = new NodePacketFactory();
 
-            (this as INodePacketFactory).RegisterPacketHandler(NodePacketType.ServerNodeBuilCommand, ServerNodeBuildCommand.FactoryForDeserialization, this);
+            (this as INodePacketFactory).RegisterPacketHandler(NodePacketType.ServerNodeBuildCommand, ServerNodeBuildCommand.FactoryForDeserialization, this);
             (this as INodePacketFactory).RegisterPacketHandler(NodePacketType.NodeBuildComplete, NodeBuildComplete.FactoryForDeserialization, this);
         }
 
@@ -112,6 +113,10 @@ namespace Microsoft.Build.Execution
         /// <returns>The reason for shutting down.</returns>
         public NodeEngineShutdownReason Run(bool enableReuse, bool lowPriority, out Exception? shutdownException)
         {
+            // TODO: remove later.
+            enableReuse = false;
+            lowPriority = false;
+
             string msBuildLocation = BuildEnvironmentHelper.Instance.CurrentMSBuildExePath;
             var handshake = new ServerNodeHandshake(
                 CommunicationsUtilities.GetHandshakeOptions(taskHost: false, nodeReuse: enableReuse, lowPriority: lowPriority, is64Bit: EnvironmentUtilities.Is64BitProcess),
@@ -290,7 +295,7 @@ namespace Microsoft.Build.Execution
         {
             switch (packet.Type)
             {
-                case NodePacketType.ServerNodeBuilCommand:
+                case NodePacketType.ServerNodeBuildCommand:
                     HandleServerNodeBuildCommand((ServerNodeBuildCommand)packet);
                     break;
                 case NodePacketType.NodeBuildComplete:
@@ -425,9 +430,9 @@ namespace Microsoft.Build.Execution
             _shutdownEvent.Set();
         }
 
-        internal sealed class ServerNamedMutex : IDisposable
+        public sealed class ServerNamedMutex : IDisposable
         {
-            public readonly Mutex _serverMutex;
+            public readonly Mutex serverMutex;
 
             public bool IsDisposed { get; private set; }
 
@@ -435,7 +440,7 @@ namespace Microsoft.Build.Execution
 
             public ServerNamedMutex(string mutexName, out bool createdNew)
             {
-                _serverMutex = new Mutex(
+                serverMutex = new Mutex(
                     initiallyOwned: true,
                     name: mutexName,
                     createdNew: out createdNew);
@@ -486,7 +491,7 @@ namespace Microsoft.Build.Execution
                     throw new InvalidOperationException("Lock already held");
                 }
 
-                return IsLocked = _serverMutex.WaitOne(timeoutMs);
+                return IsLocked = serverMutex.WaitOne(timeoutMs);
             }
 
             public void Dispose()
@@ -502,12 +507,12 @@ namespace Microsoft.Build.Execution
                 {
                     if (IsLocked)
                     {
-                        _serverMutex.ReleaseMutex();
+                        serverMutex.ReleaseMutex();
                     }
                 }
                 finally
                 {
-                    _serverMutex.Dispose();
+                    serverMutex.Dispose();
                     IsLocked = false;
                 }
             }

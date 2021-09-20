@@ -7,12 +7,12 @@ namespace Microsoft.Build.BackEnd
 {
     internal class ServerNodeConsoleWrite : INodePacket
     {
-        public string Text { get; }
+        public string Text { get; private set; } = default!;
 
         /// <summary>
         /// 1 = stdout, 2 = stderr
         /// </summary>
-        public byte OutputType { get; }
+        public byte OutputType { get; private set; } = default!;
 
         public ServerNodeConsoleWrite(string text, byte outputType)
         {
@@ -20,12 +20,16 @@ namespace Microsoft.Build.BackEnd
             OutputType = outputType;
         }
 
+        private ServerNodeConsoleWrite()
+        {
+        }
+
         #region INodePacket Members
 
         /// <summary>
         /// Packet type.
         /// </summary>
-        public NodePacketType Type => NodePacketType.ServerNodeConsole;
+        public NodePacketType Type => NodePacketType.ServerNodeConsoleWrite;
 
         #endregion
 
@@ -40,8 +44,22 @@ namespace Microsoft.Build.BackEnd
             }
             else
             {
-                throw new InvalidOperationException("Read from stream not supported");
+                var br = translator.Reader;
+
+                Text = br.ReadString();
+                OutputType = br.ReadByte();
             }
+        }
+
+        /// <summary>
+        /// Factory for deserialization.
+        /// </summary>
+        internal static INodePacket FactoryForDeserialization(ITranslator translator)
+        {
+            ServerNodeConsoleWrite command = new();
+            command.Translate(translator);
+
+            return command;
         }
     }
 }

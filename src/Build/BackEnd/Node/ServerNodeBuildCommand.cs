@@ -34,7 +34,7 @@ namespace Microsoft.Build.BackEnd
         /// <summary>
         /// Retrieves the packet type.
         /// </summary>
-        public NodePacketType Type => NodePacketType.ServerNodeBuilCommand;
+        public NodePacketType Type => NodePacketType.ServerNodeBuildCommand;
 
         #endregion
 
@@ -90,7 +90,18 @@ namespace Microsoft.Build.BackEnd
             }
             else
             {
-                throw new InvalidOperationException("Writing into stream not supported");
+                var bw = translator.Writer;
+
+                bw.Write(CommandLine);
+                bw.Write(StartupDirectory);
+                bw.Write(BuildProcessEnvironment.Count);
+                foreach (var key in BuildProcessEnvironment.Keys)
+                {
+                    bw.Write(key);
+                    bw.Write(BuildProcessEnvironment[key]);
+                }
+                bw.Write(Culture.ToString());
+                bw.Write(UICulture.ToString());
             }
         }
 
