@@ -16,7 +16,9 @@ using Microsoft.Win32.SafeHandles;
 
 using FILETIME = System.Runtime.InteropServices.ComTypes.FILETIME;
 using Microsoft.Build.Utilities;
+#if !CLR2COMPATIBILITY
 using Microsoft.Build.Eventing;
+#endif
 
 namespace Microsoft.Build.Shared
 {
@@ -1080,7 +1082,9 @@ namespace Microsoft.Build.Shared
         /// </remarks>
         internal static DateTime GetLastWriteFileUtcTime(string fullPath)
         {
+#if !CLR2COMPATIBILITY
             MSBuildEventSource.Log.GetLastWriteFileUtcTimeStart(fullPath);
+#endif
 
             DateTime fileModifiedTime = DateTime.MinValue;
 
@@ -1105,8 +1109,9 @@ namespace Microsoft.Build.Shared
                         fileModifiedTime = GetContentLastWriteFileUtcTime(fullPath);
                     }
                 }
-
+#if !CLR2COMPATIBILITY
                 MSBuildEventSource.Log.GetLastWriteFileUtcTimeStop(fullPath);
+#endif
                 return fileModifiedTime;
             }
             else
@@ -1115,7 +1120,9 @@ namespace Microsoft.Build.Shared
                         ? File.GetLastWriteTimeUtc(fullPath)
                         : DateTime.MinValue;
 
+#if !CLR2COMPATIBILITY
                 MSBuildEventSource.Log.GetLastWriteFileUtcTimeStop(fullPath);
+#endif
                 return res;
             }
         }
