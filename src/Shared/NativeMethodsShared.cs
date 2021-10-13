@@ -1084,7 +1084,6 @@ namespace Microsoft.Build.Shared
         {
 #if !CLR2COMPATIBILITY
             MSBuildEventSource.Log.GetLastWriteFileUtcTimeStart(fullPath);
-#endif
 
             DateTime fileModifiedTime = DateTime.MinValue;
 
@@ -1109,9 +1108,7 @@ namespace Microsoft.Build.Shared
                         fileModifiedTime = GetContentLastWriteFileUtcTime(fullPath);
                     }
                 }
-#if !CLR2COMPATIBILITY
                 MSBuildEventSource.Log.GetLastWriteFileUtcTimeStop(fullPath);
-#endif
                 return fileModifiedTime;
             }
             else
@@ -1120,11 +1117,12 @@ namespace Microsoft.Build.Shared
                         ? File.GetLastWriteTimeUtc(fullPath)
                         : DateTime.MinValue;
 
-#if !CLR2COMPATIBILITY
                 MSBuildEventSource.Log.GetLastWriteFileUtcTimeStop(fullPath);
-#endif
                 return res;
-            }
+            }      
+#else
+            throw new NotImplementedException("AAAAAAA");
+#endif
         }
 
         /// <summary>
