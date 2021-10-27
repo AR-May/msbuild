@@ -454,6 +454,48 @@ namespace Microsoft.Build.Eventing
             WriteEvent(61, fileItemSpec, wasUpToDate);
         }
 
+        [Event(62, Keywords = Keywords.All)]
+        public void PRE_cache_miss(string projectFile)
+        {
+            WriteEvent(62, projectFile);
+        }
+
+        [Event(63, Keywords = Keywords.All)]
+        public void PRE_cache_remove(string projectFile)
+        {
+            WriteEvent(63, projectFile);
+        }
+
+        [Event(64, Keywords = Keywords.All)]
+        public void PRE_cache_not_satisfied(string projectFile)
+        {
+            WriteEvent(64, projectFile);
+        }
+
+        [Event(65, Keywords = Keywords.All)]
+        public void PRE_cache_reload(string projectFile)
+        {
+            WriteEvent(65, projectFile);
+        }
+
+        [Event(66, Keywords = Keywords.All)]
+        public void PRE_cache_hit(string projectFile)
+        {
+            WriteEvent(66, projectFile);
+        }
+
+        [Event(67, Keywords = Keywords.All)]
+        public void PRECacheGetStart(string projectFile)
+        {
+            WriteEvent(67, projectFile);
+        }
+
+        [Event(68, Keywords = Keywords.All)]
+        public void PRECacheGetStop(string projectFile)
+        {
+            WriteEvent(68, projectFile);
+        }
+
         #endregion
     }
 }

@@ -3,6 +3,7 @@
 
 using System;
 using Microsoft.Build.Construction;
+using Microsoft.Build.Eventing;
 
 namespace Microsoft.Build.Evaluation
 {
@@ -100,6 +101,7 @@ namespace Microsoft.Build.Evaluation
         /// </summary>
         protected virtual void RaiseProjectRootElementRemovedFromStrongCache(ProjectRootElement projectRootElement)
         {
+            MSBuildEventSource.Log.PRE_cache_remove(projectRootElement.FullPath);
             StrongCacheEntryRemovedDelegate removedEvent = StrongCacheEntryRemoved;
             removedEvent?.Invoke(this, projectRootElement);
         }

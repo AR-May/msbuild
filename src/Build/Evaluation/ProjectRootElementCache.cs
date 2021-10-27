@@ -14,6 +14,7 @@ using System.Diagnostics;
 using System.Globalization;
 using Microsoft.Build.Internal;
 using OutOfProcNode = Microsoft.Build.Execution.OutOfProcNode;
+using Microsoft.Build.Eventing;
 
 namespace Microsoft.Build.Evaluation
 {
@@ -216,6 +217,19 @@ namespace Microsoft.Build.Evaluation
         internal override ProjectRootElement Get(string projectFile, OpenProjectRootElement openProjectRootElement, bool isExplicitlyLoaded,
             bool? preserveFormatting)
         {
+            //if (projectFile == @"C:\Users\alinama\work\MSBUILD\test-repos\OrchardCore\OrchardCore\src\OrchardCore\OrchardCore.DisplayManagement\OrchardCore.DisplayManagement.csproj")
+            //{
+            //    Debugger.Launch();
+
+            //    System.Diagnostics.StackTrace t = new System.Diagnostics.StackTrace();
+            //    File.AppendAllText(
+            //        @"C:\Users\alinama\work\MSBUILD\issues\ProjectRootElementCache-remove-miss-count#6715\call_stacks.txt",
+            //        @"-----------" + Environment.NewLine + t.ToString() + Environment.NewLine
+            //    );
+            //}
+
+            MSBuildEventSource.Log.PRECacheGetStart(projectFile);
+            
             // Should already have been canonicalized
             ErrorUtilities.VerifyThrowInternalRooted(projectFile);
 
@@ -236,11 +250,13 @@ namespace Microsoft.Build.Evaluation
                 }
                 else
                 {
+                    MSBuildEventSource.Log.PRE_cache_miss(projectFile);
                     DebugTraceCache("Not found in cache: ", projectFile);
                 }
 
                 if (preserveFormatting != null && projectRootElement != null && projectRootElement.XmlDocument.PreserveWhitespace != preserveFormatting)
                 {
+                    MSBuildEventSource.Log.PRE_cache_reload(projectFile);
                     //  Cached project doesn't match preserveFormatting setting, so reload it
                     projectRootElement.Reload(true, preserveFormatting);
                 }
@@ -249,6 +265,7 @@ namespace Microsoft.Build.Evaluation
             bool projectRootElementIsInvalid = IsInvalidEntry(projectFile, projectRootElement);
             if (projectRootElementIsInvalid)
             {
+                MSBuildEventSource.Log.PRE_cache_not_satisfied(projectFile);
                 DebugTraceCache("Not satisfied from cache: ", projectFile);
                 ForgetEntryIfExists(projectRootElement);
             }
@@ -257,11 +274,14 @@ namespace Microsoft.Build.Evaluation
             {
                 if (projectRootElement == null || projectRootElementIsInvalid)
                 {
+                    MSBuildEventSource.Log.PRECacheGetStop(projectFile);
                     return null;
                 }
                 else
                 {
+                    MSBuildEventSource.Log.PRE_cache_hit(projectFile);
                     DebugTraceCache("Satisfied from XML cache: ", projectFile);
+                    MSBuildEventSource.Log.PRECacheGetStop(projectFile);
                     return projectRootElement;
                 }
             }
@@ -291,9 +311,11 @@ namespace Microsoft.Build.Evaluation
             }
             else
             {
+                MSBuildEventSource.Log.PRE_cache_hit(projectFile);
                 DebugTraceCache("Satisfied from XML cache: ", projectFile);
             }
 
+            MSBuildEventSource.Log.PRECacheGetStop(projectFile);
             return projectRootElement;
         }
 
