@@ -34,6 +34,7 @@ using ConsoleLogger = Microsoft.Build.Logging.ConsoleLogger;
 using LoggerDescription = Microsoft.Build.Logging.LoggerDescription;
 using ForwardingLoggerRecord = Microsoft.Build.Logging.ForwardingLoggerRecord;
 using BinaryLogger = Microsoft.Build.Logging.BinaryLogger;
+using Microsoft.Build.Client;
 
 #nullable disable
 
@@ -215,14 +216,31 @@ namespace Microsoft.Build.CommandLine
                 DumpCounters(true /* initialize only */);
             }
 
-            // return 0 on success, non-zero on failure
-            int exitCode = ((s_initialized && Execute(
+            // return value: 0 on success, non-zero on failure
+            int exitCode;
+
+            bool runMsbuildInServer = Environment.GetEnvironmentVariable("RUN_MSBUILD_IN_SERVER") == "1";
+            if (runMsbuildInServer)
+            {
+                exitCode = MSBuildClient.Execute(
 #if FEATURE_GET_COMMANDLINE
                 Environment.CommandLine
 #else
                 ConstructArrayArg(args)
 #endif
-            ) == ExitType.Success) ? 0 : 1);
+                );
+            }
+            else
+            {
+                
+                exitCode = ((s_initialized && Execute(
+#if FEATURE_GET_COMMANDLINE
+                Environment.CommandLine
+#else
+                ConstructArrayArg(args)
+#endif
+                ) == ExitType.Success) ? 0 : 1);
+            }
 
             if (Environment.GetEnvironmentVariable("MSBUILDDUMPPROCESSCOUNTERS") == "1")
             {

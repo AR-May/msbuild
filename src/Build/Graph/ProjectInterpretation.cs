@@ -273,7 +273,7 @@ namespace Microsoft.Build.Graph
         delegate GlobalPropertyPartsForMSBuildTask GlobalPropertiesModifier(GlobalPropertyPartsForMSBuildTask defaultParts, ProjectItemInstance projectReference);
 
         /// <summary>
-        ///     Gets the effective global properties for an item that will get passed to <see cref="MSBuild.Projects"/>.
+        ///     Gets the effective global properties for an item that will get passed to TODO.
         /// </summary>
         /// <remarks>
         ///     The behavior of this method matches the hardcoded behaviour of the msbuild task
