@@ -156,15 +156,9 @@ namespace Microsoft.Build.Client
     internal class EntryNodeConsoleWrite
     {
         private string _text;
-        private ConsoleColor _foreground;
-        private ConsoleColor _background;
         private byte _outputType;
 
         public string Text => _text;
-
-        public ConsoleColor Foreground => _foreground;
-
-        public ConsoleColor Background => _background;
 
         /// <summary>
         /// 1 = stdout, 2 = stderr
@@ -174,8 +168,6 @@ namespace Microsoft.Build.Client
         private EntryNodeConsoleWrite()
         {
             _text = "";
-            _foreground = new ConsoleColor();
-            _background = new ConsoleColor();
             _outputType = 0;
     }
 
@@ -196,8 +188,6 @@ namespace Microsoft.Build.Client
             using var br = new BinaryReader(inputStream);
 
             consoleWrite._text = br.ReadString();
-            consoleWrite._foreground = (ConsoleColor)br.ReadInt32();
-            consoleWrite._background = (ConsoleColor)br.ReadInt32();
             consoleWrite._outputType = br.ReadByte();
 
             return consoleWrite;

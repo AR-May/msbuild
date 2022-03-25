@@ -10,7 +10,7 @@ using Microsoft.Build.BackEnd;
 using Microsoft.Build.Internal;
 using Microsoft.Build.Shared;
 using static Microsoft.Build.CommandLine.MSBuildApp;
-using static Microsoft.Build.Execution.OutOfProcEntryNode;
+using static Microsoft.Build.Execution.OutOfProcServerNode;
 
 namespace Microsoft.Build.Client
 {
@@ -20,22 +20,6 @@ namespace Microsoft.Build.Client
     /// </summary>
     public static class MSBuildClient
     {
-
-        // public static int Main(string[] args)
-        // {
-        //    Console.WriteLine(string.Join(" ", args));
-        //    bool runMsbuildInServer = Environment.GetEnvironmentVariable("RUN_MSBUILD_IN_SERVER") == "1";
-        //    if (runMsbuildInServer)
-        //    {
-        //        int exitCode = Execute(args);
-        //        return exitCode;
-        //    }
-        //    else
-        //    {
-        //        Console.WriteLine("TODO: fallout to usual msbuild call");
-        //        return 0;
-        //    }
-        // }
         public static ExitType Execute(
 #if FEATURE_GET_COMMANDLINE
             string commandLine
@@ -45,9 +29,14 @@ namespace Microsoft.Build.Client
             )
         {
 #if !FEATURE_GET_COMMANDLINE
-            string commandLine = string.Join(" ", commandLineArr);
+            string commandLine = string.Join(" ", commandLineArr); // TODO: maybe msbuildLocation would be needed here. 
 #endif
-            string msBuildLocation = BuildEnvironmentHelper.Instance.CurrentMSBuildExePath;
+            // Debugger.Launch();
+
+            // TODO: figure out the location.
+            // string msBuildLocation = BuildEnvironmentHelper.Instance.CurrentMSBuildExePath;
+
+            string msBuildLocation = @"C:\Users\alinama\work\MSBUILD\msbuild-1\msbuild\artifacts\bin\MSBuild\Debug\net6.0\MSBuild.dll";
 
             string[] msBuildServerOptions = new [] {
                 "/nologo",
@@ -56,10 +45,6 @@ namespace Microsoft.Build.Client
             }.ToArray();
 
             ProcessStartInfo msBuildServerStartInfo = GetMSBuildServerProcessStartInfo(msBuildLocation,msBuildServerOptions, new Dictionary<string, string>());
-
-            // var handshake2 = new ServerNodeHandshake(
-            //    GetHandshakeOptions(),
-            //    msBuildLocation);
 
             // TODO: remove later. debug.
             StreamWriter sw = new StreamWriter(@"C:\Users\alinama\work\MSBUILD\msbuild-1\client-handshake.txt");
@@ -96,6 +81,7 @@ namespace Microsoft.Build.Client
             NamedPipeClientStream nodeStream = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
 
             nodeStream.Connect(serverWasAlreadyRunning && !serverWasBusy ? 1_000 : 20_000);
+            Console.WriteLine("Client is connected to server.");
 
             int[] handshakeComponents = handshake.RetrieveHandshakeComponents();
             for (int i = 0; i < handshakeComponents.Length; i++)
@@ -128,7 +114,7 @@ namespace Microsoft.Build.Client
             }
 
             var buildCommand = new EntryNodeCommand(
-                commandLine: '"' + msBuildLocation + '"' + " " + commandLine,
+                commandLine: commandLine,
                 startupDirectory: Directory.GetCurrentDirectory(),
                 buildProcessEnvironment: envVars,
                 CultureInfo.CurrentCulture,
@@ -144,8 +130,6 @@ namespace Microsoft.Build.Client
                 var packet = ReadPacket(nodeStream);
                 if (packet is EntryNodeConsoleWrite consoleWrite)
                 {
-                    Console.ForegroundColor = consoleWrite.Foreground;
-                    Console.BackgroundColor = consoleWrite.Background;
                     switch (consoleWrite.OutputType)
                     {
                         case 1:

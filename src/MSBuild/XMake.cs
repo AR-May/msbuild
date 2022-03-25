@@ -34,7 +34,6 @@ using ConsoleLogger = Microsoft.Build.Logging.ConsoleLogger;
 using LoggerDescription = Microsoft.Build.Logging.LoggerDescription;
 using ForwardingLoggerRecord = Microsoft.Build.Logging.ForwardingLoggerRecord;
 using BinaryLogger = Microsoft.Build.Logging.BinaryLogger;
-using Microsoft.Build.Client;
 
 #nullable disable
 
@@ -216,14 +215,14 @@ namespace Microsoft.Build.CommandLine
                 DumpCounters(true /* initialize only */);
             }
 
-            // return value: 0 on success, non-zero on failure
+            // return 0 on success, non-zero on failure
             int exitCode = ((s_initialized && Execute(
 #if FEATURE_GET_COMMANDLINE
                 Environment.CommandLine
 #else
                 ConstructArrayArg(args)
 #endif
-                ) == ExitType.Success) ? 0 : 1);
+            ) == ExitType.Success) ? 0 : 1);
 
             if (Environment.GetEnvironmentVariable("MSBUILDDUMPPROCESSCOUNTERS") == "1")
             {
@@ -651,19 +650,11 @@ namespace Microsoft.Build.CommandLine
                     {
                         ReplayBinaryLog(projectFile, loggers, distributedLoggerRecords, cpuCount);
                     }
-                    else // build
+                    else // regular build
                     {
                         // if everything checks out, and sufficient information is available to start building
-                        bool runMsbuildInServer = Environment.GetEnvironmentVariable("RUN_MSBUILD_IN_SERVER") == "1";
-                        if (runMsbuildInServer)
-                        {
-                            // if we are to run build on a msbuild service.
-                            exitType = MSBuildClient.Execute(commandLine);
-                        }
-                        else
-                        {
-                            // fallback to a regular build
-                            if (!BuildProject(
+                        if (
+                            !BuildProject(
                                 projectFile,
                                 targets,
                                 toolsVersion,
@@ -675,29 +666,27 @@ namespace Microsoft.Build.CommandLine
 #if FEATURE_XML_SCHEMA_VALIDATION
                                 needToValidateProject, schemaFile,
 #endif
-                                cpuCount,
-                                enableNodeReuse,
-                                preprocessWriter,
-                                targetsWriter,
-                                detailedSummary,
-                                warningsAsErrors,
-                                warningsNotAsErrors,
-                                warningsAsMessages,
-                                enableRestore,
-                                profilerLogger,
-                                enableProfiler,
-                                interactive,
-                                isolateProjects,
-                                graphBuildOptions,
-                                lowPriority,
-                                inputResultsCaches,
-                                outputResultsCache,
-                                commandLine
-                            ))
+                                    cpuCount,
+                                    enableNodeReuse,
+                                    preprocessWriter,
+                                    targetsWriter,
+                                    detailedSummary,
+                                    warningsAsErrors,
+                                    warningsNotAsErrors,
+                                    warningsAsMessages,
+                                    enableRestore,
+                                    profilerLogger,
+                                    enableProfiler,
+                                    interactive,
+                                    isolateProjects,
+                                    graphBuildOptions,
+                                    lowPriority,
+                                    inputResultsCaches,
+                                    outputResultsCache,
+                                    commandLine))
                             {
                                 exitType = ExitType.BuildError;
                             }
-                        }
                     } // end of build
 
                     DateTime t2 = DateTime.Now;

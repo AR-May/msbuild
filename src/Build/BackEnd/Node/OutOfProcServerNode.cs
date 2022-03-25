@@ -10,6 +10,7 @@ using System.Threading;
 using Microsoft.Build.BackEnd;
 using Microsoft.Build.Shared;
 using Microsoft.Build.Internal;
+using System.Diagnostics;
 
 namespace Microsoft.Build.Execution
 {
@@ -112,12 +113,20 @@ namespace Microsoft.Build.Execution
         /// <returns>The reason for shutting down.</returns>
         public NodeEngineShutdownReason Run(bool enableReuse, bool lowPriority, out Exception? shutdownException)
         {
+            Debugger.Launch();
+
             string msBuildLocation = BuildEnvironmentHelper.Instance.CurrentMSBuildExePath;
             var handshake = new ServerNodeHandshake(
                 CommunicationsUtilities.GetHandshakeOptions(taskHost: false, nodeReuse: enableReuse, lowPriority: lowPriority, is64Bit: EnvironmentUtilities.Is64BitProcess),
                 msBuildLocation);
 
             string pipeName = NamedPipeUtil.GetPipeNameOrPath("MSBuildServer-" + handshake.ComputeHash());
+
+            // TODO: remove later. debug.
+            StreamWriter sw = new StreamWriter(@"C:\Users\alinama\work\MSBUILD\msbuild-1\server-handshake.txt");
+            sw.WriteLine(CommunicationsUtilities.GetHandshakeOptions(taskHost: false, nodeReuse: enableReuse, lowPriority: lowPriority, is64Bit: EnvironmentUtilities.Is64BitProcess));
+            sw.WriteLine(msBuildLocation);
+            sw.Close();
 
             string serverRunningMutexName = $@"Global\server-running-{pipeName}";
             _serverBusyMutexName = $@"Global\server-busy-{pipeName}";
