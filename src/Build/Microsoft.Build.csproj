@@ -122,8 +122,8 @@
     <Compile Include="..\Shared\NodeShutdown.cs" />
     <Compile Include="..\Shared\NamedPipeUtil.cs" />
     <Compile Include="..\Shared\ProcessExtensions.cs" />
+    <Compile Include="..\Shared\ServerNodeHandshake.cs" />
     <Compile Include="..\Shared\TaskLoggingHelper.cs">
-    <Compile Include="..\Shared\ServerNodeHandshake.cs">
       <Link>BackEnd\Components\RequestBuilder\IntrinsicTasks\TaskLoggingHelper.cs</Link>
       <ExcludeFromStyleCop>True</ExcludeFromStyleCop>
     </Compile>
