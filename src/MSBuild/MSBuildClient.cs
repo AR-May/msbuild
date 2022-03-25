@@ -8,6 +8,8 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using Microsoft.Build.BackEnd;
 using Microsoft.Build.Internal;
+using Microsoft.Build.Shared;
+using static Microsoft.Build.CommandLine.MSBuildApp;
 using static Microsoft.Build.Execution.OutOfProcEntryNode;
 
 namespace Microsoft.Build.Client
@@ -38,11 +40,14 @@ namespace Microsoft.Build.Client
 #if FEATURE_GET_COMMANDLINE
             string commandLine
 #else
-            string[] commandLine
+            string[] commandLineArr
 #endif
             )
         {
-            string msBuildLocation = @"C:\Users\alinama\work\MSBUILD\msbuild-1\msbuild\artifacts\bin\bootstrap\net472\MSBuild\Current\Bin\amd64\MSBuild.exe";
+#if !FEATURE_GET_COMMANDLINE
+            string commandLine = string.Join(" ", commandLineArr);
+#endif
+            string msBuildLocation = BuildEnvironmentHelper.Instance.CurrentMSBuildExePath;
 
             string[] msBuildServerOptions = new [] {
                 "/nologo",
@@ -56,8 +61,14 @@ namespace Microsoft.Build.Client
             //    GetHandshakeOptions(),
             //    msBuildLocation);
 
+            // TODO: remove later. debug.
+            StreamWriter sw = new StreamWriter(@"C:\Users\alinama\work\MSBUILD\msbuild-1\client-handshake.txt");
+            sw.WriteLine(CommunicationsUtilities.GetHandshakeOptions(taskHost: false, nodeReuse: true, is64Bit: EnvironmentUtilities.Is64BitProcess));
+            sw.WriteLine(msBuildLocation);
+            sw.Close();
+
             var handshake = new EntryNodeHandshake(
-                GetHandshakeOptions(),
+                CommunicationsUtilities.GetHandshakeOptions(taskHost: false, nodeReuse: true, is64Bit: EnvironmentUtilities.Is64BitProcess),
                 // CommunicationsUtilities.GetHandshakeOptions(taskHost: false, nodeReuse: enableReuse, lowPriority: lowPriority, is64Bit: EnvironmentUtilities.Is64BitProcess),
                 msBuildLocation);
 
@@ -117,7 +128,7 @@ namespace Microsoft.Build.Client
             }
 
             var buildCommand = new EntryNodeCommand(
-                commandLine: '"' + msBuildLocation + '"' + " " + string.Join(" ", arguments),
+                commandLine: '"' + msBuildLocation + '"' + " " + commandLine,
                 startupDirectory: Directory.GetCurrentDirectory(),
                 buildProcessEnvironment: envVars,
                 CultureInfo.CurrentCulture,
@@ -127,7 +138,7 @@ namespace Microsoft.Build.Client
 
             CommunicationsUtilities.Trace("Build command send...");
 
-            int exitCode;
+            ExitType exitType = ExitType.Success;
             while (true)
             {
                 var packet = ReadPacket(nodeStream);
@@ -150,7 +161,7 @@ namespace Microsoft.Build.Client
                 else if (packet is EntryNodeResponse response)
                 {
                     CommunicationsUtilities.Trace($"Build response received: exit code {response.ExitCode}, exit type '{response.ExitType}'");
-                    exitCode = response.ExitCode;
+                    exitType = (ExitType) Enum.Parse(typeof(ExitType), response.ExitType);
                     break;
                 }
                 else
@@ -159,7 +170,7 @@ namespace Microsoft.Build.Client
                 }
             }
 
-            return exitCode;
+            return exitType;
         }
 
         private static Process LaunchNode(ProcessStartInfo processStartInfo)

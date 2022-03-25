@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <Import Project="..\Shared\FileSystemSources.proj" />
   <Import Project="..\Shared\DebuggingSources.proj" />
@@ -47,6 +47,7 @@
 
     <DebugType Condition="'$(Platform)' == 'x64'">full</DebugType><!-- Setting DebugType here goes hand in hand with eng\AfterSigning.targets. This is to prompt the x64 build to produce a 'full' .pdb that's `more compatible` then 'portable' and 'embedded' .pdbs. This doesn't get set on 32 bit architecture, which will default to 'embedded' and 'pdb2pdb' will convert those as needed. See https://github.com/dotnet/msbuild/pull/5070 for context. -->
     <DefineConstants>$(DefineConstants);MSBUILDENTRYPOINTEXE</DefineConstants>
+    <NoWarn>$(NoWarn);CS8600;CS8601;CS8603</NoWarn>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -91,6 +92,12 @@
     </Compile>
     <Compile Include="..\Shared\EscapingUtilities.cs">
       <ExcludeFromStyleCop>true</ExcludeFromStyleCop>
+    </Compile>
+    <Compile Include="..\Shared\EnvironmentUtilities.cs">
+      <Link>SharedUtilities\EnvironmentUtilities.cs</Link>
+    </Compile>
+    <Compile Include="..\Shared\EntryNodeHandshake.cs">
+      <Link>SharedUtilities\EntryNodeHandshake.cs</Link>
     </Compile>
     <Compile Include="..\Shared\ErrorUtilities.cs">
       <ExcludeFromStyleCop>true</ExcludeFromStyleCop>
@@ -171,6 +178,8 @@
     <Compile Include="InitializationException.cs">
       <ExcludeFromStyleCop>true</ExcludeFromStyleCop>
     </Compile>
+    <Compile Include="CommunicationProtocol.cs" />
+    <Compile Include="MSBuildClient.cs" />
     <Compile Include="NodeEndpointOutOfProcTaskHost.cs" />
     <Compile Include="LogMessagePacket.cs" />
     <Compile Include="ProjectSchemaValidationHandler.cs">

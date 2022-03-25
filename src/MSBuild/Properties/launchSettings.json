@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "MSBuild": {
+      "commandName": "Project",
+      "commandLineArgs": "\"C:\\Users\\alinama\\work\\MSBUILD\\msbuild-1\\test\\1\\ConsoleApp1\\ConsoleApp1.sln\" /t:rebuild",
+      "environmentVariables": {
+        "RUN_MSBUILD_IN_SERVER": "1"
+      }
+    }
+  }
+}

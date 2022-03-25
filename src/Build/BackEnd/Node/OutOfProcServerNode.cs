@@ -425,9 +425,9 @@ namespace Microsoft.Build.Execution
             _shutdownEvent.Set();
         }
 
-        internal sealed class ServerNamedMutex : IDisposable
+        public sealed class ServerNamedMutex : IDisposable
         {
-            public readonly Mutex _serverMutex;
+            public readonly Mutex serverMutex;
 
             public bool IsDisposed { get; private set; }
 
@@ -435,7 +435,7 @@ namespace Microsoft.Build.Execution
 
             public ServerNamedMutex(string mutexName, out bool createdNew)
             {
-                _serverMutex = new Mutex(
+                serverMutex = new Mutex(
                     initiallyOwned: true,
                     name: mutexName,
                     createdNew: out createdNew);
@@ -486,7 +486,7 @@ namespace Microsoft.Build.Execution
                     throw new InvalidOperationException("Lock already held");
                 }
 
-                return IsLocked = _serverMutex.WaitOne(timeoutMs);
+                return IsLocked = serverMutex.WaitOne(timeoutMs);
             }
 
             public void Dispose()
@@ -502,12 +502,12 @@ namespace Microsoft.Build.Execution
                 {
                     if (IsLocked)
                     {
-                        _serverMutex.ReleaseMutex();
+                        serverMutex.ReleaseMutex();
                     }
                 }
                 finally
                 {
-                    _serverMutex.Dispose();
+                    serverMutex.Dispose();
                     IsLocked = false;
                 }
             }
