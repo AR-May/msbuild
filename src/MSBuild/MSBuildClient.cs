@@ -57,7 +57,7 @@ namespace Microsoft.Build.Client
 
             ProcessStartInfo msBuildServerStartInfo = GetMSBuildServerProcessStartInfo(msBuildLocation,msBuildServerOptions, new Dictionary<string, string>());
 
-            // var handshake2 = new EntryNodeHandshake(
+            // var handshake2 = new ServerNodeHandshake(
             //    GetHandshakeOptions(),
             //    msBuildLocation);
 
@@ -67,7 +67,7 @@ namespace Microsoft.Build.Client
             sw.WriteLine(msBuildLocation);
             sw.Close();
 
-            var handshake = new EntryNodeHandshake(
+            var handshake = new ServerNodeHandshake(
                 CommunicationsUtilities.GetHandshakeOptions(taskHost: false, nodeReuse: true, is64Bit: EnvironmentUtilities.Is64BitProcess),
                 // CommunicationsUtilities.GetHandshakeOptions(taskHost: false, nodeReuse: enableReuse, lowPriority: lowPriority, is64Bit: EnvironmentUtilities.Is64BitProcess),
                 msBuildLocation);
@@ -105,7 +105,7 @@ namespace Microsoft.Build.Client
             }
 
             // This indicates that we have finished all the parts of our handshake; hopefully the endpoint has as well.
-            WriteIntForHandshake(nodeStream, EntryNodeHandshake.EndOfHandshakeSignal);
+            WriteIntForHandshake(nodeStream, ServerNodeHandshake.EndOfHandshakeSignal);
 
             CommunicationsUtilities.Trace("Reading handshake from pipe {0}", pipeName);
 
@@ -263,7 +263,7 @@ namespace Microsoft.Build.Client
             // Accept only the first byte of the EndOfHandshakeSignal
             int valueRead = ReadIntForHandshake(stream, timeout: 1000);
 
-            if (valueRead != EntryNodeHandshake.EndOfHandshakeSignal)
+            if (valueRead != ServerNodeHandshake.EndOfHandshakeSignal)
             {
                 CommunicationsUtilities.Trace("Expected end of handshake signal but received {0}. Probably the host is a different MSBuild build.", valueRead);
                 throw new InvalidOperationException();

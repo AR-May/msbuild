@@ -68,9 +68,6 @@
     <Compile Include="..\Shared\EncodingStringWriter.cs">
       <Link>SharedUtilities\EncodingStringWriter.cs</Link>
     </Compile>
-    <Compile Include="..\Shared\EntryNodeHandshake.cs">
-      <Link>SharedUtilities\EntryNodeHandshake.cs</Link>
-    </Compile>
     <Compile Include="..\Shared\AssemblyNameComparer.cs">
       <Link>SharedUtilities\AssemblyNameComparer.cs</Link>
     </Compile>
@@ -126,6 +123,7 @@
     <Compile Include="..\Shared\NamedPipeUtil.cs" />
     <Compile Include="..\Shared\ProcessExtensions.cs" />
     <Compile Include="..\Shared\TaskLoggingHelper.cs">
+    <Compile Include="..\Shared\ServerNodeHandshake.cs">
       <Link>BackEnd\Components\RequestBuilder\IntrinsicTasks\TaskLoggingHelper.cs</Link>
       <ExcludeFromStyleCop>True</ExcludeFromStyleCop>
     </Compile>
@@ -150,12 +148,7 @@
     <Compile Include="BackEnd\Components\Caching\ConfigCacheWithOverride.cs" />
     <Compile Include="BackEnd\Components\Caching\ResultsCacheWithOverride.cs" />
     <Compile Include="BackEnd\Components\ProjectCache\*.cs" />
-<<<<<<< HEAD
     <Compile Include="BackEnd\Components\Communications\ServerNodeEndpointOutOfProc.cs" />
-    <Compile Include="BackEnd\Components\Communications\ServerNodeHandshake.cs" />
-=======
-    <Compile Include="BackEnd\Components\Communications\EntryNodeEndpointOutOfProc.cs" />
->>>>>>> 54237d36a (move hadnshake and move the entry point)
     <Compile Include="BackEnd\Components\SdkResolution\SdkResolverException.cs" />
     <Compile Include="BackEnd\Components\SdkResolution\TranslationHelpers.cs" />
     <Compile Include="FileSystem\*.cs" />

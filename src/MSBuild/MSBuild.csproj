@@ -96,8 +96,8 @@
     <Compile Include="..\Shared\EnvironmentUtilities.cs">
       <Link>SharedUtilities\EnvironmentUtilities.cs</Link>
     </Compile>
-    <Compile Include="..\Shared\EntryNodeHandshake.cs">
-      <Link>SharedUtilities\EntryNodeHandshake.cs</Link>
+    <Compile Include="..\Shared\ServerNodeHandshake.cs">
+      <Link>SharedUtilities\ServerNodeHandshake.cs</Link>
     </Compile>
     <Compile Include="..\Shared\ErrorUtilities.cs">
       <ExcludeFromStyleCop>true</ExcludeFromStyleCop>
