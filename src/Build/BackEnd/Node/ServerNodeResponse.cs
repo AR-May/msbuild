@@ -14,6 +14,10 @@ namespace Microsoft.Build.BackEnd
             ExitType = exitType;
         }
 
+        private ServerNodeResponse()
+        {
+        }
+
         #region INodePacket Members
 
         /// <summary>
@@ -24,9 +28,9 @@ namespace Microsoft.Build.BackEnd
 
         #endregion
 
-        public int ExitCode { get; }
+        public int ExitCode { get; private set; } = default!;
 
-        public string ExitType { get; }
+        public string ExitType { get; private set; } = default!;
 
         public void Translate(ITranslator translator)
         {
@@ -39,8 +43,21 @@ namespace Microsoft.Build.BackEnd
             }
             else
             {
-                throw new InvalidOperationException("Read from stream not supported");
+                var br = translator.Reader;
+
+                ExitCode = br.ReadInt32();
+                ExitType = br.ReadString();
             }
+        }
+
+        /// <summary>
+        /// Factory for deserialization.
+        /// </summary>
+        internal static ServerNodeResponse FactoryForDeserialization(ITranslator translator)
+        {
+            ServerNodeResponse packet = new ServerNodeResponse();
+            packet.Translate(translator);
+            return packet;
         }
     }
 }
