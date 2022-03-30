@@ -152,6 +152,8 @@
     <Compile Include="BackEnd\Components\SdkResolution\SdkResolverException.cs" />
     <Compile Include="BackEnd\Components\SdkResolution\TranslationHelpers.cs" />
     <Compile Include="FileSystem\*.cs" />
+    <Compile Include="BackEnd\Node\MSBuildClient.cs" />
+    <Compile Include="BackEnd\Node\MSBuildClientEndpoint.cs" />
     <Compile Include="BackEnd\Node\ServerNodeBuildCommand.cs" />
     <Compile Include="BackEnd\Node\ServerNodeConsoleWrite.cs" />
     <Compile Include="BackEnd\Node\ServerNodeResponse.cs" />

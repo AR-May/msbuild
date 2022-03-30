@@ -178,8 +178,7 @@
     <Compile Include="InitializationException.cs">
       <ExcludeFromStyleCop>true</ExcludeFromStyleCop>
     </Compile>
-    <Compile Include="CommunicationProtocol.cs" />
-    <Compile Include="MSBuildClient.cs" />
+    <Compile Include="MSBuildClientApp.cs" />
     <Compile Include="NodeEndpointOutOfProcTaskHost.cs" />
     <Compile Include="LogMessagePacket.cs" />
     <Compile Include="ProjectSchemaValidationHandler.cs">
@@ -244,12 +243,8 @@
     <ProjectReference Include="..\Tasks\Microsoft.Build.Tasks.csproj" />
   </ItemGroup>
 
-  <Target Name="CopyXsds"
-          BeforeTargets="AfterBuild">
-    <Copy SourceFiles="@(XsdsForVS)"
-          DestinationFiles="@(XsdsForVS->'$([MSBuild]::NormalizeDirectory('$(ArtifactsDir)', 'xsd'))%(RecursiveDir)%(Filename)%(Extension)')"
-          SkipUnchangedFiles="$(SkipCopyUnchangedFiles)"
-          />
+  <Target Name="CopyXsds" BeforeTargets="AfterBuild">
+    <Copy SourceFiles="@(XsdsForVS)" DestinationFiles="@(XsdsForVS-&gt;'$([MSBuild]::NormalizeDirectory('$(ArtifactsDir)', 'xsd'))%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="$(SkipCopyUnchangedFiles)" />
   </Target>
 
   <!-- Include MSBuild.deps.json and MSBuild.runtimeconfig.json in ContentWithTargetPath so they will be copied to the output folder of projects
@@ -270,10 +265,7 @@
        in resolving references using them instead of the correct build-time references.
        Instead, add them just afterward, before assigning target paths/copying to
        the bin folder. -->
-  <Target Name="AddRefAssemblies"
-          DependsOnTargets="ResolveAssemblyReferences"
-          BeforeTargets="AssignTargetPaths"
-          Condition="'$(MonoBuild)' != 'true'">
+  <Target Name="AddRefAssemblies" DependsOnTargets="ResolveAssemblyReferences" BeforeTargets="AssignTargetPaths" Condition="'$(MonoBuild)' != 'true'">
     <ItemGroup>
       <Content Include="$(NuGetPackageRoot)\netstandard.library\2.0.3\build\netstandard2.0\ref\netstandard.dll" Link="ref\netstandard.dll" CopyToOutputDirectory="PreserveNewest" />
       <Content Include="$(NuGetPackageRoot)\netstandard.library\2.0.3\build\netstandard2.0\ref\mscorlib.dll" Link="ref\mscorlib.dll" CopyToOutputDirectory="PreserveNewest" />
@@ -352,7 +344,7 @@
     </Task>
   </UsingTask>
 
-  <Target Name="ValidateMSBuildPackageDependencyVersions" BeforeTargets="AfterBuild" Condition="'$(TargetFrameworkIdentifier)' == '.NETFramework'" >
+  <Target Name="ValidateMSBuildPackageDependencyVersions" BeforeTargets="AfterBuild" Condition="'$(TargetFrameworkIdentifier)' == '.NETFramework'">
     <ValidateMSBuildPackageDependencyVersions AppConfig="@(AppConfigWithTargetPath)" AssemblyPath="$(OutputPath)" />
   </Target>
 
