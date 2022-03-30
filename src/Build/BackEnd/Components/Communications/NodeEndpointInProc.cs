@@ -155,6 +155,7 @@ namespace Microsoft.Build.BackEnd
 
         #endregion
 
+        // TODO: make a breakpoint and see if we get here.
         #region INodeEndpoint Methods
         /// <summary>
         /// Causes this endpoint to wait for the remote endpoint to connect
