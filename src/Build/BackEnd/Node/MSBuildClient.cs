@@ -4,67 +4,195 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.IO.Pipes;
+using System.Linq;
 using System.Runtime.InteropServices;
 using Microsoft.Build.BackEnd;
 using Microsoft.Build.Internal;
+using Microsoft.Build.Shared;
+using static Microsoft.Build.Execution.OutOfProcServerNode;
 
 namespace Microsoft.Build.Client
 {
     /// <summary>
+    /// Enumeration of the various ways in which the MSBuildClient.exe application can exit.
+    /// </summary>
+    public class MSBuildClientExitResult
+    {
+        /// <summary>
+        /// The MSBuild client .
+        /// </summary>
+        public ClientExitType MSBuildClientExitType { get; set; }
+        public string? MSBuildAppExitTypeString { get; set; }
+        public string? MSbuildServerErrorMsg; // TODO remove it, just log.
+
+        public MSBuildClientExitResult(ClientExitType MSBuildClientExitType, string MSBuildAppExitTypeString)
+        {
+            this.MSBuildClientExitType = MSBuildClientExitType;
+            this.MSBuildAppExitTypeString = MSBuildAppExitTypeString;
+        }
+
+        public MSBuildClientExitResult(ClientExitType MSBuildClientExitType, string MSBuildAppExitTypeString, string ErrorMsg)
+        {
+            this.MSBuildClientExitType = MSBuildClientExitType;
+            this.MSBuildAppExitTypeString = MSBuildAppExitTypeString;
+            this.MSbuildServerErrorMsg = ErrorMsg;
+        }
+
+        public MSBuildClientExitResult()
+        {
+        }
+    }
+
+    public enum ClientExitType
+    {
+        /// <summary>
+        /// The MSBuild client successfully processed the build request.
+        /// </summary>
+        Success,
+        /// <summary>
+        /// The build stopped unexpectedly, for example,
+        /// because a namedpipe was unexpectedly closed.
+        /// </summary>
+        Unexpected,
+        /// <summary>
+        /// Server is busy. This should cause fallback to MSBuildApp execution.
+        /// </summary>
+        ServerBusy,
+        /// <summary>
+        /// Client was shutted down.
+        /// </summary>
+        Shutdown
+    }
+
+    /// <summary>
     /// This class implements the MSBuildClient.exe command-line application. It processes
     /// command-line arguments and invokes the build engine.
     /// </summary>
-    /// // TODO: argument/attribute saying that it is experimental API
+    /// // TODO: argument/attribute saying that it is an experimental API
     public class MSBuildClient
     {
-        /// <summary>
-        /// Enumeration of the various ways in which the MSBuildClient.exe application can exit.
-        /// </summary>
-        public class ExitResult
-        {
-            /// <summary>
-            /// The MSBuild client .
-            /// </summary>
-            public ExitType MSBuildClientExitType;
-            public string? MSBuildAppExitTypeString;
+        private MSBuildClientExitResult _exitResult;
 
-            public ExitResult(ExitType MSBuildClientExitType, string MSBuildAppExitTypeString)
-            {
-                this.MSBuildClientExitType = MSBuildClientExitType;
-                this.MSBuildAppExitTypeString = MSBuildAppExitTypeString;
-            }
-        }
-
-        public enum ExitType
-        {
-            /// <summary>
-            /// The MSBuild client successfully processed the build request.
-            /// </summary>
-            Success,
-            /// <summary>
-            /// The build stopped unexpectedly, for example,
-            /// because a namedpipe was unexpectedly closed.
-            /// </summary>
-            Unexpected,
-            /// <summary>
-            /// Server is busy. This should cause fallback to MSBuildApp execution.
-            /// </summary>
-            ServerBusy,
-            /// <summary>
-            /// Client was shutted down.
-            /// </summary>
-            Shutdown
-        }
+        private string _msBuildLocation = BuildEnvironmentHelper.Instance.CurrentMSBuildExePath;
 
         public MSBuildClient()
         {
-           throw new NotImplementedException();
+            _exitResult = new();
         }
 
-        public ExitResult Execute(string commandLine)
+        public MSBuildClientExitResult Execute(string commandLine)
+        {
+            // string msBuildLocation = @"C:\Users\alinama\work\MSBUILD\msbuild-1\msbuild\artifacts\bin\bootstrap\net472\MSBuild\Current\Bin\amd64\MSBuild.exe";
+
+            string[] msBuildServerOptions = new[] {
+                "/nologo",
+                "/nodemode:8",
+                "/nodeReuse:true"
+            }.ToArray();
+
+            ProcessStartInfo msBuildServerStartInfo = GetMSBuildServerProcessStartInfo(_msBuildLocation, msBuildServerOptions, new Dictionary<string, string>());
+
+            var handshake = new ServerNodeHandshake(
+                CommunicationsUtilities.GetHandshakeOptions(taskHost: false, nodeReuse: false, lowPriority: false, is64Bit: EnvironmentUtilities.Is64BitProcess),
+                _msBuildLocation);
+
+            string pipeName = GetPipeNameOrPath("MSBuildServer-" + handshake.ComputeHash());
+
+            // check if server is running
+            string serverRunningMutexName = $@"Global\server-running-{pipeName}";
+            string serverBusyMutexName = $@"Global\server-busy-{pipeName}";
+
+            var serverWasAlreadyRunning = ServerNamedMutex.WasOpen(serverRunningMutexName);
+            if (!serverWasAlreadyRunning)
+            {
+                Process msbuildProcess = LaunchNode(msBuildServerStartInfo);
+                Console.WriteLine("Server is launched.");
+            }
+
+            var serverWasBusy = ServerNamedMutex.WasOpen(serverBusyMutexName);
+            if (serverWasBusy)
+            {
+                CommunicationsUtilities.Trace("Server is busy, falling back to former behavior.");
+                _exitResult.MSBuildClientExitType = ClientExitType.ServerBusy;
+                return _exitResult;
+            }
+
+            // connect to it
+            NamedPipeClientStream nodeStream = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous
+#if FEATURE_PIPEOPTIONS_CURRENTUSERONLY
+                                                                         | PipeOptions.CurrentUserOnly
+#endif
+            );
+
+            nodeStream.Connect(serverWasAlreadyRunning && !serverWasBusy ? 1_000 : 20_000);
+
+            int[] handshakeComponents = handshake.RetrieveHandshakeComponents();
+            for (int i = 0; i < handshakeComponents.Length; i++)
+            {
+                CommunicationsUtilities.Trace("Writing handshake part {0} ({1}) to pipe {2}", i, handshakeComponents[i], pipeName);
+                WriteIntForHandshake(nodeStream, handshakeComponents[i]);
+            }
+
+            // This indicates that we have finished all the parts of our handshake; hopefully the endpoint has as well.
+            WriteIntForHandshake(nodeStream, ServerNodeHandshake.EndOfHandshakeSignal);
+
+            CommunicationsUtilities.Trace("Reading handshake from pipe {0}", pipeName);
+
+            ReadEndOfHandshakeSignal(nodeStream, timeout: 1000);
+
+            CommunicationsUtilities.Trace("Successfully connected to pipe {0}...!", pipeName);
+
+            Dictionary<string, string> envVars = new Dictionary<string, string>();
+            var vars = Environment.GetEnvironmentVariables();
+            foreach (var key in vars.Keys)
+            {
+                envVars[(string)key] = (string)vars[key];
+            }
+
+            foreach (var pair in msBuildServerStartInfo.Environment)
+            {
+                envVars[pair.Key] = pair.Value;
+            }
+
+            var buildCommand = new ServerNodeBuildCommand(
+                commandLine,
+                startupDirectory: Directory.GetCurrentDirectory(),
+                buildProcessEnvironment: envVars,
+                CultureInfo.CurrentCulture,
+                CultureInfo.CurrentUICulture);
+
+            WritePacket(nodeStream, buildCommand);
+
+            CommunicationsUtilities.Trace("Build command send...");
+
+            while (true)
+            {
+                var packet = ReadPacket(nodeStream);
+                try
+                {
+                    HandlePacket(packet);
+                }
+                catch (Exception ex)
+                {
+                    _exitResult.MSBuildClientExitType = ClientExitType.Unexpected;
+                    CommunicationsUtilities.Trace(ex.Message);
+                    return _exitResult;
+                }
+            }
+        }
+
+
+
+        private INodePacket ReadPacket(NamedPipeClientStream nodeStream)
         {
             throw new NotImplementedException();
         }
+
+        private void WritePacket(NamedPipeClientStream nodeStream, INodePacket packet)
+        {
+            throw new NotImplementedException();
+        }
+
 
         /// <summary>
         /// Dispatches the packet to the correct handler.
@@ -79,11 +207,31 @@ namespace Microsoft.Build.Client
                 case NodePacketType.ServerNodeResponse:
                     HandleServerNodeResponse((ServerNodeResponse)packet);
                     break;
+                default: throw new InvalidOperationException($"Unexpected packet type {packet.GetType().Name}");
             }
         }
 
-        private void HandleServerNodeResponse(ServerNodeResponse packet) => throw new NotImplementedException();
-        private void HandleServerNodeConsole(ServerNodeConsoleWrite packet) => throw new NotImplementedException();
+        private void HandleServerNodeConsole(ServerNodeConsoleWrite consoleWrite)
+        {
+            switch (consoleWrite.OutputType)
+            {
+                case 1:
+                    Console.Write(consoleWrite.Text);
+                    break;
+                case 2:
+                    Console.Error.Write(consoleWrite.Text);
+                    break;
+                default:
+                    throw new InvalidOperationException($"Unexpected console output type {consoleWrite.OutputType}");
+            }
+        }
+
+        private void HandleServerNodeResponse(ServerNodeResponse response)
+        {
+            CommunicationsUtilities.Trace($"Build response received: exit code {response.ExitCode}, exit type '{response.ExitType}'");
+            int exitCode = response.ExitCode;
+            _exitResult = new MSBuildClientExitResult(ClientExitType.Success, response.ExitType);
+        }
 
         private static Process LaunchNode(ProcessStartInfo processStartInfo)
         {

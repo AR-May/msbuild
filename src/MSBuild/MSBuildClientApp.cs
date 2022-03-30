@@ -27,18 +27,19 @@ namespace Microsoft.Build.Client
                 return MSBuildApp.Execute(commandLine);
             }
 
-            MSBuildClient msbuildClient = new MSBuildClient();
 #if !FEATURE_GET_COMMANDLINE
             string commandLine = string.Join(" ", commandLineArr); // TODO: maybe msbuildLocation would be needed here. 
 #endif
-            MSBuildClient.ExitResult exitResult = msbuildClient.Execute(commandLine);
+            // TODO:? process switches "lowpriority".
+            MSBuildClient msbuildClient = new MSBuildClient();
+            MSBuildClientExitResult exitResult = msbuildClient.Execute(commandLine);
 
-            if (exitResult.MSBuildClientExitType == MSBuildClient.ExitType.ServerBusy)
+            if (exitResult.MSBuildClientExitType == ClientExitType.ServerBusy)
             {
                 // Fallback to old behavior.
                 return MSBuildApp.Execute(commandLine);
             }
-            else if ((exitResult.MSBuildClientExitType == MSBuildClient.ExitType.Success)
+            else if ((exitResult.MSBuildClientExitType == ClientExitType.Success)
                     && Enum.TryParse(exitResult.MSBuildAppExitTypeString, out MSBuildApp.ExitType MSBuildAppExitType))
             {
                 return MSBuildAppExitType;

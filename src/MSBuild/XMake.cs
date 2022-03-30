@@ -83,7 +83,11 @@ namespace Microsoft.Build.CommandLine
             /// <summary>
             /// A project cache failed unexpectedly.
             /// </summary>
-            ProjectCacheFailure
+            ProjectCacheFailure,
+            /// <summary>
+            /// MSbuildServerClientFailure. // TODO: think maybe have 2 types retryable and not.
+            /// </summary>
+            MSbuildServerClientFailure
         }
 
         /// <summary>
