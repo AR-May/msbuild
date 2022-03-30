@@ -1,309 +1,71 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.IO.Pipes;
-using System.Linq;
 using System.Runtime.InteropServices;
-using System.Threading;
 using Microsoft.Build.BackEnd;
-using Microsoft.Build.Execution;
 using Microsoft.Build.Internal;
-using Microsoft.Build.Shared;
-using static Microsoft.Build.Execution.OutOfProcServerNode;
 
 namespace Microsoft.Build.Client
 {
-    // TODO: should it be static? consider that.
     /// <summary>
     /// This class implements the MSBuildClient.exe command-line application. It processes
     /// command-line arguments and invokes the build engine.
     /// </summary>
     /// // TODO: argument/attribute saying that it is experimental API
-    public class MSBuildClient : INodePacketFactory, INodePacketHandler
+    public class MSBuildClient
     {
         /// <summary>
         /// Enumeration of the various ways in which the MSBuildClient.exe application can exit.
         /// </summary>
+        public class ExitResult
+        {
+            /// <summary>
+            /// The MSBuild client .
+            /// </summary>
+            public ExitType MSBuildClientExitType;
+            public string? MSBuildAppExitTypeString;
+
+            public ExitResult(ExitType MSBuildClientExitType, string MSBuildAppExitTypeString)
+            {
+                this.MSBuildClientExitType = MSBuildClientExitType;
+                this.MSBuildAppExitTypeString = MSBuildAppExitTypeString;
+            }
+        }
+
         public enum ExitType
         {
             /// <summary>
-            /// The application executed successfully.
+            /// The MSBuild client successfully processed the build request.
             /// </summary>
             Success,
             /// <summary>
-            /// There was a syntax error in a command line argument.
-            /// </summary>
-            SwitchError,
-            /// <summary>
-            /// A command line argument was not valid.
-            /// </summary>
-            InitializationError,
-            /// <summary>
-            /// The build failed.
-            /// </summary>
-            BuildError,
-            /// <summary>
-            /// A logger aborted the build.
-            /// </summary>
-            LoggerAbort,
-            /// <summary>
-            /// A logger failed unexpectedly.
-            /// </summary>
-            LoggerFailure,
-            /// <summary>
             /// The build stopped unexpectedly, for example,
-            /// because a child died or hung.
+            /// because a namedpipe was unexpectedly closed.
             /// </summary>
             Unexpected,
             /// <summary>
-            /// A project cache failed unexpectedly.
+            /// Server is busy. This should cause fallback to MSBuildApp execution.
             /// </summary>
-            ProjectCacheFailure
+            ServerBusy,
+            /// <summary>
+            /// Client was shutted down.
+            /// </summary>
+            Shutdown
         }
-
-        /// <summary>
-        /// The endpoint used to talk to the host.
-        /// </summary>
-        private INodeEndpoint _nodeEndpoint = default!;
-
-        /// <summary>
-        /// The packet factory.
-        /// </summary>
-        private readonly NodePacketFactory _packetFactory;
-
-        /// <summary>
-        /// The queue of packets we have received but which have not yet been processed.
-        /// </summary>
-        private readonly ConcurrentQueue<INodePacket> _receivedPackets;
-
-        /// <summary>
-        /// The event which is set when we receive packets.
-        /// </summary>
-        private readonly AutoResetEvent _packetReceivedEvent;
-
-        /// <summary>
-        /// The event which is set when we should shut down.
-        /// </summary>
-        private readonly ManualResetEvent _shutdownEvent;
-
-        /// <summary>
-        /// The reason we are shutting down.
-        /// </summary>
-        private NodeEngineShutdownReason _shutdownReason;
-
-        /// <summary>
-        /// The exception, if any, which caused shutdown.
-        /// </summary>
-        private Exception? _shutdownException = null;
 
         public MSBuildClient()
         {
-            _receivedPackets = new ConcurrentQueue<INodePacket>();
-            _packetReceivedEvent = new AutoResetEvent(false);
-            _shutdownEvent = new ManualResetEvent(false);
-            _packetFactory = new NodePacketFactory();
-
-            (this as INodePacketFactory).RegisterPacketHandler(NodePacketType.ServerNodeConsole, ServerNodeConsoleWrite.FactoryForDeserialization, this);
-            (this as INodePacketFactory).RegisterPacketHandler(NodePacketType.ServerNodeResponse, ServerNodeResponse.FactoryForDeserialization, this);
+           throw new NotImplementedException();
         }
 
-    public int Execute(string commandLine)
+        public ExitResult Execute(string commandLine)
         {
-            // TODO: figure out the location.
-            // string msBuildLocation = BuildEnvironmentHelper.Instance.CurrentMSBuildExePath;
-
-            // string msBuildLocation = @"C:\Users\alinama\work\MSBUILD\msbuild-1\msbuild\artifacts\bin\MSBuild\Debug\net6.0\MSBuild.dll";
-            string msBuildLocation = BuildEnvironmentHelper.Instance.CurrentMSBuildExePath;
-
-            string[] msBuildServerOptions = new [] {
-                "/nologo",
-                "/nodemode:8",
-                "/nodeReuse:true"
-            }.ToArray();
-
-            ProcessStartInfo msBuildServerStartInfo = GetMSBuildServerProcessStartInfo(msBuildLocation,msBuildServerOptions, new Dictionary<string, string>());
-
-            // TODO: remove later. debug.
-            StreamWriter sw = new StreamWriter(@"C:\Users\alinama\work\MSBUILD\msbuild-1\client-handshake.txt");
-            sw.WriteLine(CommunicationsUtilities.GetHandshakeOptions(taskHost: false, nodeReuse: true, is64Bit: EnvironmentUtilities.Is64BitProcess));
-            sw.WriteLine(msBuildLocation);
-            sw.Close();
-
-            var handshake = new ServerNodeHandshake(
-                CommunicationsUtilities.GetHandshakeOptions(taskHost: false, nodeReuse: true, is64Bit: EnvironmentUtilities.Is64BitProcess),
-                // CommunicationsUtilities.GetHandshakeOptions(taskHost: false, nodeReuse: enableReuse, lowPriority: lowPriority, is64Bit: EnvironmentUtilities.Is64BitProcess),
-                msBuildLocation);
-
-            string pipeName = GetPipeNameOrPath("MSBuildServer-" + handshake.ComputeHash());
-
-            // check if server is running
-            string serverRunningMutexName = $@"Global\server-running-{pipeName}";
-            string serverBusyMutexName = $@"Global\server-busy-{pipeName}";
-
-            var serverWasAlreadyRunning = ServerNamedMutex.WasOpen(serverRunningMutexName);
-            if (!serverWasAlreadyRunning)
-            {
-                Process msbuildProcess = LaunchNode(msBuildServerStartInfo);
-                Console.WriteLine("Server is launched.");
-            }
-
-            var serverWasBusy = ServerNamedMutex.WasOpen(serverBusyMutexName);
-            if (serverWasBusy)
-            {
-                Console.WriteLine("Server is busy - that IS unexpected - we shall fallback to former behavior.");
-                throw new InvalidOperationException("Server is busy - that IS unexpected - we shall fallback to former behavior. NOT IMPLEMENTED YET");
-            }
-
-            int connectTimeout = serverWasAlreadyRunning && !serverWasBusy ? 1_000 : 20_000;
-
-            // Connection to server node.
-            _nodeEndpoint = new MSBuildClientEndpoint(pipeName, handshake, connectTimeout);
-            _nodeEndpoint.OnLinkStatusChanged += OnLinkStatusChanged;
-            _nodeEndpoint.Connect(this);
-
-            // Send the build command to server.
-
-            Dictionary<string, string> envVars = new Dictionary<string, string>();
-            var vars = Environment.GetEnvironmentVariables();
-            foreach (var key in vars.Keys)
-            {
-                envVars[(string)key] = "" + (string)vars[key];
-            }
-
-            foreach (var pair in msBuildServerStartInfo.Environment)
-            {
-                envVars[pair.Key] = pair.Value;
-            }
-
-            var buildCommand = new ServerNodeBuildCommand(
-                commandLine: commandLine,
-                startupDirectory: Directory.GetCurrentDirectory(),
-                buildProcessEnvironment: envVars,
-                CultureInfo.CurrentCulture,
-                CultureInfo.CurrentUICulture);
-
-            SendPacket(buildCommand);
-
-            // Wait and process packets from server node.
-
-            int exitCode = 0;
-            var waitHandles = new WaitHandle[] { _shutdownEvent, _packetReceivedEvent };
-            while (true)
-            {
-                int index = WaitHandle.WaitAny(waitHandles);
-                switch (index)
-                {
-                    case 0:
-                        // TODO: Shutdown handling?
-                        return 1;
-
-                    case 1:
-
-                        while (_receivedPackets.TryDequeue(out INodePacket? packet))
-                        {
-                            if (packet != null)
-                            {
-                                HandlePacket(packet);
-                            }
-                        }
-
-                        break;
-                }
-            }
-
-
-            // connect to it
-            //NamedPipeClientStream nodeStream = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
-
-            //nodeStream.Connect(serverWasAlreadyRunning && !serverWasBusy ? 1_000 : 20_000);
-            //Console.WriteLine("Client is connected to server.");
-
-            //int[] handshakeComponents = handshake.RetrieveHandshakeComponents();
-            //for (int i = 0; i < handshakeComponents.Length; i++)
-            //{
-            //    CommunicationsUtilities.Trace("Writing handshake part {0} ({1}) to pipe {2}", i, handshakeComponents[i], pipeName);
-            //    WriteIntForHandshake(nodeStream, handshakeComponents[i]);
-            //}
-
-            //// This indicates that we have finished all the parts of our handshake; hopefully the endpoint has as well.
-            //WriteIntForHandshake(nodeStream, ServerNodeHandshake.EndOfHandshakeSignal);
-
-            //CommunicationsUtilities.Trace("Reading handshake from pipe {0}", pipeName);
-
-            //// TODO
-
-            //ReadEndOfHandshakeSignal(nodeStream, timeout: 1000);
-
-            //CommunicationsUtilities.Trace("Successfully connected to pipe {0}...!", pipeName);
-
-            //Dictionary<string, string> envVars = new Dictionary<string, string>();
-            //var vars = Environment.GetEnvironmentVariables();
-            //foreach (var key in vars.Keys)
-            //{
-            //    envVars[(string)key] = "" + (string)vars[key];
-            //}
-
-            //foreach (var pair in msBuildServerStartInfo.Environment)
-            //{
-            //    envVars[pair.Key] = pair.Value;
-            //}
-
-            //var buildCommand = new EntryNodeCommand(
-            //    commandLine: commandLine,
-            //    startupDirectory: Directory.GetCurrentDirectory(),
-            //    buildProcessEnvironment: envVars,
-            //    CultureInfo.CurrentCulture,
-            //    CultureInfo.CurrentUICulture);
-
-            //buildCommand.WriteToStream(nodeStream);
-
-            //CommunicationsUtilities.Trace("Build command send...");
-            //
-            //while (true)
-            //{
-            //    var packet = ReadPacket(nodeStream);
-            //    if (packet is EntryNodeConsoleWrite consoleWrite)
-            //    {
-            //        switch (consoleWrite.OutputType)
-            //        {
-            //            case 1:
-            //                Console.Write(consoleWrite.Text);
-            //                break;
-            //            case 2:
-            //                Console.Error.Write(consoleWrite.Text);
-            //                break;
-            //            default:
-            //                throw new InvalidOperationException($"Unexpected console output type {consoleWrite.OutputType}");
-            //        }
-            //    }
-            //    else if (packet is EntryNodeResponse response)
-            //    {
-            //        CommunicationsUtilities.Trace($"Build response received: exit code {response.ExitCode}, exit type '{response.ExitType}'");
-            //        exitCode = response.ExitCode;
-            //        break;
-            //    }
-            //    else
-            //    {
-            //        throw new InvalidOperationException($"Unexpected packet type {packet.GetType().Name}");
-            //    }
-            //}
-
-            return exitCode;
+            throw new NotImplementedException();
         }
 
-        /// <summary>
-        /// Callback for logging packets to be sent.
-        /// </summary>
-        private void SendPacket(INodePacket packet)
-        {
-            if (_nodeEndpoint.LinkStatus == LinkStatus.Active)
-            {
-                _nodeEndpoint.SendData(packet);
-            }
-        }
         /// <summary>
         /// Dispatches the packet to the correct handler.
         /// </summary>
@@ -477,90 +239,6 @@ namespace Microsoft.Build.Client
             }
 
             return result;
-        }
-
-#region INodePacketFactory Members
-
-        /// <summary>
-        /// Registers a packet handler.
-        /// </summary>
-        /// <param name="packetType">The packet type for which the handler should be registered.</param>
-        /// <param name="factory">The factory used to create packets.</param>
-        /// <param name="handler">The handler for the packets.</param>
-        void INodePacketFactory.RegisterPacketHandler(NodePacketType packetType, NodePacketFactoryMethod factory, INodePacketHandler handler)
-        {
-            _packetFactory.RegisterPacketHandler(packetType, factory, handler);
-        }
-
-        /// <summary>
-        /// Unregisters a packet handler.
-        /// </summary>
-        /// <param name="packetType">The type of packet for which the handler should be unregistered.</param>
-        void INodePacketFactory.UnregisterPacketHandler(NodePacketType packetType)
-        {
-            _packetFactory.UnregisterPacketHandler(packetType);
-        }
-
-        /// <summary>
-        /// Deserializes and routes a packer to the appropriate handler.
-        /// </summary>
-        /// <param name="nodeId">The node from which the packet was received.</param>
-        /// <param name="packetType">The packet type.</param>
-        /// <param name="translator">The translator to use as a source for packet data.</param>
-        void INodePacketFactory.DeserializeAndRoutePacket(int nodeId, NodePacketType packetType, ITranslator translator)
-        {
-            _packetFactory.DeserializeAndRoutePacket(nodeId, packetType, translator);
-        }
-
-        /// <summary>
-        /// Routes a packet to the appropriate handler.
-        /// </summary>
-        /// <param name="nodeId">The node id from which the packet was received.</param>
-        /// <param name="packet">The packet to route.</param>
-        void INodePacketFactory.RoutePacket(int nodeId, INodePacket packet)
-        {
-            _packetFactory.RoutePacket(nodeId, packet);
-        }
-
-        #endregion
-
-#region INodePacketHandler Members
-
-        /// <summary>
-        /// Called when a packet has been received.
-        /// </summary>
-        /// <param name="node">The node from which the packet was received.</param>
-        /// <param name="packet">The packet.</param>
-        void INodePacketHandler.PacketReceived(int node, INodePacket packet)
-        {
-            _receivedPackets.Enqueue(packet);
-            _packetReceivedEvent.Set();
-        }
-#endregion
-
-
-        /// <summary>
-        /// Event handler for the node endpoint's LinkStatusChanged event.
-        /// </summary>
-        private void OnLinkStatusChanged(INodeEndpoint endpoint, LinkStatus status)
-        {
-            switch (status)
-            {
-                case LinkStatus.ConnectionFailed:
-                case LinkStatus.Failed:
-                    _shutdownReason = NodeEngineShutdownReason.ConnectionFailed;
-                    _shutdownEvent.Set();
-                    break;
-
-                case LinkStatus.Inactive:
-                    break;
-
-                case LinkStatus.Active:
-                    break;
-
-                default:
-                    break;
-            }
         }
     }
 }
