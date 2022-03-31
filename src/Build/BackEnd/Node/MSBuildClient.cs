@@ -6,6 +6,7 @@ using System.IO;
 using System.IO.Pipes;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading;
 using Microsoft.Build.BackEnd;
 using Microsoft.Build.Internal;
 using Microsoft.Build.Shared;
@@ -19,24 +20,10 @@ namespace Microsoft.Build.Client
     public class MSBuildClientExitResult
     {
         /// <summary>
-        /// The MSBuild client .
+        /// The MSBuild client.
         /// </summary>
         public ClientExitType MSBuildClientExitType { get; set; }
         public string? MSBuildAppExitTypeString { get; set; }
-        public string? MSbuildServerErrorMsg; // TODO remove it, just log.
-
-        public MSBuildClientExitResult(ClientExitType MSBuildClientExitType, string MSBuildAppExitTypeString)
-        {
-            this.MSBuildClientExitType = MSBuildClientExitType;
-            this.MSBuildAppExitTypeString = MSBuildAppExitTypeString;
-        }
-
-        public MSBuildClientExitResult(ClientExitType MSBuildClientExitType, string MSBuildAppExitTypeString, string ErrorMsg)
-        {
-            this.MSBuildClientExitType = MSBuildClientExitType;
-            this.MSBuildAppExitTypeString = MSBuildAppExitTypeString;
-            this.MSbuildServerErrorMsg = ErrorMsg;
-        }
 
         public MSBuildClientExitResult()
         {
@@ -51,7 +38,7 @@ namespace Microsoft.Build.Client
         Success,
         /// <summary>
         /// The build stopped unexpectedly, for example,
-        /// because a namedpipe was unexpectedly closed.
+        /// ?? because a namedpipe was unexpectedly closed.
         /// </summary>
         Unexpected,
         /// <summary>
@@ -61,7 +48,11 @@ namespace Microsoft.Build.Client
         /// <summary>
         /// Client was shutted down.
         /// </summary>
-        Shutdown
+        Shutdown,
+        /// <summary>
+        /// ConnectionError.
+        /// </summary>
+        ConnectionError
     }
 
     /// <summary>
@@ -72,98 +63,61 @@ namespace Microsoft.Build.Client
     public class MSBuildClient
     {
         private MSBuildClientExitResult _exitResult;
-
-        private string _msBuildLocation = BuildEnvironmentHelper.Instance.CurrentMSBuildExePath;
+        private string _msBuildLocation;
+        Dictionary<string, string> _serverEnvironmentVariables;
 
         public MSBuildClient()
         {
             _exitResult = new();
+            _msBuildLocation = BuildEnvironmentHelper.Instance.CurrentMSBuildExePath;
+            _serverEnvironmentVariables = new();
         }
 
         public MSBuildClientExitResult Execute(string commandLine)
         {
-            // string msBuildLocation = @"C:\Users\alinama\work\MSBUILD\msbuild-1\msbuild\artifacts\bin\bootstrap\net472\MSBuild\Current\Bin\amd64\MSBuild.exe";
-
-            string[] msBuildServerOptions = new[] {
-                "/nologo",
-                "/nodemode:8",
-                "/nodeReuse:true"
-            }.ToArray();
-
-            ProcessStartInfo msBuildServerStartInfo = GetMSBuildServerProcessStartInfo(_msBuildLocation, msBuildServerOptions, new Dictionary<string, string>());
-
-            var handshake = new ServerNodeHandshake(
-                CommunicationsUtilities.GetHandshakeOptions(taskHost: false, nodeReuse: false, lowPriority: false, is64Bit: EnvironmentUtilities.Is64BitProcess),
-                _msBuildLocation);
-
+            var handshake = GetHandshake();
             string pipeName = GetPipeNameOrPath("MSBuildServer-" + handshake.ComputeHash());
-
-            // check if server is running
             string serverRunningMutexName = $@"Global\server-running-{pipeName}";
             string serverBusyMutexName = $@"Global\server-busy-{pipeName}";
 
-            var serverWasAlreadyRunning = ServerNamedMutex.WasOpen(serverRunningMutexName);
+            // Start server it if is not running.
+            bool serverWasAlreadyRunning = ServerNamedMutex.WasOpen(serverRunningMutexName);
             if (!serverWasAlreadyRunning)
             {
-                Process msbuildProcess = LaunchNode(msBuildServerStartInfo);
+                Process msbuildProcess = LaunchNode();
                 Console.WriteLine("Server is launched.");
             }
 
+            // Check that server is not busy.
             var serverWasBusy = ServerNamedMutex.WasOpen(serverBusyMutexName);
             if (serverWasBusy)
             {
-                CommunicationsUtilities.Trace("Server is busy, falling back to former behavior.");
+                Console.WriteLine("Server is busy, falling back to former behavior.");
                 _exitResult.MSBuildClientExitType = ClientExitType.ServerBusy;
                 return _exitResult;
             }
 
-            // connect to it
+            // Connect to server.
             NamedPipeClientStream nodeStream = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous
 #if FEATURE_PIPEOPTIONS_CURRENTUSERONLY
                                                                          | PipeOptions.CurrentUserOnly
 #endif
             );
 
-            nodeStream.Connect(serverWasAlreadyRunning && !serverWasBusy ? 1_000 : 20_000);
-
-            int[] handshakeComponents = handshake.RetrieveHandshakeComponents();
-            for (int i = 0; i < handshakeComponents.Length; i++)
+            try
             {
-                CommunicationsUtilities.Trace("Writing handshake part {0} ({1}) to pipe {2}", i, handshakeComponents[i], pipeName);
-                WriteIntForHandshake(nodeStream, handshakeComponents[i]);
+                ConnectToServer(nodeStream, handshake, serverWasAlreadyRunning && !serverWasBusy ? 1_000 : 20_000, pipeName);
             }
-
-            // This indicates that we have finished all the parts of our handshake; hopefully the endpoint has as well.
-            WriteIntForHandshake(nodeStream, ServerNodeHandshake.EndOfHandshakeSignal);
-
-            CommunicationsUtilities.Trace("Reading handshake from pipe {0}", pipeName);
-
-            ReadEndOfHandshakeSignal(nodeStream, timeout: 1000);
-
-            CommunicationsUtilities.Trace("Successfully connected to pipe {0}...!", pipeName);
-
-            Dictionary<string, string> envVars = new Dictionary<string, string>();
-            var vars = Environment.GetEnvironmentVariables();
-            foreach (var key in vars.Keys)
+            catch (Exception ex)
             {
-                envVars[(string)key] = (string)vars[key];
-            }
+                Console.WriteLine($"Failed to conect to server: {ex.Message}");
+                _exitResult.MSBuildClientExitType = ClientExitType.ConnectionError;
+                return _exitResult;
+            };
 
-            foreach (var pair in msBuildServerStartInfo.Environment)
-            {
-                envVars[pair.Key] = pair.Value;
-            }
-
-            var buildCommand = new ServerNodeBuildCommand(
-                commandLine,
-                startupDirectory: Directory.GetCurrentDirectory(),
-                buildProcessEnvironment: envVars,
-                CultureInfo.CurrentCulture,
-                CultureInfo.CurrentUICulture);
+            ServerNodeBuildCommand buildCommand = GetServerNodeBuildCommand(commandLine);
 
             WritePacket(nodeStream, buildCommand);
-
-            CommunicationsUtilities.Trace("Build command send...");
 
             while (true)
             {
@@ -175,20 +129,72 @@ namespace Microsoft.Build.Client
                 catch (Exception ex)
                 {
                     _exitResult.MSBuildClientExitType = ClientExitType.Unexpected;
-                    CommunicationsUtilities.Trace(ex.Message);
+                    Console.WriteLine(ex.Message);
                     return _exitResult;
                 }
             }
         }
 
+        private ServerNodeBuildCommand GetServerNodeBuildCommand(string commandLine)
+        {
 
+            Dictionary<string, string> envVars = new Dictionary<string, string>();
+            var environmentVariables = Environment.GetEnvironmentVariables();
+            foreach (var key in environmentVariables.Keys)
+            {
+                envVars[(string)key] = (string)environmentVariables[key];
+            }
 
-        private INodePacket ReadPacket(NamedPipeClientStream nodeStream)
+            foreach (var pair in _serverEnvironmentVariables)
+            {
+                envVars[pair.Key] = pair.Value;
+            }
+
+            return new ServerNodeBuildCommand(
+                        commandLine,
+                        startupDirectory: Directory.GetCurrentDirectory(),
+                        buildProcessEnvironment: envVars,
+                        CultureInfo.CurrentCulture,
+                        CultureInfo.CurrentUICulture);
+        }
+
+        private void ConnectToServer(NamedPipeClientStream nodeStream, ServerNodeHandshake handshake, int timeout, string pipeName)
+        {
+            nodeStream.Connect(timeout);
+
+            int[] handshakeComponents = handshake.RetrieveHandshakeComponents();
+            for (int i = 0; i < handshakeComponents.Length; i++)
+            {
+                Console.WriteLine("Writing handshake part {0} ({1}) to pipe {2}", i, handshakeComponents[i], pipeName);
+                WriteIntForHandshake(nodeStream, handshakeComponents[i]);
+            }
+
+            // This indicates that we have finished all the parts of our handshake; hopefully the endpoint has as well.
+            WriteIntForHandshake(nodeStream, ServerNodeHandshake.EndOfHandshakeSignal);
+
+            Console.WriteLine("Reading handshake from pipe {0}", pipeName);
+
+            ReadEndOfHandshakeSignal(nodeStream, timeout: 1000);
+
+            Console.WriteLine("Successfully connected to pipe {0}...!", pipeName);
+        }
+
+        private ServerNodeHandshake GetHandshake()
+        {
+            // string msBuildLocation = @"C:\Users\alinama\work\MSBUILD\msbuild-1\msbuild\artifacts\bin\bootstrap\net472\MSBuild\Current\Bin\amd64\MSBuild.exe";
+
+            return new ServerNodeHandshake(
+                CommunicationsUtilities.GetHandshakeOptions(taskHost: false, nodeReuse: false, lowPriority: false, is64Bit: EnvironmentUtilities.Is64BitProcess),
+                _msBuildLocation
+            );
+        }
+
+        private INodePacket ReadPacketTODO(NamedPipeClientStream nodeStream)
         {
             throw new NotImplementedException();
         }
 
-        private void WritePacket(NamedPipeClientStream nodeStream, INodePacket packet)
+        private void WritePacketTODO(NamedPipeClientStream nodeStream, INodePacket packet)
         {
             throw new NotImplementedException();
         }
@@ -201,8 +207,8 @@ namespace Microsoft.Build.Client
         {
             switch (packet.Type)
             {
-                case NodePacketType.ServerNodeConsole:
-                    HandleServerNodeConsole((ServerNodeConsoleWrite)packet);
+                case NodePacketType.ServerNodeConsoleWrite:
+                    HandleServerNodeConsoleWrite((ServerNodeConsoleWrite)packet);
                     break;
                 case NodePacketType.ServerNodeResponse:
                     HandleServerNodeResponse((ServerNodeResponse)packet);
@@ -211,7 +217,7 @@ namespace Microsoft.Build.Client
             }
         }
 
-        private void HandleServerNodeConsole(ServerNodeConsoleWrite consoleWrite)
+        private void HandleServerNodeConsoleWrite(ServerNodeConsoleWrite consoleWrite)
         {
             switch (consoleWrite.OutputType)
             {
@@ -228,13 +234,32 @@ namespace Microsoft.Build.Client
 
         private void HandleServerNodeResponse(ServerNodeResponse response)
         {
-            CommunicationsUtilities.Trace($"Build response received: exit code {response.ExitCode}, exit type '{response.ExitType}'");
-            int exitCode = response.ExitCode;
-            _exitResult = new MSBuildClientExitResult(ClientExitType.Success, response.ExitType);
+            Console.WriteLine($"Build response received: exit code {response.ExitCode}, exit type '{response.ExitType}'");
+            _exitResult.MSBuildClientExitType = ClientExitType.Success;
+            _exitResult.MSBuildAppExitTypeString = response.ExitType;
         }
 
-        private static Process LaunchNode(ProcessStartInfo processStartInfo)
+        private Process LaunchNode()
         {
+            string[] msBuildServerOptions = new[] {
+                    "/nologo",
+                    "/nodemode:8",
+                    "/nodeReuse:true"
+            }.ToArray();
+
+            ProcessStartInfo processStartInfo = new ProcessStartInfo
+            {
+                FileName = _msBuildLocation,
+                Arguments = string.Join(" ", msBuildServerOptions),
+                UseShellExecute = false
+            };
+
+            foreach (var entry in _serverEnvironmentVariables)
+            {
+                processStartInfo.Environment[entry.Key] = entry.Value;
+            };
+
+
             // Redirect the streams of worker nodes so that this 
             // parent doesn't wait on idle worker nodes to close streams
             // after the build is complete.
@@ -255,23 +280,6 @@ namespace Microsoft.Build.Client
             }
 
             return process;
-        }
-
-        private static ProcessStartInfo GetMSBuildServerProcessStartInfo(string msBuildLocation, string[] arguments, Dictionary<string, string> environmentVariables)
-        {
-            ProcessStartInfo processInfo = new ProcessStartInfo
-            {
-                FileName = msBuildLocation,
-                Arguments = string.Join(" ", arguments),
-                UseShellExecute = false
-            };
-
-            foreach (var entry in environmentVariables)
-            {
-                processInfo.Environment[entry.Key] = entry.Value;
-            };
-
-            return processInfo;
         }
 
         private static string GetPipeNameOrPath(string pipeName)
@@ -387,6 +395,95 @@ namespace Microsoft.Build.Client
             }
 
             return result;
+        }
+
+
+        // TODO: REFACTOR IT
+        private static INodePacket ReadPacket(NamedPipeClientStream nodeStream)
+        {
+            var headerBytes = new byte[5];
+            var readBytes = nodeStream.Read(headerBytes, 0, 5);
+            if (readBytes != 5)
+                throw new InvalidOperationException("Not enough header bytes read from named pipe");
+            byte packetType = headerBytes[0];
+            int bodyLen = (headerBytes[1] << 00) |
+                          (headerBytes[2] << 08) |
+                          (headerBytes[3] << 16) |
+                          (headerBytes[4] << 24);
+            var bodyBytes = new byte[bodyLen];
+            readBytes = nodeStream.Read(bodyBytes, 0, bodyLen);
+            if (readBytes != bodyLen)
+                throw new InvalidOperationException($"Not enough bytes read to read body: expected {bodyLen}, read {readBytes}");
+
+            var ms = new MemoryStream(bodyBytes);
+            switch (headerBytes[0])
+            {
+                case (byte)NodePacketType.ServerNodeResponse:
+                    return DeserializeFromStreamServerNodeResponse(ms);
+                case (byte)NodePacketType.ServerNodeConsoleWrite:
+                    return DeserializeFromStreamServerNodeConsoleWrite(ms);
+            }
+
+            throw new InvalidOperationException($"Unexpected packet type {headerBytes[0]:X}");
+        }
+
+        private static ServerNodeResponse DeserializeFromStreamServerNodeResponse(Stream inputStream)
+        {
+            using var br = new BinaryReader(inputStream);
+
+            int exitCode = br.ReadInt32();
+            string exitType = br.ReadString();
+
+            ServerNodeResponse response = new ServerNodeResponse(exitCode, exitType);
+            return response;
+        }
+
+        private static ServerNodeConsoleWrite DeserializeFromStreamServerNodeConsoleWrite(Stream inputStream)
+        {
+            using var br = new BinaryReader(inputStream);
+
+            string text = br.ReadString();
+            byte outputType = br.ReadByte();
+
+            ServerNodeConsoleWrite consoleWrite = new ServerNodeConsoleWrite(text, outputType);
+            return consoleWrite;
+        }
+
+        private void WritePacket(Stream nodeStream, ServerNodeBuildCommand buildCommand)
+        {
+            using var ms = new MemoryStream();
+            using var bw = new BinaryWriter(ms);
+
+            // header
+            bw.Write((byte)NodePacketType.ServerNodeBuildCommand);
+            bw.Write((int)0);
+            int headerSize = (int)ms.Position;
+
+            // body
+            bw.Write(buildCommand.CommandLine);
+            bw.Write(buildCommand.StartupDirectory);
+            bw.Write(buildCommand.BuildProcessEnvironment.Count);
+            foreach (var pair in buildCommand.BuildProcessEnvironment)
+            {
+                bw.Write(pair.Key);
+                bw.Write(pair.Value);
+            }
+            bw.Write(buildCommand.Culture.Name);
+            bw.Write(buildCommand.UICulture.Name);
+
+            int bodySize = (int)ms.Position - headerSize;
+
+            ms.Position = 1;
+            ms.WriteByte((byte)bodySize);
+            ms.WriteByte((byte)(bodySize >> 8));
+            ms.WriteByte((byte)(bodySize >> 16));
+            ms.WriteByte((byte)(bodySize >> 24));
+
+            // copy packet message bytes into stream
+            var bytes = ms.GetBuffer();
+            nodeStream.Write(bytes, 0, headerSize + bodySize);
+
+            Console.WriteLine("Build command send...");
         }
     }
 }

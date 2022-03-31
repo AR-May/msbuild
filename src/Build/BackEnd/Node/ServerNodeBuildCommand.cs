@@ -34,7 +34,7 @@ namespace Microsoft.Build.BackEnd
         /// <summary>
         /// Retrieves the packet type.
         /// </summary>
-        public NodePacketType Type => NodePacketType.ServerNodeBuilCommand;
+        public NodePacketType Type => NodePacketType.ServerNodeBuildCommand;
 
         #endregion
 

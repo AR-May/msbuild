@@ -29,7 +29,7 @@ namespace Microsoft.Build.BackEnd
         /// <summary>
         /// Packet type.
         /// </summary>
-        public NodePacketType Type => NodePacketType.ServerNodeConsole;
+        public NodePacketType Type => NodePacketType.ServerNodeConsoleWrite;
 
         #endregion
 
@@ -61,6 +61,5 @@ namespace Microsoft.Build.BackEnd
 
             return command;
         }
-
     }
 }

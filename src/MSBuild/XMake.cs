@@ -87,7 +87,7 @@ namespace Microsoft.Build.CommandLine
             /// <summary>
             /// MSbuildServerClientFailure. // TODO: think maybe have 2 types retryable and not.
             /// </summary>
-            MSbuildServerClientFailure
+            MSBuildServerOrClientFailure
         }
 
         /// <summary>

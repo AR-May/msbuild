@@ -74,7 +74,7 @@ namespace Microsoft.Build.Execution
             _shutdownEvent = new ManualResetEvent(false);
             _packetFactory = new NodePacketFactory();
 
-            (this as INodePacketFactory).RegisterPacketHandler(NodePacketType.ServerNodeBuilCommand, ServerNodeBuildCommand.FactoryForDeserialization, this);
+            (this as INodePacketFactory).RegisterPacketHandler(NodePacketType.ServerNodeBuildCommand, ServerNodeBuildCommand.FactoryForDeserialization, this);
             (this as INodePacketFactory).RegisterPacketHandler(NodePacketType.NodeBuildComplete, NodeBuildComplete.FactoryForDeserialization, this);
         }
 
@@ -299,7 +299,7 @@ namespace Microsoft.Build.Execution
         {
             switch (packet.Type)
             {
-                case NodePacketType.ServerNodeBuilCommand:
+                case NodePacketType.ServerNodeBuildCommand:
                     HandleServerNodeBuildCommand((ServerNodeBuildCommand)packet);
                     break;
                 case NodePacketType.NodeBuildComplete:

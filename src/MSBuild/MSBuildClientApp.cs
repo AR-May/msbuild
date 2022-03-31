@@ -13,7 +13,7 @@ namespace Microsoft.Build.Client
 #if FEATURE_GET_COMMANDLINE
             string commandLine
 #else
-            string[] commandLineArr
+            string[] commandLine
 #endif
             )
         {
@@ -23,20 +23,23 @@ namespace Microsoft.Build.Client
             bool runMsbuildInServer = Environment.GetEnvironmentVariable("RUN_MSBUILD_IN_SERVER") == "1";
             if (!runMsbuildInServer)
             {
-                // Fallback to old behavior.
+                // Escape hatch to an old behavior.
                 return MSBuildApp.Execute(commandLine);
             }
 
-#if !FEATURE_GET_COMMANDLINE
-            string commandLine = string.Join(" ", commandLineArr); // TODO: maybe msbuildLocation would be needed here. 
-#endif
             // TODO:? process switches "lowpriority".
+
+#if !FEATURE_GET_COMMANDLINE
+            string commandLineString = string.Join(" ", commandLine); // TODO: maybe msbuildLocation would be needed here.
+#else
+            string commandLineString = commandLine;
+#endif
             MSBuildClient msbuildClient = new MSBuildClient();
-            MSBuildClientExitResult exitResult = msbuildClient.Execute(commandLine);
+            MSBuildClientExitResult exitResult = msbuildClient.Execute(commandLineString);
 
             if (exitResult.MSBuildClientExitType == ClientExitType.ServerBusy)
             {
-                // Fallback to old behavior.
+                // Server is busy, fall back to old behavior.
                 return MSBuildApp.Execute(commandLine);
             }
             else if ((exitResult.MSBuildClientExitType == ClientExitType.Success)
