@@ -99,47 +99,83 @@ namespace Microsoft.Build.Experimental.Client
         /// </summary>
         private bool _buildFinished;
 
-        internal NamedPipeClientStream? NodeStream { get; set; }
-        internal ServerNodeHandshake? Handshake { get; set; }
-        internal string? PipeName { get; set; }
+        /// <summary>
+        /// Handshake between server and client.
+        /// </summary>
+        private ServerNodeHandshake? _handshake = default!;
+
+        /// <summary>
+        /// The named pipe name for client-server communication.
+        /// </summary>
+        private string? _pipeName = default!;
+
+        /// <summary>
+        /// The named pipe stream for client-server communication.
+        /// </summary>
+        private NamedPipeClientStream? _nodeStream = default!;
 
         /// <summary>
         /// Public constructor.
         /// </summary>
         public MSBuildClient()
         {
-            _exitResult = new();
             ServerEnvironmentVariables = new();
+            _exitResult = new();
             _buildFinished = false;
 
-            // TODO: a workaround. Refactor this.
-            string currentMSBuildPath = BuildEnvironmentHelper.Instance.CurrentMSBuildExePath;
-            if (currentMSBuildPath.Contains(".exe"))
+            _msBuildDllLocation = string.Empty;
+            _exeFileLocation = BuildEnvironmentHelper.Instance.CurrentMSBuildExePath; ;
+#if RUNTIME_TYPE_NETCORE || MONO
+            // Run the child process with the same host as the currently-running process.
+            // Mono automagically uses the current mono, to execute a managed assembly.
+            if (!NativeMethodsShared.IsMono)
             {
-                _exeFileLocation = currentMSBuildPath;
-                _msBuildDllLocation = "";
+                // _exeFileLocation consists the msbuild dll instead.
+                _msBuildDllLocation = _exeFileLocation;
+                _exeFileLocation = GetCurrentHost();
             }
-            else
+#endif
+        }
+
+        // Copied from NodeProviderOutOfProc. TODO: Refactor this
+
+#if RUNTIME_TYPE_NETCORE || MONO
+        private static string? CurrentHost;
+#endif
+        private static string GetCurrentHost()
+        {
+#if RUNTIME_TYPE_NETCORE || MONO
+            if (CurrentHost == null)
             {
-                _exeFileLocation = @"dotnet.exe";
-                _msBuildDllLocation = currentMSBuildPath;
+                string dotnetExe = Path.Combine(FileUtilities.GetFolderAbove(BuildEnvironmentHelper.Instance.CurrentMSBuildToolsDirectory, 2),
+                    NativeMethodsShared.IsWindows ? "dotnet.exe" : "dotnet");
+                if (File.Exists(dotnetExe))
+                {
+                    CurrentHost = dotnetExe;
+                }
+                else
+                {
+                    using (Process currentProcess = Process.GetCurrentProcess())
+                    {
+                        CurrentHost = currentProcess.MainModule?.FileName;
+                    }
+                }
             }
+
+            return CurrentHost;
+#else
+            return null;
+#endif
         }
 
         /// <summary>
-        /// Initialise client variables. 
+        /// Internal constructor. Used for testing.
         /// </summary>
-        public void Init()
+        internal MSBuildClient(ServerNodeHandshake handshake, string pipeName, NamedPipeClientStream nodeStream) : this()
         {
-            Handshake = GetHandshake();
-
-            PipeName = GetPipeNameOrPath("MSBuildServer-" + Handshake.ComputeHash());
-
-            NodeStream = new NamedPipeClientStream(".", PipeName, PipeDirection.InOut, PipeOptions.Asynchronous
-#if FEATURE_PIPEOPTIONS_CURRENTUSERONLY
-                                                                         | PipeOptions.CurrentUserOnly
-#endif
-            );
+            _handshake = handshake;
+            _pipeName = pipeName;
+            _nodeStream = nodeStream;
         }
 
         /// <summary>
@@ -153,11 +189,23 @@ namespace Microsoft.Build.Experimental.Client
         /// or the manner in which it failed.</returns>
         public MSBuildClientExitResult Execute(string commandLine)
         {
-            Init();
+            // Initialise _handshake, _pipeName and _nodeStream if they are not set.
+            if ((_nodeStream is null) || (_pipeName is null) || (_handshake is null))
+            {
+                _handshake = GetHandshake();
 
-            string serverRunningMutexName = $@"Global\server-running-{PipeName}";
-            string serverBusyMutexName = $@"Global\server-busy-{PipeName}";
-            string serverLaunchMutexName = $@"Global\server-launch-{PipeName}";
+                _pipeName = GetPipeNameOrPath("MSBuildServer-" + _handshake.ComputeHash());
+
+                _nodeStream = new NamedPipeClientStream(".", _pipeName, PipeDirection.InOut, PipeOptions.Asynchronous
+#if FEATURE_PIPEOPTIONS_CURRENTUSERONLY
+                                                                         | PipeOptions.CurrentUserOnly
+#endif
+                );
+            }
+
+            string serverRunningMutexName = $@"Global\server-running-{_pipeName}";
+            string serverBusyMutexName = $@"Global\server-busy-{_pipeName}";
+            string serverLaunchMutexName = $@"Global\server-launch-{_pipeName}";
 
             // Start server it if is not running.
             bool serverWasAlreadyRunning = ServerNamedMutex.WasOpen(serverRunningMutexName);
@@ -197,7 +245,7 @@ namespace Microsoft.Build.Experimental.Client
             // Connect to server.
             try
             {
-                ConnectToServer(NodeStream, Handshake, serverWasAlreadyRunning && !serverWasBusy ? 1_000 : 20_000, PipeName);
+                ConnectToServer(_nodeStream, _handshake, serverWasAlreadyRunning && !serverWasBusy ? 1_000 : 20_000, _pipeName);
             }
             catch (Exception ex)
             {
@@ -208,13 +256,13 @@ namespace Microsoft.Build.Experimental.Client
 
             // Send build command.
             ServerNodeBuildCommand buildCommand = GetServerNodeBuildCommand(commandLine);
-            WritePacket(NodeStream, buildCommand);
+            WritePacket(_nodeStream, buildCommand);
 
             // Read server responses.
             _buildFinished = false;
             while (!_buildFinished)
             {
-                var packet = ReadPacket(NodeStream);
+                var packet = ReadPacket(_nodeStream);
                 try
                 {
                     HandlePacket(packet);
@@ -256,6 +304,8 @@ namespace Microsoft.Build.Experimental.Client
 
         private ServerNodeHandshake GetHandshake()
         {
+            // params? lowprio?
+
             return new ServerNodeHandshake(
                 CommunicationsUtilities.GetHandshakeOptions(taskHost: false, is64Bit: EnvironmentUtilities.Is64BitProcess),
                 _msBuildDllLocation
