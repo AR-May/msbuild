@@ -114,6 +114,8 @@ namespace Microsoft.Build.Execution
         public NodeEngineShutdownReason Run(bool enableReuse, bool lowPriority, out Exception? shutdownException)
         {
             Debugger.Launch();
+            enableReuse = false;
+            lowPriority = false;
 
             string msBuildLocation = BuildEnvironmentHelper.Instance.CurrentMSBuildExePath;
             var handshake = new ServerNodeHandshake(
@@ -121,12 +123,6 @@ namespace Microsoft.Build.Execution
                 msBuildLocation);
 
             string pipeName = NamedPipeUtil.GetPipeNameOrPath("MSBuildServer-" + handshake.ComputeHash());
-
-            // TODO: remove later. debug.
-            StreamWriter sw = new StreamWriter(@"C:\Users\alinama\work\MSBUILD\msbuild-1\server-handshake.txt");
-            sw.WriteLine(CommunicationsUtilities.GetHandshakeOptions(taskHost: false, nodeReuse: enableReuse, lowPriority: lowPriority, is64Bit: EnvironmentUtilities.Is64BitProcess));
-            sw.WriteLine(msBuildLocation);
-            sw.Close();
 
             string serverRunningMutexName = $@"Global\server-running-{pipeName}";
             _serverBusyMutexName = $@"Global\server-busy-{pipeName}";

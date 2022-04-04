@@ -85,9 +85,10 @@ namespace Microsoft.Build.CommandLine
             /// </summary>
             ProjectCacheFailure,
             /// <summary>
-            /// MSbuildServerClientFailure. // TODO: think maybe have 2 types retryable and not.
+            /// The client for MSBuild server failed unexpectedly, for example,
+            /// because the server process died or hung.
             /// </summary>
-            MSBuildServerOrClientFailure
+            MSBuildClientFailure
         }
 
         /// <summary>
