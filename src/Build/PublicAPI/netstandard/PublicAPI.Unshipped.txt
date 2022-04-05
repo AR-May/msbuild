@@ -10,3 +10,29 @@ Microsoft.Build.Execution.OutOfProcServerNode.OutOfProcServerNode(System.Func<st
 Microsoft.Build.Execution.OutOfProcServerNode.Run(bool enableReuse, bool lowPriority, out System.Exception shutdownException) -> Microsoft.Build.Execution.NodeEngineShutdownReason
 Microsoft.Build.Execution.OutOfProcServerNode.Run(bool enableReuse, out System.Exception shutdownException) -> Microsoft.Build.Execution.NodeEngineShutdownReason
 Microsoft.Build.Execution.OutOfProcServerNode.Run(out System.Exception shutdownException) -> Microsoft.Build.Execution.NodeEngineShutdownReason
+Microsoft.Build.Execution.OutOfProcServerNode.ServerNamedMutex
+Microsoft.Build.Execution.OutOfProcServerNode.ServerNamedMutex.Dispose() -> void
+Microsoft.Build.Execution.OutOfProcServerNode.ServerNamedMutex.IsDisposed.get -> bool
+Microsoft.Build.Execution.OutOfProcServerNode.ServerNamedMutex.IsLocked.get -> bool
+Microsoft.Build.Execution.OutOfProcServerNode.ServerNamedMutex.ServerNamedMutex(string mutexName, out bool createdNew) -> void
+Microsoft.Build.Execution.OutOfProcServerNode.ServerNamedMutex.TryLock(int timeoutMs) -> bool
+Microsoft.Build.Experimental.Client.ClientExitType
+Microsoft.Build.Experimental.Client.ClientExitType.ConnectionError = 3 -> Microsoft.Build.Experimental.Client.ClientExitType
+Microsoft.Build.Experimental.Client.ClientExitType.LaunchError = 4 -> Microsoft.Build.Experimental.Client.ClientExitType
+Microsoft.Build.Experimental.Client.ClientExitType.ServerBusy = 1 -> Microsoft.Build.Experimental.Client.ClientExitType
+Microsoft.Build.Experimental.Client.ClientExitType.Shutdown = 2 -> Microsoft.Build.Experimental.Client.ClientExitType
+Microsoft.Build.Experimental.Client.ClientExitType.Success = 0 -> Microsoft.Build.Experimental.Client.ClientExitType
+Microsoft.Build.Experimental.Client.ClientExitType.Unexpected = 5 -> Microsoft.Build.Experimental.Client.ClientExitType
+Microsoft.Build.Experimental.Client.MSBuildClient
+Microsoft.Build.Experimental.Client.MSBuildClient.Execute(string commandLine) -> Microsoft.Build.Experimental.Client.MSBuildClientExitResult
+Microsoft.Build.Experimental.Client.MSBuildClient.MSBuildClient(string msbuildLocation, string exeLocation, string dllLocation) -> void
+Microsoft.Build.Experimental.Client.MSBuildClient.ServerEnvironmentVariables.get -> System.Collections.Generic.Dictionary<string, string>
+Microsoft.Build.Experimental.Client.MSBuildClient.ServerEnvironmentVariables.set -> void
+Microsoft.Build.Experimental.Client.MSBuildClientExitResult
+Microsoft.Build.Experimental.Client.MSBuildClientExitResult.MSBuildAppExitTypeString.get -> string
+Microsoft.Build.Experimental.Client.MSBuildClientExitResult.MSBuildAppExitTypeString.set -> void
+Microsoft.Build.Experimental.Client.MSBuildClientExitResult.MSBuildClientExitResult() -> void
+Microsoft.Build.Experimental.Client.MSBuildClientExitResult.MSBuildClientExitType.get -> Microsoft.Build.Experimental.Client.ClientExitType
+Microsoft.Build.Experimental.Client.MSBuildClientExitResult.MSBuildClientExitType.set -> void
+readonly Microsoft.Build.Execution.OutOfProcServerNode.ServerNamedMutex.serverMutex -> System.Threading.Mutex
+static Microsoft.Build.Execution.OutOfProcServerNode.ServerNamedMutex.WasOpen(string mutexName) -> bool

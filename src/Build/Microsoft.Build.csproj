@@ -22,7 +22,7 @@
     <ApplyNgenOptimization Condition="'$(TargetFramework)' == '$(FullFrameworkTFM)'">full</ApplyNgenOptimization>
 
     <!-- Do not generate a warning that our 'stable' package should not have a prerelease dependency. -->
-    <NoWarn>$(NoWarn);NU5104;CS8600;CS8601;CS8603;RS0016</NoWarn>
+    <NoWarn>$(NoWarn);NU5104</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

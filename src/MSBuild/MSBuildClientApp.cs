@@ -1,9 +1,11 @@
 ﻿using System;
-using Microsoft.Build.CommandLine;
 using Microsoft.Build.Shared;
 using Microsoft.Build.Experimental.Client;
+
+#if RUNTIME_TYPE_NETCORE || MONO
 using System.IO;
 using System.Diagnostics;
+#endif
 
 namespace Microsoft.Build.CommandLine
 {
@@ -19,7 +21,7 @@ namespace Microsoft.Build.CommandLine
         /// This is the entry point for the MSBuild client.
         /// </summary>
         /// <remark>
-        /// The locations of msbuild exe/dll and dotnet.exe are automatically determined.
+        /// The locations of msbuild exe/dll and dotnet.exe are automatically detected.
         /// </remark>
         /// <returns>0 on success, 1 on failure</returns>
         public static int Run(
@@ -31,6 +33,8 @@ namespace Microsoft.Build.CommandLine
             string msBuildLocation = BuildEnvironmentHelper.Instance.CurrentMSBuildExePath;
             string dllLocation = string.Empty;
             string exeLocation = string.Empty;
+
+            // TODO: check the detection.
 
 #if RUNTIME_TYPE_NETCORE || MONO
             // Run the child process with the same host as the currently-running process.
@@ -160,10 +164,8 @@ namespace Microsoft.Build.CommandLine
         // Copied from NodeProviderOutOfProc. TODO: Refactor this?
 #if RUNTIME_TYPE_NETCORE || MONO
         private static string? CurrentHost;
-#endif
         private static string GetCurrentHost()
         {
-#if RUNTIME_TYPE_NETCORE || MONO
             if (CurrentHost == null)
             {
                 string dotnetExe = Path.Combine(FileUtilities.GetFolderAbove(BuildEnvironmentHelper.Instance.CurrentMSBuildToolsDirectory, 2),
@@ -176,15 +178,13 @@ namespace Microsoft.Build.CommandLine
                 {
                     using (Process currentProcess = Process.GetCurrentProcess())
                     {
-                        CurrentHost = currentProcess.MainModule?.FileName;
+                        CurrentHost = currentProcess.MainModule?.FileName ?? throw new InvalidOperationException("Failed to retrieve process executable.");
                     }
                 }
             }
 
             return CurrentHost;
-#else
-            return null;
-#endif
         }
+#endif
     }
 }

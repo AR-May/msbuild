@@ -1,11 +1,11 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.IO.Pipes;
 using System.Linq;
-using System.Net.Mail;
 using System.Runtime.InteropServices;
 using Microsoft.Build.BackEnd;
 using Microsoft.Build.Internal;
@@ -267,10 +267,10 @@ namespace Microsoft.Build.Experimental.Client
         {
 
             Dictionary<string, string> envVars = new Dictionary<string, string>();
-            var environmentVariables = Environment.GetEnvironmentVariables();
+            IDictionary environmentVariables = Environment.GetEnvironmentVariables();
             foreach (var key in environmentVariables.Keys)
             {
-                envVars[(string)key] = (string)environmentVariables[key];
+                envVars[(string)key] = (string) (environmentVariables[key] ?? "");
             }
 
             foreach (var pair in ServerEnvironmentVariables)
@@ -404,17 +404,7 @@ namespace Microsoft.Build.Experimental.Client
             processStartInfo.CreateNoWindow = true;
             processStartInfo.UseShellExecute = false;
 
-            Process process;
-            try
-            {
-                process = Process.Start(processStartInfo);
-            }
-            catch (Exception ex)
-            {
-                throw new InvalidOperationException("MSBuild server node failed to lunch", ex);
-            }
-
-            return process;
+            return Process.Start(processStartInfo) ?? throw new InvalidOperationException("MSBuild server node failed to lunch");
         }
 
         private static string GetPipeNameOrPath(string pipeName)
