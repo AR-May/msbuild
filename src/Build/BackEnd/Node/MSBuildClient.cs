@@ -5,6 +5,7 @@ using System.Globalization;
 using System.IO;
 using System.IO.Pipes;
 using System.Linq;
+using System.Net.Mail;
 using System.Runtime.InteropServices;
 using Microsoft.Build.BackEnd;
 using Microsoft.Build.Internal;
@@ -100,35 +101,42 @@ namespace Microsoft.Build.Experimental.Client
         /// <summary>
         /// Whether MSBuild server finished the build.
         /// </summary>
-        private bool _buildFinished;
+        private bool _buildFinished = false;
 
         /// <summary>
         /// Handshake between server and client.
         /// </summary>
-        private ServerNodeHandshake? _handshake = default!;
+        private ServerNodeHandshake _handshake;
 
         /// <summary>
         /// The named pipe name for client-server communication.
         /// </summary>
-        private string? _pipeName = default!;
+        private string _pipeName;
 
         /// <summary>
         /// The named pipe stream for client-server communication.
         /// </summary>
-        private NamedPipeClientStream? _nodeStream = default!;
+        private NamedPipeClientStream _nodeStream;
 
         /// <summary>
         /// Public constructor with parameters.
         /// </summary>
         public MSBuildClient(string msbuildLocation, string exeLocation, string dllLocation)
         {
-            ServerEnvironmentVariables = new();
-            _exitResult = new();
-            _buildFinished = false;
-
             _msBuildLocation = msbuildLocation;
             _exeLocation = exeLocation;
             _dllLocation = dllLocation;
+
+            ServerEnvironmentVariables = new();
+            _exitResult = new();
+
+            _handshake = GetHandshake();
+            _pipeName = GetPipeNameOrPath("MSBuildServer-" + _handshake.ComputeHash());
+            _nodeStream = new NamedPipeClientStream(".", _pipeName, PipeDirection.InOut, PipeOptions.Asynchronous
+#if FEATURE_PIPEOPTIONS_CURRENTUSERONLY
+                                                                         | PipeOptions.CurrentUserOnly
+#endif
+            );
         }
 
         /// <summary>
@@ -141,11 +149,17 @@ namespace Microsoft.Build.Experimental.Client
             string msbuildLocation,
             string exeLocation,
             string dllLocation
-        ) : this(msbuildLocation, exeLocation, dllLocation)
+        )
         {
             _handshake = handshake;
             _pipeName = pipeName;
             _nodeStream = nodeStream;
+            _msBuildLocation = msbuildLocation;
+            _exeLocation = exeLocation;
+            _dllLocation = dllLocation;
+
+            ServerEnvironmentVariables = new();
+            _exitResult = new();
         }
 
         /// <summary>
@@ -159,44 +173,16 @@ namespace Microsoft.Build.Experimental.Client
         /// or the manner in which it failed.</returns>
         public MSBuildClientExitResult Execute(string commandLine)
         {
-            // Initialise _handshake, _pipeName and _nodeStream if they are not set.
-            if ((_nodeStream is null) || (_pipeName is null) || (_handshake is null))
-            {
-                _handshake = GetHandshake();
-                _pipeName = GetPipeNameOrPath("MSBuildServer-" + _handshake.ComputeHash());
-                _nodeStream = new NamedPipeClientStream(".", _pipeName, PipeDirection.InOut, PipeOptions.Asynchronous
-#if FEATURE_PIPEOPTIONS_CURRENTUSERONLY
-                                                                         | PipeOptions.CurrentUserOnly
-#endif
-                );
-            }
-
             string serverRunningMutexName = $@"Global\server-running-{_pipeName}";
             string serverBusyMutexName = $@"Global\server-busy-{_pipeName}";
-            string serverLaunchMutexName = $@"Global\server-launch-{_pipeName}";
 
             // Start server it if is not running.
             bool serverWasAlreadyRunning = ServerNamedMutex.WasOpen(serverRunningMutexName);
             if (!serverWasAlreadyRunning)
             {
-                using var serverLaunchMutex = ServerNamedMutex.OpenOrCreateMutex(serverLaunchMutexName, out bool mutexCreatedNew);
-                if (!mutexCreatedNew)
+                if (!LaunchMSBuildServer())
                 {
-                    // Some other client process launching a server and setting a build request for it. Fallback to usual msbuild app build.
-                    CommunicationsUtilities.Trace("Another process launching the msbuild server, falling back to former behavior.");
-                    _exitResult.MSBuildClientExitType = ClientExitType.ServerBusy;
-                    return _exitResult;
-                }
-
-                try
-                {
-                    Process msbuildProcess = LaunchNode();
-                    CommunicationsUtilities.Trace("Server is launched.");
-                }
-                catch (Exception ex)
-                {
-                    CommunicationsUtilities.Trace($"Failed to launch the msbuild server: {ex.Message}");
-                    _exitResult.MSBuildClientExitType = ClientExitType.LaunchError;
+                    // Failed to launch MSBuild server.
                     return _exitResult;
                 }
             }
@@ -211,20 +197,13 @@ namespace Microsoft.Build.Experimental.Client
             }
 
             // Connect to server.
-            try
+            if (!ConnectToServer(serverWasAlreadyRunning && !serverWasBusy ? 1_000 : 20_000))
             {
-                ConnectToServer(_nodeStream, _handshake, serverWasAlreadyRunning && !serverWasBusy ? 1_000 : 20_000, _pipeName);
-            }
-            catch (Exception ex)
-            {
-                CommunicationsUtilities.Trace($"Failed to conect to server: {ex.Message}");
-                _exitResult.MSBuildClientExitType = ClientExitType.ConnectionError;
                 return _exitResult;
-            };
+            }
 
             // Send build command.
-            ServerNodeBuildCommand buildCommand = GetServerNodeBuildCommand(commandLine);
-            WritePacket(_nodeStream, buildCommand);
+            SendBuildCommand(commandLine, _nodeStream);
 
             // Read server responses.
             _buildFinished = false;
@@ -245,6 +224,43 @@ namespace Microsoft.Build.Experimental.Client
 
             CommunicationsUtilities.Trace("Build finished.");
             return _exitResult;
+        }
+
+        /// <summary>
+        /// Launches MSBuild server.
+        /// </summary>
+        /// <returns> Whether MSBuild server was started successfully.</returns>
+        private bool LaunchMSBuildServer()
+        {
+            string serverLaunchMutexName = $@"Global\server-launch-{_pipeName}";
+            using var serverLaunchMutex = ServerNamedMutex.OpenOrCreateMutex(serverLaunchMutexName, out bool mutexCreatedNew);
+            if (!mutexCreatedNew)
+            {
+                // Some other client process launching a server and setting a build request for it. Fallback to usual msbuild app build.
+                CommunicationsUtilities.Trace("Another process launching the msbuild server, falling back to former behavior.");
+                _exitResult.MSBuildClientExitType = ClientExitType.ServerBusy;
+                return false;
+            }
+
+            try
+            {
+                Process msbuildProcess = LaunchNode();
+                CommunicationsUtilities.Trace("Server is launched.");
+            }
+            catch (Exception ex)
+            {
+                CommunicationsUtilities.Trace($"Failed to launch the msbuild server: {ex.Message}");
+                _exitResult.MSBuildClientExitType = ClientExitType.LaunchError;
+                return false;
+            }
+
+            return true;
+        }
+
+        private void SendBuildCommand(string commandLine, NamedPipeClientStream nodeStream)
+        {
+            ServerNodeBuildCommand buildCommand = GetServerNodeBuildCommand(commandLine);
+            WritePacket(_nodeStream, buildCommand);
         }
 
         private ServerNodeBuildCommand GetServerNodeBuildCommand(string commandLine)
@@ -320,6 +336,44 @@ namespace Microsoft.Build.Experimental.Client
             _buildFinished = true;
         }
 
+        // TODO: refactor communication.
+
+        /// <summary>
+        /// Connects to MSBuild server.
+        /// </summary>
+        /// <returns> Whether the client connected to MSBuild server successfully.</returns>
+        private bool ConnectToServer(int timeout)
+        {
+            try
+            {
+                _nodeStream.Connect(timeout);
+
+                int[] handshakeComponents = _handshake.RetrieveHandshakeComponents();
+                for (int i = 0; i < handshakeComponents.Length; i++)
+                {
+                    CommunicationsUtilities.Trace("Writing handshake part {0} ({1}) to pipe {2}", i, handshakeComponents[i], _pipeName);
+                    WriteIntForHandshake(_nodeStream, handshakeComponents[i]);
+                }
+
+                // This indicates that we have finished all the parts of our handshake; hopefully the endpoint has as well.
+                WriteIntForHandshake(_nodeStream, ServerNodeHandshake.EndOfHandshakeSignal);
+
+                CommunicationsUtilities.Trace("Reading handshake from pipe {0}", _pipeName);
+
+                ReadEndOfHandshakeSignal(_nodeStream, timeout: 1000);
+
+                CommunicationsUtilities.Trace("Successfully connected to pipe {0}...!", _pipeName);
+            }
+            catch (Exception ex)
+            {
+                CommunicationsUtilities.Trace($"Failed to conect to server: {ex.Message}");
+                _exitResult.MSBuildClientExitType = ClientExitType.ConnectionError;
+                return false;
+            }
+
+            return true;
+        }
+
         private Process LaunchNode()
         {
             string[] msBuildServerOptions = new[] {
@@ -361,28 +415,6 @@ namespace Microsoft.Build.Experimental.Client
             }
 
             return process;
-        }
-
-        // TODO: refactor communication.
-        private void ConnectToServer(NamedPipeClientStream nodeStream, ServerNodeHandshake handshake, int timeout, string pipeName)
-        {
-            nodeStream.Connect(timeout);
-
-            int[] handshakeComponents = handshake.RetrieveHandshakeComponents();
-            for (int i = 0; i < handshakeComponents.Length; i++)
-            {
-                CommunicationsUtilities.Trace("Writing handshake part {0} ({1}) to pipe {2}", i, handshakeComponents[i], pipeName);
-                WriteIntForHandshake(nodeStream, handshakeComponents[i]);
-            }
-
-            // This indicates that we have finished all the parts of our handshake; hopefully the endpoint has as well.
-            WriteIntForHandshake(nodeStream, ServerNodeHandshake.EndOfHandshakeSignal);
-
-            CommunicationsUtilities.Trace("Reading handshake from pipe {0}", pipeName);
-
-            ReadEndOfHandshakeSignal(nodeStream, timeout: 1000);
-
-            CommunicationsUtilities.Trace("Successfully connected to pipe {0}...!", pipeName);
         }
 
         private static string GetPipeNameOrPath(string pipeName)
