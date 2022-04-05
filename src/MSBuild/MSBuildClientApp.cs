@@ -2,6 +2,8 @@
 using Microsoft.Build.CommandLine;
 using Microsoft.Build.Shared;
 using Microsoft.Build.Experimental.Client;
+using System.IO;
+using System.Diagnostics;
 
 namespace Microsoft.Build.CommandLine
 {
@@ -16,6 +18,9 @@ namespace Microsoft.Build.CommandLine
         /// <summary>
         /// This is the entry point for the MSBuild client.
         /// </summary>
+        /// <remark>
+        /// The locations of msbuild exe/dll and dotnet.exe are automatically determined.
+        /// </remark>
         /// <returns>0 on success, 1 on failure</returns>
         public static int Run(
 #if !FEATURE_GET_COMMANDLINE
@@ -23,12 +28,63 @@ namespace Microsoft.Build.CommandLine
 #endif
             )
         {
+            string msBuildLocation = BuildEnvironmentHelper.Instance.CurrentMSBuildExePath;
+            string dllLocation = string.Empty;
+            string exeLocation = string.Empty;
+
+#if RUNTIME_TYPE_NETCORE || MONO
+            // Run the child process with the same host as the currently-running process.
+            // Mono automagically uses the current mono, to execute a managed assembly.
+            if (!NativeMethodsShared.IsMono)
+            {
+                // _exeFileLocation consists the msbuild dll instead.
+                dllLocation = msBuildLocation;
+                exeLocation = GetCurrentHost();
+            }
+            else
+            {
+                // _exeFileLocation consists the msbuild dll instead.
+                exeLocation = msBuildLocation;
+            }
+#else
+            exeLocation = msBuildLocation;
+#endif
+
             int exitCode = (Execute(
 #if FEATURE_GET_COMMANDLINE
-                Environment.CommandLine
+                Environment.CommandLine,
 #else
-                ConstructArrayArg(args)
+                ConstructArrayArg(args),
 #endif
+                msBuildLocation,
+                exeLocation,
+                dllLocation
+            ) == MSBuildApp.ExitType.Success) ? 0 : 1;
+            return exitCode;
+        }
+
+        /// <summary>
+        /// This is the entry point for the MSBuild client.
+        /// </summary>
+        /// <returns>0 on success, 1 on failure</returns>
+        public static int Run(
+#if !FEATURE_GET_COMMANDLINE
+            string[] args,
+#endif
+            string msbuildLocation,
+            string exeLocation,
+            string dllLocation
+            )
+        {
+            int exitCode = (Execute(
+#if FEATURE_GET_COMMANDLINE
+                Environment.CommandLine,
+#else
+                ConstructArrayArg(args),
+#endif
+                msbuildLocation,
+                exeLocation,
+                dllLocation
             ) == MSBuildApp.ExitType.Success) ? 0 : 1;
             return exitCode;
         }
@@ -44,10 +100,13 @@ namespace Microsoft.Build.CommandLine
         /// or the manner in which it failed.</returns>
         public static MSBuildApp.ExitType Execute(
 #if FEATURE_GET_COMMANDLINE
-            string commandLine
+            string commandLine,
 #else
-            string[] commandLine
+            string[] commandLine,
 #endif
+            string msbuildLocation,
+            string exeLocation,
+            string dllLocation
             )
         {
             // Escape hatch to an old behavior.
@@ -63,7 +122,7 @@ namespace Microsoft.Build.CommandLine
 #else
             string commandLineString = commandLine;
 #endif
-            MSBuildClient msbuildClient = new MSBuildClient();
+            MSBuildClient msbuildClient = new MSBuildClient(msbuildLocation, exeLocation, dllLocation); 
             MSBuildClientExitResult exitResult = msbuildClient.Execute(commandLineString);
 
             if (exitResult.MSBuildClientExitType == ClientExitType.ServerBusy)
@@ -95,6 +154,37 @@ namespace Microsoft.Build.CommandLine
             Array.Copy(args, 0, newArgArray, 1, args.Length);
 
             return newArgArray;
+        }
+
+
+        // Copied from NodeProviderOutOfProc. TODO: Refactor this?
+#if RUNTIME_TYPE_NETCORE || MONO
+        private static string? CurrentHost;
+#endif
+        private static string GetCurrentHost()
+        {
+#if RUNTIME_TYPE_NETCORE || MONO
+            if (CurrentHost == null)
+            {
+                string dotnetExe = Path.Combine(FileUtilities.GetFolderAbove(BuildEnvironmentHelper.Instance.CurrentMSBuildToolsDirectory, 2),
+                    NativeMethodsShared.IsWindows ? "dotnet.exe" : "dotnet");
+                if (File.Exists(dotnetExe))
+                {
+                    CurrentHost = dotnetExe;
+                }
+                else
+                {
+                    using (Process currentProcess = Process.GetCurrentProcess())
+                    {
+                        CurrentHost = currentProcess.MainModule?.FileName;
+                    }
+                }
+            }
+
+            return CurrentHost;
+#else
+            return null;
+#endif
         }
     }
 }

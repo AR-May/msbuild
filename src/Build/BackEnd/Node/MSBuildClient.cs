@@ -21,20 +21,18 @@ namespace Microsoft.Build.Experimental.Client
     {
         /// <summary>
         /// The MSBuild client exit type.
-        /// This field covers different ways MSBuild client execution can finish. Build errors are not included.
-        /// The client could finish successfully and the build at the same time could result in a build error.
+        /// Covers different ways MSBuild client execution can finish.
+        /// Build errors are not included. The client could finish successfully and the build at the same time could result in a build error.
         /// </summary>
         public ClientExitType MSBuildClientExitType { get; set; }
 
         /// <summary>
-        /// The build exit type. Possible values: MSBuildApp.ExitType serialised into a string.
+        /// The build exit type. Possible values: MSBuildApp.ExitType serialized into a string.
         /// This field is null if MSBuild client execution was not successful.
         /// </summary>
         public string? MSBuildAppExitTypeString { get; set; }
 
-        public MSBuildClientExitResult()
-        {
-        }
+        public MSBuildClientExitResult() { }
     }
 
     public enum ClientExitType
@@ -80,14 +78,19 @@ namespace Microsoft.Build.Experimental.Client
         public Dictionary<string, string> ServerEnvironmentVariables { get; set; }
 
         /// <summary>
-        /// Location of executable file to launch the server process.
+        /// Location of msbuild dll or exe.
         /// </summary>
-        private string _exeFileLocation;
+        private string _msBuildLocation;
 
         /// <summary>
-        /// Location of msbuild dll, if needed.
+        /// Location of executable file to launch the server process. That should be either dotnet.exe or MSBuild.exe location.
         /// </summary>
-        private string _msBuildDllLocation;
+        private string _exeLocation;
+
+        /// <summary>
+        /// Location of dll file to launch the server process if needed. Empty if executable is msbuild.exe and not empty if dotnet.exe.
+        /// </summary>
+        private string _dllLocation;
 
         /// <summary>
         /// The MSBuild client execution result.
@@ -115,63 +118,30 @@ namespace Microsoft.Build.Experimental.Client
         private NamedPipeClientStream? _nodeStream = default!;
 
         /// <summary>
-        /// Public constructor.
+        /// Public constructor with parameters.
         /// </summary>
-        public MSBuildClient()
+        public MSBuildClient(string msbuildLocation, string exeLocation, string dllLocation)
         {
             ServerEnvironmentVariables = new();
             _exitResult = new();
             _buildFinished = false;
 
-            _msBuildDllLocation = string.Empty;
-            _exeFileLocation = BuildEnvironmentHelper.Instance.CurrentMSBuildExePath; ;
-#if RUNTIME_TYPE_NETCORE || MONO
-            // Run the child process with the same host as the currently-running process.
-            // Mono automagically uses the current mono, to execute a managed assembly.
-            if (!NativeMethodsShared.IsMono)
-            {
-                // _exeFileLocation consists the msbuild dll instead.
-                _msBuildDllLocation = _exeFileLocation;
-                _exeFileLocation = GetCurrentHost();
-            }
-#endif
-        }
-
-        // Copied from NodeProviderOutOfProc. TODO: Refactor this
-
-#if RUNTIME_TYPE_NETCORE || MONO
-        private static string? CurrentHost;
-#endif
-        private static string GetCurrentHost()
-        {
-#if RUNTIME_TYPE_NETCORE || MONO
-            if (CurrentHost == null)
-            {
-                string dotnetExe = Path.Combine(FileUtilities.GetFolderAbove(BuildEnvironmentHelper.Instance.CurrentMSBuildToolsDirectory, 2),
-                    NativeMethodsShared.IsWindows ? "dotnet.exe" : "dotnet");
-                if (File.Exists(dotnetExe))
-                {
-                    CurrentHost = dotnetExe;
-                }
-                else
-                {
-                    using (Process currentProcess = Process.GetCurrentProcess())
-                    {
-                        CurrentHost = currentProcess.MainModule?.FileName;
-                    }
-                }
-            }
-
-            return CurrentHost;
-#else
-            return null;
-#endif
+            _msBuildLocation = msbuildLocation;
+            _exeLocation = exeLocation;
+            _dllLocation = dllLocation;
         }
 
         /// <summary>
         /// Internal constructor. Used for testing.
         /// </summary>
-        internal MSBuildClient(ServerNodeHandshake handshake, string pipeName, NamedPipeClientStream nodeStream) : this()
+        internal MSBuildClient(
+            ServerNodeHandshake handshake,
+            string pipeName,
+            NamedPipeClientStream nodeStream,
+            string msbuildLocation,
+            string exeLocation,
+            string dllLocation
+        ) : this(msbuildLocation, exeLocation, dllLocation)
         {
             _handshake = handshake;
             _pipeName = pipeName;
@@ -193,9 +163,7 @@ namespace Microsoft.Build.Experimental.Client
             if ((_nodeStream is null) || (_pipeName is null) || (_handshake is null))
             {
                 _handshake = GetHandshake();
-
                 _pipeName = GetPipeNameOrPath("MSBuildServer-" + _handshake.ComputeHash());
-
                 _nodeStream = new NamedPipeClientStream(".", _pipeName, PipeDirection.InOut, PipeOptions.Asynchronous
 #if FEATURE_PIPEOPTIONS_CURRENTUSERONLY
                                                                          | PipeOptions.CurrentUserOnly
@@ -308,7 +276,7 @@ namespace Microsoft.Build.Experimental.Client
 
             return new ServerNodeHandshake(
                 CommunicationsUtilities.GetHandshakeOptions(taskHost: false, is64Bit: EnvironmentUtilities.Is64BitProcess),
-                _msBuildDllLocation
+                _msBuildLocation
             );
         }
 
@@ -355,14 +323,14 @@ namespace Microsoft.Build.Experimental.Client
         private Process LaunchNode()
         {
             string[] msBuildServerOptions = new[] {
-                _msBuildDllLocation,
+                _dllLocation,
                 "/nologo",
                 "/nodemode:8"
             }.ToArray();
 
             ProcessStartInfo processStartInfo = new ProcessStartInfo
             {
-                FileName = _exeFileLocation,
+                FileName = _exeLocation,
                 Arguments = string.Join(" ", msBuildServerOptions),
                 UseShellExecute = false
             };
@@ -396,7 +364,6 @@ namespace Microsoft.Build.Experimental.Client
         }
 
         // TODO: refactor communication.
-
         private void ConnectToServer(NamedPipeClientStream nodeStream, ServerNodeHandshake handshake, int timeout, string pipeName)
         {
             nodeStream.Connect(timeout);
