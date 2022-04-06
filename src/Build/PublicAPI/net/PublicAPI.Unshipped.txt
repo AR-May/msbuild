@@ -30,7 +30,7 @@ Microsoft.Build.Experimental.Client.MSBuildClientExitResult
 Microsoft.Build.Experimental.Client.MSBuildClientExitResult.MSBuildAppExitTypeString.get -> string
 Microsoft.Build.Experimental.Client.MSBuildClientExitResult.MSBuildAppExitTypeString.set -> void
 Microsoft.Build.Experimental.Client.MSBuildClientExitResult.MSBuildClientExitResult() -> void
-Microsoft.Build.Experimental.Client.MSBuildClientExitResult.MSBuildClientExitType.get -> Microsoft.Build.Experimental.Client.ClientExitType
+Microsoft.Build.Experimental.Client.MSBuildClientExitResult.MSBuildClientExitType.get -> Microsoft.Build.Experimental.Client.MSBuildClientExitType
 Microsoft.Build.Experimental.Client.MSBuildClientExitResult.MSBuildClientExitType.set -> void
 readonly Microsoft.Build.Execution.OutOfProcServerNode.ServerNamedMutex.serverMutex -> System.Threading.Mutex
 static Microsoft.Build.Execution.OutOfProcServerNode.ServerNamedMutex.WasOpen(string mutexName) -> bool

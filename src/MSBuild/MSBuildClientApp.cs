@@ -129,12 +129,12 @@ namespace Microsoft.Build.CommandLine
             MSBuildClient msbuildClient = new MSBuildClient(msbuildLocation, exeLocation, dllLocation); 
             MSBuildClientExitResult exitResult = msbuildClient.Execute(commandLineString);
 
-            if (exitResult.MSBuildClientExitType == ClientExitType.ServerBusy)
+            if (exitResult.MSBuildClientExitType == MSBuildClientExitType.ServerBusy)
             {
                 // Server is busy, fallback to old behavior.
                 return MSBuildApp.Execute(commandLine);
             }
-            else if ((exitResult.MSBuildClientExitType == ClientExitType.Success)
+            else if ((exitResult.MSBuildClientExitType == MSBuildClientExitType.Success)
                     && Enum.TryParse(exitResult.MSBuildAppExitTypeString, out MSBuildApp.ExitType MSBuildAppExitType))
             {
                 // The client successfully set up a build task for MSBuild server and recieved the result.

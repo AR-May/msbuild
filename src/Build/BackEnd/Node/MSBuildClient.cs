@@ -16,56 +16,6 @@ using static Microsoft.Build.Execution.OutOfProcServerNode;
 namespace Microsoft.Build.Experimental.Client
 {
     /// <summary>
-    /// Enumeration of the various ways in which the MSBuildClient execution can exit.
-    /// </summary>
-    public class MSBuildClientExitResult
-    {
-        /// <summary>
-        /// The MSBuild client exit type.
-        /// Covers different ways MSBuild client execution can finish.
-        /// Build errors are not included. The client could finish successfully and the build at the same time could result in a build error.
-        /// </summary>
-        public ClientExitType MSBuildClientExitType { get; set; }
-
-        /// <summary>
-        /// The build exit type. Possible values: MSBuildApp.ExitType serialized into a string.
-        /// This field is null if MSBuild client execution was not successful.
-        /// </summary>
-        public string? MSBuildAppExitTypeString { get; set; }
-
-        public MSBuildClientExitResult() { }
-    }
-
-    public enum ClientExitType
-    {
-        /// <summary>
-        /// The MSBuild client successfully processed the build request.
-        /// </summary>
-        Success,
-        /// <summary>
-        /// Server is busy. This return value should cause fallback to old MSBuildApp execution.
-        /// </summary>
-        ServerBusy,
-        /// <summary>
-        /// Client was shutted down.
-        /// </summary>
-        Shutdown,
-        /// <summary>
-        /// Client was unable to connect to the server.
-        /// </summary>
-        ConnectionError,
-        /// <summary>
-        /// Client was unable to launch to the server.
-        /// </summary>
-        LaunchError,
-        /// <summary>
-        /// The build stopped unexpectedly, for example,
-        /// because a named pipe between the server and the client was unexpectedly closed.
-        /// </summary>
-        Unexpected
-    }
-
-    /// <summary>
     /// This class implements the MSBuildClient.exe command-line application. It processes
     /// command-line arguments and invokes the build engine.
     /// </summary>
@@ -192,7 +142,7 @@ namespace Microsoft.Build.Experimental.Client
             if (serverWasBusy)
             {
                 CommunicationsUtilities.Trace("Server is busy, falling back to former behavior.");
-                _exitResult.MSBuildClientExitType = ClientExitType.ServerBusy;
+                _exitResult.MSBuildClientExitType = MSBuildClientExitType.ServerBusy;
                 return _exitResult;
             }
 
@@ -217,7 +167,7 @@ namespace Microsoft.Build.Experimental.Client
                 catch (Exception ex)
                 {
                     CommunicationsUtilities.Trace($"HandlePacket error: {ex.Message}");
-                    _exitResult.MSBuildClientExitType = ClientExitType.Unexpected;
+                    _exitResult.MSBuildClientExitType = MSBuildClientExitType.Unexpected;
                     return _exitResult;
                 }
             }
@@ -238,7 +188,7 @@ namespace Microsoft.Build.Experimental.Client
             {
                 // Some other client process launching a server and setting a build request for it. Fallback to usual msbuild app build.
                 CommunicationsUtilities.Trace("Another process launching the msbuild server, falling back to former behavior.");
-                _exitResult.MSBuildClientExitType = ClientExitType.ServerBusy;
+                _exitResult.MSBuildClientExitType = MSBuildClientExitType.ServerBusy;
                 return false;
             }
 
@@ -250,7 +200,7 @@ namespace Microsoft.Build.Experimental.Client
             catch (Exception ex)
             {
                 CommunicationsUtilities.Trace($"Failed to launch the msbuild server: {ex.Message}");
-                _exitResult.MSBuildClientExitType = ClientExitType.LaunchError;
+                _exitResult.MSBuildClientExitType = MSBuildClientExitType.LaunchError;
                 return false;
             }
 
@@ -331,7 +281,7 @@ namespace Microsoft.Build.Experimental.Client
         private void HandleServerNodeResponse(ServerNodeResponse response)
         {
             CommunicationsUtilities.Trace($"Build response received: exit code {response.ExitCode}, exit type '{response.ExitType}'");
-            _exitResult.MSBuildClientExitType = ClientExitType.Success;
+            _exitResult.MSBuildClientExitType = MSBuildClientExitType.Success;
             _exitResult.MSBuildAppExitTypeString = response.ExitType;
             _buildFinished = true;
         }
@@ -367,7 +317,7 @@ namespace Microsoft.Build.Experimental.Client
             catch (Exception ex)
             {
                 CommunicationsUtilities.Trace($"Failed to conect to server: {ex.Message}");
-                _exitResult.MSBuildClientExitType = ClientExitType.ConnectionError;
+                _exitResult.MSBuildClientExitType = MSBuildClientExitType.ConnectionError;
                 return false;
             }
 
