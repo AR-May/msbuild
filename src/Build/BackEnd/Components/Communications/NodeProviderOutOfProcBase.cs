@@ -9,7 +9,9 @@ using System.Globalization;
 using System.IO;
 using System.IO.Pipes;
 using System.Diagnostics;
+#if !FEATURE_APM
 using System.Threading;
+#endif
 using System.Threading.Tasks;
 using System.Runtime.InteropServices;
 #if FEATURE_PIPE_SECURITY
@@ -23,7 +25,6 @@ using Microsoft.Build.Exceptions;
 using Microsoft.Build.Internal;
 using Microsoft.Build.Shared;
 using Microsoft.Build.Shared.FileSystem;
-using Microsoft.Build.Utilities;
 
 using BackendNativeMethods = Microsoft.Build.BackEnd.NativeMethods;
 using Task = System.Threading.Tasks.Task;
