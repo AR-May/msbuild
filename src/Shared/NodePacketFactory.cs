@@ -93,6 +93,7 @@ namespace Microsoft.Build.BackEnd
                 _factoryMethod = factoryMethod;
             }
 
+            // DESERIALISATION HERE!
             /// <summary>
             /// Creates a packet from a binary stream and sends it to the registered handler.
             /// </summary>

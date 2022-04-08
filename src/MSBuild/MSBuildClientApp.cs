@@ -129,8 +129,13 @@ namespace Microsoft.Build.CommandLine
             MSBuildClient msbuildClient = new MSBuildClient(msbuildLocation, exeLocation, dllLocation); 
             MSBuildClientExitResult exitResult = msbuildClient.Execute(commandLineString);
 
-            if (exitResult.MSBuildClientExitType == MSBuildClientExitType.ServerBusy)
+            if (exitResult.MSBuildClientExitType == MSBuildClientExitType.ServerBusy
+                || exitResult.MSBuildClientExitType == MSBuildClientExitType.ConnectionError
+            )
             {
+                // TODO: debug, remove it.
+                throw new Exception("NOT CONNECTED TO SERVER.");
+
                 // Server is busy, fallback to old behavior.
                 return MSBuildApp.Execute(commandLine);
             }
