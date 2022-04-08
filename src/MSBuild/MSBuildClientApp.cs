@@ -137,7 +137,7 @@ namespace Microsoft.Build.CommandLine
                 throw new Exception("NOT CONNECTED TO SERVER.");
 
                 // Server is busy, fallback to old behavior.
-                return MSBuildApp.Execute(commandLine);
+                // return MSBuildApp.Execute(commandLine);
             }
             else if ((exitResult.MSBuildClientExitType == MSBuildClientExitType.Success)
                     && Enum.TryParse(exitResult.MSBuildAppExitTypeString, out MSBuildApp.ExitType MSBuildAppExitType))

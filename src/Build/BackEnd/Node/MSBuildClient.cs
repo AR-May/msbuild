@@ -666,15 +666,8 @@ namespace Microsoft.Build.Experimental.Client
             foreach (var entry in ServerEnvironmentVariables)
             {
                 processStartInfo.Environment[entry.Key] = entry.Value;
-            };
+            }
 
-
-            // Redirect the streams of worker nodes so that this 
-            // parent doesn't wait on idle worker nodes to close streams
-            // after the build is complete.
-            processStartInfo.RedirectStandardInput = false;
-            processStartInfo.RedirectStandardOutput = false;
-            processStartInfo.RedirectStandardError = false;
             processStartInfo.CreateNoWindow = true;
             processStartInfo.UseShellExecute = false;
 
