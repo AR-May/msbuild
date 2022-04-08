@@ -7,13 +7,15 @@ using System.Globalization;
 using System.IO;
 using System.IO.Pipes;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Threading;
+#if !FEATURE_APM
+using System.Threading.Tasks;
+#endif
 using Microsoft.Build.BackEnd;
 using Microsoft.Build.Internal;
 using Microsoft.Build.Shared;
 using static Microsoft.Build.Execution.OutOfProcServerNode;
-#nullable enable 
+#nullable enable
 
 namespace Microsoft.Build.Experimental.Client
 {
@@ -30,7 +32,7 @@ namespace Microsoft.Build.Experimental.Client
         /// </summary>
         public Dictionary<string, string> ServerEnvironmentVariables { get; set; }
 
-        #region Private fields
+#region Private fields
         /// <summary>
         /// Location of msbuild dll or exe.
         /// </summary>
@@ -70,9 +72,12 @@ namespace Microsoft.Build.Experimental.Client
         /// The named pipe stream for client-server communication.
         /// </summary>
         private NamedPipeClientStream _nodeStream;
-        #endregion
-        
-/*
+#endregion
+
+
+
+#region Message pump
+
         /// <summary>
         /// The event which is set when we connection failed.
         /// </summary>
@@ -82,8 +87,6 @@ namespace Microsoft.Build.Experimental.Client
         /// The event which is set when we should shut down.
         /// </summary>
         private readonly ManualResetEvent _shutdownEvent;
-        
-*/
 
         /// <summary>
         /// The packet factory.
@@ -108,8 +111,6 @@ namespace Microsoft.Build.Experimental.Client
         /// </summary>
         private readonly AutoResetEvent _packetReceivedEvent;
 
-/*
-        #region Message pump
 
 
         /// <summary>
@@ -120,14 +121,14 @@ namespace Microsoft.Build.Experimental.Client
         /// <summary>
         /// Set when the asynchronous packet pump should terminate
         /// </summary>
-        private AutoResetEvent _terminatePacketPump;
+        private ManualResetEvent _terminatePacketPump;
 
         /// <summary>
         /// The thread which runs the asynchronous packet pump
         /// </summary>
-        private Thread _packetPump;
-        #endregion
-*/
+        private Thread? _packetPump;
+#endregion
+
 
         /// <summary>
         /// Public constructor with parameters.
@@ -149,6 +150,8 @@ namespace Microsoft.Build.Experimental.Client
 #endif
             );
 
+            _asyncDataMonitor = new AutoResetEvent(false);
+            _connectionFailedEvent = new ManualResetEvent(false);
             _receivedPackets = new ConcurrentQueue<INodePacket>();
             _packetReceivedEvent = new AutoResetEvent(false);
             _packetFactory = new NodePacketFactory();
@@ -159,11 +162,10 @@ namespace Microsoft.Build.Experimental.Client
 
             (this as INodePacketFactory).RegisterPacketHandler(NodePacketType.ServerNodeConsoleWrite, ServerNodeConsoleWrite.FactoryForDeserialization, this);
             (this as INodePacketFactory).RegisterPacketHandler(NodePacketType.ServerNodeResponse, ServerNodeResponse.FactoryForDeserialization, this);
-        
-/*
+
+            _terminatePacketPump = new ManualResetEvent(false);
             _packetReceivedEvent = new AutoResetEvent(false);
             _shutdownEvent = new ManualResetEvent(false);
-*/
         }
 
 /*        
@@ -228,7 +230,7 @@ namespace Microsoft.Build.Experimental.Client
             // Send build command.
             SendBuildCommand(commandLine, _nodeStream);
 
-/*
+
             InitializeAsyncPacketThread();
 
             var waitHandles = new WaitHandle[] {_shutdownEvent, _packetReceivedEvent };
@@ -264,35 +266,6 @@ namespace Microsoft.Build.Experimental.Client
                         }
 
                         break;
-                }
-            }
-*/
-
-            // Read server responses.
-            _buildFinished = false;
-            while (!_buildFinished)
-            {
-                INodePacket packet;
-
-                try
-                {
-                    packet = ReadPacket(_nodeStream);
-                }
-                catch
-                {
-                    _exitResult.MSBuildClientExitType = MSBuildClientExitType.Unexpected;
-                    return _exitResult;
-                }
-
-                try
-                {
-                    HandlePacket(packet);
-                }
-                catch (Exception ex)
-                {
-                    CommunicationsUtilities.Trace($"HandlePacket error: {ex.Message}");
-                    _exitResult.MSBuildClientExitType = MSBuildClientExitType.Unexpected;
-                    return _exitResult;
                 }
             }
 
@@ -411,7 +384,7 @@ namespace Microsoft.Build.Experimental.Client
             _buildFinished = true;
         }
 
-        #region INodePacketFactory Members
+#region INodePacketFactory Members
 
         /// <summary>
         /// Registers a packet handler.
@@ -454,9 +427,9 @@ namespace Microsoft.Build.Experimental.Client
             _packetFactory.RoutePacket(nodeId, packet);
         }
 
-        #endregion
+#endregion
 
-        #region INodePacketHandler Members
+#region INodePacketHandler Members
 
         /// <summary>
         /// Called when a packet has been received.
@@ -469,144 +442,142 @@ namespace Microsoft.Build.Experimental.Client
             _packetReceivedEvent.Set();
         }
 
-        #endregion
-
-        /*
-                #region Packet pump
-                /// <summary>
-                /// Initializes the packet pump thread and the supporting events as well as the packet queue.
-                /// </summary>
-                private void InitializeAsyncPacketThread()
-                {
-                    lock (_asyncDataMonitor)
-                    {
-                        _packetPump = new Thread(PacketPumpProc);
-                        _packetPump.IsBackground = true;
-                        _packetPump.Name = "MSbuild Client Packet Pump";
-                        _terminatePacketPump = new AutoResetEvent(false);
-                        _packetPump.Start();
-                    }
-                }
+#endregion
 
 
-                /// <summary>
-                /// This method handles the asynchronous message pump.  It waits for messages to show up on the queue
-                /// and calls FireDataAvailable for each such packet.  It will terminate when the terminate event is
-                /// set.
-                /// </summary>
-                private void PacketPumpProc()
-                {
-                    AutoResetEvent localTerminatePacketPump = _terminatePacketPump;
+#region Packet pump
+        /// <summary>
+        /// Initializes the packet pump thread and the supporting events as well as the packet queue.
+        /// </summary>
+        private void InitializeAsyncPacketThread()
+        {
+            lock (_asyncDataMonitor)
+            {
+                _packetPump = new Thread(PacketPumpProc);
+                _packetPump.IsBackground = true;
+                _packetPump.Name = "MSbuild Client Packet Pump";
+                _terminatePacketPump = new ManualResetEvent(false);
+                _packetPump.Start();
+            }
+        }
 
-                    RunReadLoop(_nodeStream, localTerminatePacketPump);
 
-                    CommunicationsUtilities.Trace("Ending read loop");
-                }
+        /// <summary>
+        /// This method handles the asynchronous message pump.  It waits for messages to show up on the queue
+        /// and calls FireDataAvailable for each such packet.  It will terminate when the terminate event is
+        /// set.
+        /// </summary>
+        private void PacketPumpProc()
+        {
+            ManualResetEvent localTerminatePacketPump = _terminatePacketPump;
+
+            RunReadLoop(_nodeStream, localTerminatePacketPump);
+
+            CommunicationsUtilities.Trace("Ending read loop");
+        }
 
 
-                private void RunReadLoop(Stream localPipe, AutoResetEvent localTerminatePacketPump)
-                {
-                    CommunicationsUtilities.Trace("Entering read loop.");
-                    byte[] headerByte = new byte[5];
-        #if FEATURE_APM
-                    IAsyncResult result = localPipe.BeginRead(headerByte, 0, headerByte.Length, null, null);
-        #else
-                    Task<int> readTask = CommunicationsUtilities.ReadAsync(localReadPipe, headerByte, headerByte.Length);
-        #endif
+        private void RunReadLoop(Stream localPipe, ManualResetEvent localTerminatePacketPump)
+        {
+            CommunicationsUtilities.Trace("Entering read loop.");
+            byte[] headerByte = new byte[5];
+#if FEATURE_APM
+            IAsyncResult result = localPipe.BeginRead(headerByte, 0, headerByte.Length, null, null);
+#else
+                    Task<int> readTask = CommunicationsUtilities.ReadAsync(localPipe, headerByte, headerByte.Length);
+#endif
 
-                    do
-                    {
-                        // Ordering is important. 
-                        WaitHandle[] handles = new WaitHandle[] {
-        #if FEATURE_APM
+            do
+            {
+                // Ordering is important. 
+                WaitHandle[] handles = new WaitHandle[] {
+#if FEATURE_APM
                             result.AsyncWaitHandle,
-        #else
+#else
                             ((IAsyncResult)readTask).AsyncWaitHandle,
-        #endif
+#endif
                             localTerminatePacketPump };
 
-                        int waitId = WaitHandle.WaitAny(handles);
-                        switch (waitId)
+                int waitId = WaitHandle.WaitAny(handles);
+                switch (waitId)
+                {
+                    case 0:
                         {
-                            case 0:
-                                {
-                                    // Client recieved a packet header. Read the rest of a package.
-                                    int bytesRead = 0;
-                                    try
-                                    {
-        #if FEATURE_APM
-                                        bytesRead = localPipe.EndRead(result);
-        #else
+                            // Client recieved a packet header. Read the rest of a package.
+                            int bytesRead = 0;
+                            try
+                            {
+#if FEATURE_APM
+                                bytesRead = localPipe.EndRead(result);
+#else
                                         bytesRead = readTask.Result;
-        #endif
-                                    }
-                                    catch (Exception e)
-                                    {
-                                        // Lost communications.  Abort (but allow node reuse)
-                                        CommunicationsUtilities.Trace("Exception reading from server.  {0}", e);
-                                        ExceptionHandling.DumpExceptionToFile(e);
-                                        break;
-                                    }
+#endif
+                            }
+                            catch (Exception e)
+                            {
+                                // Lost communications.  Abort (but allow node reuse)
+                                CommunicationsUtilities.Trace("Exception reading from server.  {0}", e);
+                                ExceptionHandling.DumpExceptionToFile(e);
+                                break;
+                            }
 
-                                    if (bytesRead != headerByte.Length)
-                                    {
-                                        // Incomplete read.  Abort.
-                                        if (bytesRead == 0)
-                                        {
-                                            CommunicationsUtilities.Trace("Parent disconnected abruptly");
-                                        }
-                                        else
-                                        {
-                                            CommunicationsUtilities.Trace("Incomplete header read from server.  {0} of {1} bytes read", bytesRead, headerByte.Length);
-                                        }
-
-                                        break;
-                                    }
-
-                                    NodePacketType packetType = (NodePacketType)Enum.ToObject(typeof(NodePacketType), headerByte[0]);
-
-                                    try
-                                    {
-                                        // lock (_receivedPackets)
-                                        // {
-                                        //     _receivedPackets.Enqueue(packet);
-                                        //     _packetReceivedEvent.Set();
-                                        // }
-                                        // _packetFactory.DeserializeAndRoutePacket(0, packetType, BinaryTranslator.GetReadTranslator(localReadPipe, _sharedReadBuffer));
-                                    }
-                                    catch (Exception e)
-                                    {
-                                        // Error while deserializing or handling packet.  Abort.
-                                        CommunicationsUtilities.Trace("Exception while deserializing packet {0}: {1}", packetType, e);
-                                        ExceptionHandling.DumpExceptionToFile(e);
-                                        break;
-                                    }
-
-        #if FEATURE_APM
-                                    result = localPipe.BeginRead(headerByte, 0, headerByte.Length, null, null);
-        #else
-                                    readTask = CommunicationsUtilities.ReadAsync(localReadPipe, headerByte, headerByte.Length);
-        #endif
+                            if (bytesRead != headerByte.Length)
+                            {
+                                // Incomplete read.  Abort.
+                                if (bytesRead == 0)
+                                {
+                                    CommunicationsUtilities.Trace("Parent disconnected abruptly");
+                                }
+                                else
+                                {
+                                    CommunicationsUtilities.Trace("Incomplete header read from server.  {0} of {1} bytes read", bytesRead, headerByte.Length);
                                 }
 
                                 break;
+                            }
 
-                            case 1:
-                                // Terminate a message pump.
-                                throw new NotImplementedException();
+                            NodePacketType packetType = (NodePacketType)Enum.ToObject(typeof(NodePacketType), headerByte[0]);
 
-                            default:
-                                ErrorUtilities.ThrowInternalError("waitId {0} out of range.", waitId);
+                            try
+                            {
+                                // lock (_receivedPackets)
+                                // {
+                                //     _receivedPackets.Enqueue(packet);
+                                //     _packetReceivedEvent.Set();
+                                // }
+                                // _packetFactory.DeserializeAndRoutePacket(0, packetType, BinaryTranslator.GetReadTranslator(localReadPipe, _sharedReadBuffer));
+                            }
+                            catch (Exception e)
+                            {
+                                // Error while deserializing or handling packet.  Abort.
+                                CommunicationsUtilities.Trace("Exception while deserializing packet {0}: {1}", packetType, e);
+                                ExceptionHandling.DumpExceptionToFile(e);
                                 break;
+                            }
+
+#if FEATURE_APM
+                            result = localPipe.BeginRead(headerByte, 0, headerByte.Length, null, null);
+#else
+                                    readTask = CommunicationsUtilities.ReadAsync(localPipe, headerByte, headerByte.Length);
+#endif
                         }
-                    }
-                    while (true);
+
+                        break;
+
+                    case 1:
+                        // Terminate a message pump.
+                        throw new NotImplementedException();
+
+                    default:
+                        ErrorUtilities.ThrowInternalError("waitId {0} out of range.", waitId);
+                        break;
                 }
+            }
+            while (true);
+        }
 
-                #endregion
-        */
+#endregion
 
-        // TODO: refactor communication.
 
         /// <summary>
         /// Connects to MSBuild server.
@@ -695,7 +666,7 @@ namespace Microsoft.Build.Experimental.Client
                 throw;
             }
             
-            if (_receivedPackets.TryDequeue(out INodePacket result))
+            if (_receivedPackets.TryDequeue(out INodePacket? result))
             {
                 return result;
             }
