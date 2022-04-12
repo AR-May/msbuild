@@ -71,71 +71,75 @@ namespace Microsoft.Build.Experimental.Client
         /// The named pipe stream for client-server communication.
         /// </summary>
         private NamedPipeClientStream _nodeStream;
-#endregion
-
-
-
-#region Message pump
 
         /// <summary>
-        /// The event which is set when we should shut down.
+        /// A way to cache a byte array when writing out packets
         /// </summary>
-        private readonly ManualResetEvent _shutdownEvent;
+        private MemoryStream _packetMemoryStream;
 
+        /// <summary>
+        /// A binary writer to help write into <see cref="_packetMemoryStream"/>
+        /// </summary>
+        private BinaryWriter _binaryWriter;
+        #endregion
+
+        #region Message pump
         /// <summary>
         /// The packet factory.
         /// </summary>
         private readonly NodePacketFactory _packetFactory;
 
         /// <summary>
-        /// Per-node shared read buffer.
+        /// Shared read buffer.
         /// </summary>
         private SharedReadBuffer _sharedReadBuffer;
-
-        private MemoryStream _packetMemoryStream;
-        private BinaryWriter _binaryWriter;
 
         /// <summary>
         /// The queue of packets we have received but which have not yet been processed.
         /// </summary>
-        private readonly ConcurrentQueue<INodePacket> _receivedPackets;
+        private readonly ConcurrentQueue<INodePacket> _receivedPacketsQueue;
 
         /// <summary>
-        /// The event which is set when we receive packets.
+        /// Set when packet pump receive packets and put them to <see cref="_receivedPacketsQueue"/>.
         /// </summary>
         private readonly AutoResetEvent _packetReceivedEvent;
 
-
+        /// <summary>
+        /// Set when the asynchronous packet pump should terminate.
+        /// </summary>
+        private ManualResetEvent _terminatePacketPumpEvent;
 
         /// <summary>
-        /// Object used as a lock source for the async data
+        /// Set when we packet pump enexpectedly shutdown (due to connection problems or becuase of desearilization issues).
         /// </summary>
-        private object _asyncDataMonitor;
-
-        /// <summary>
-        /// Set when the asynchronous packet pump should terminate
-        /// </summary>
-        private ManualResetEvent _terminatePacketPump;
+        private readonly ManualResetEvent _packetPumpShutdownEvent;
 
         /// <summary>
         /// The thread which runs the asynchronous packet pump
         /// </summary>
         private Thread? _packetPump;
-#endregion
+        #endregion
 
-
+        // TODO: work on eleminating extra parameters or making them more clearly described at least.
         /// <summary>
         /// Public constructor with parameters.
         /// </summary>
+        /// <param name="msbuildLocation">Location of msbuild dll or exe.</param>
+        /// <param name="exeLocation">Location of executable file to launch the server process.
+        /// That should be either dotnet.exe or MSBuild.exe location.</param>
+        /// <param name="dllLocation">Location of dll file to launch the server process if needed.
+        /// Empty if executable is msbuild.exe and not empty if dotnet.exe.</param>
         public MSBuildClient(string msbuildLocation, string exeLocation, string dllLocation)
         {
+            ServerEnvironmentVariables = new();
+            _exitResult = new();
+
+            // dll & exe locations
             _msBuildLocation = msbuildLocation;
             _exeLocation = exeLocation;
             _dllLocation = dllLocation;
 
-            ServerEnvironmentVariables = new();
-            _exitResult = new();
-
+            // Client <-> Server communication stream
             _handshake = GetHandshake();
             _pipeName = NamedPipeUtil.GetPipeNameOrPath("MSBuildServer-" + _handshake.ComputeHash());
             _nodeStream = new NamedPipeClientStream(".", _pipeName, PipeDirection.InOut, PipeOptions.Asynchronous
@@ -144,48 +148,29 @@ namespace Microsoft.Build.Experimental.Client
 #endif
             );
 
-            _asyncDataMonitor = new AutoResetEvent(false);
-            _receivedPackets = new ConcurrentQueue<INodePacket>();
-            _packetReceivedEvent = new AutoResetEvent(false);
-            _packetFactory = new NodePacketFactory();
-            _sharedReadBuffer = InterningBinaryReader.CreateSharedBuffer();
             _packetMemoryStream = new MemoryStream();
             _binaryWriter = new BinaryWriter(_packetMemoryStream);
 
+            // Packet pump block
+            _receivedPacketsQueue = new ConcurrentQueue<INodePacket>();
+            _packetReceivedEvent = new AutoResetEvent(false);
+            _terminatePacketPumpEvent = new ManualResetEvent(false);
+            _packetPumpShutdownEvent = new ManualResetEvent(false);
+            _packetFactory = new NodePacketFactory();
+            _sharedReadBuffer = InterningBinaryReader.CreateSharedBuffer();
 
             (this as INodePacketFactory).RegisterPacketHandler(NodePacketType.ServerNodeConsoleWrite, ServerNodeConsoleWrite.FactoryForDeserialization, this);
             (this as INodePacketFactory).RegisterPacketHandler(NodePacketType.ServerNodeResponse, ServerNodeResponse.FactoryForDeserialization, this);
-
-            _terminatePacketPump = new ManualResetEvent(false);
-            _packetReceivedEvent = new AutoResetEvent(false);
-            _shutdownEvent = new ManualResetEvent(false);
         }
 
-/*        
         /// <summary>
-        /// Internal constructor. Used for testing.
-        /// </summary>
-        internal MSBuildClient(
-            ServerNodeHandshake handshake,
-            string pipeName,
-            NamedPipeClientStream nodeStream,
-            string msbuildLocation,
-            string exeLocation,
-            string dllLocation
-        )
-        {
-            throw new NotImplementedException();
-        }
-*/
-
-        /// <summary>
-        /// Orchestrates the execution of the build on the server, responsible
-        /// for client-server communication.
+        /// Orchestrates the execution of the build on the server,
+        /// responsible for client-server communication.
         /// </summary>
         /// <param name="commandLine">The command line to process. The first argument
         /// on the command line is assumed to be the name/path of the executable, and
         /// is ignored.</param>
-        /// <returns>A value of type MSBuildClientExitResult that indicates whether the build succeeded,
+        /// <returns>A value of type <see cref="MSBuildClientExitResult"/> that indicates whether the build succeeded,
         /// or the manner in which it failed.</returns>
         public MSBuildClientExitResult Execute(string commandLine)
         {
@@ -221,12 +206,12 @@ namespace Microsoft.Build.Experimental.Client
             }
 
             // Send build command.
+            // Let's send it outside the packet pump so that we easier and quicklier deal with possible issues with connection to server.
             SendBuildCommand(commandLine, _nodeStream);
-
 
             InitializeAsyncPacketThread();
 
-            var waitHandles = new WaitHandle[] {_shutdownEvent, _packetReceivedEvent };
+            var waitHandles = new WaitHandle[] {_packetPumpShutdownEvent, _packetReceivedEvent };
 
             // Get the current directory before doing any work. We need this so we can restore the directory when the node shutsdown.
             while (!_buildFinished)
@@ -235,13 +220,12 @@ namespace Microsoft.Build.Experimental.Client
                 switch (index)
                 {
                     case 0:
-                        CommunicationsUtilities.Trace($"Shutdown.");
-                        _exitResult.MSBuildClientExitType = MSBuildClientExitType.Shutdown;
+                        CommunicationsUtilities.Trace($"MSBuild client error: packet pump unexpectedly shutted down.");
+                        _exitResult.MSBuildClientExitType = MSBuildClientExitType.Unexpected;
                         return _exitResult;
 
                     case 1:
-
-                        while (_receivedPackets.TryDequeue(out INodePacket? packet) && (!_buildFinished))
+                        while (_receivedPacketsQueue.TryDequeue(out INodePacket? packet) && (!_buildFinished))
                         {
                             if (packet != null)
                             {
@@ -251,7 +235,7 @@ namespace Microsoft.Build.Experimental.Client
                                 }
                                 catch (Exception ex)
                                 {
-                                    CommunicationsUtilities.Trace($"HandlePacket error: {ex.Message}");
+                                    CommunicationsUtilities.Trace($"MSBuild client error: problem during packet handling occured. {ex.Message}");
                                     _exitResult.MSBuildClientExitType = MSBuildClientExitType.Unexpected;
                                     return _exitResult;
                                 }
@@ -267,7 +251,7 @@ namespace Microsoft.Build.Experimental.Client
         }
 
         /// <summary>
-        /// Launches MSBuild server.
+        /// Launches MSBuild server. 
         /// </summary>
         /// <returns> Whether MSBuild server was started successfully.</returns>
         private bool LaunchMSBuildServer()
@@ -282,9 +266,15 @@ namespace Microsoft.Build.Experimental.Client
                 return false;
             }
 
+            string[] msBuildServerOptions = new[] {
+                _dllLocation,
+                "/nologo",
+                "/nodemode:8"
+            }.ToArray();
+
             try
             {
-                Process msbuildProcess = LaunchNode();
+                Process msbuildProcess = LaunchNode(_exeLocation, string.Join(" ", msBuildServerOptions),  ServerEnvironmentVariables);
                 CommunicationsUtilities.Trace("Server is launched.");
             }
             catch (Exception ex)
@@ -297,6 +287,29 @@ namespace Microsoft.Build.Experimental.Client
             return true;
         }
 
+        private Process LaunchNode(string exeLocation, string msBuildServerArguments, Dictionary<string, string> serverEnvironmentVariables)
+        { 
+            ProcessStartInfo processStartInfo = new ProcessStartInfo
+            {
+                FileName = exeLocation,
+                Arguments = msBuildServerArguments,
+                UseShellExecute = false
+            };
+
+            // TODO: do we really need to start msbuild server with these variables, performance-wise and theoretically thinking?
+            // We are sending them in build command as well.
+            foreach (var entry in serverEnvironmentVariables)
+            {
+                processStartInfo.Environment[entry.Key] = entry.Value;
+            }
+
+            processStartInfo.CreateNoWindow = true;
+            processStartInfo.UseShellExecute = false;
+
+            return Process.Start(processStartInfo) ?? throw new InvalidOperationException("MSBuild server node failed to lunch");
+        }
+
+
         private void SendBuildCommand(string commandLine, NamedPipeClientStream nodeStream)
         {
             ServerNodeBuildCommand buildCommand = GetServerNodeBuildCommand(commandLine);
@@ -308,6 +321,7 @@ namespace Microsoft.Build.Experimental.Client
         {
 
             Dictionary<string, string> envVars = new Dictionary<string, string>();
+
             IDictionary environmentVariables = Environment.GetEnvironmentVariables();
             foreach (var key in environmentVariables.Keys)
             {
@@ -329,7 +343,7 @@ namespace Microsoft.Build.Experimental.Client
 
         private ServerNodeHandshake GetHandshake()
         {
-            // params? lowprio?
+            // TODO: think of params? lowprio?
 
             return new ServerNodeHandshake(
                 CommunicationsUtilities.GetHandshakeOptions(taskHost: false, is64Bit: EnvironmentUtilities.Is64BitProcess),
@@ -375,6 +389,9 @@ namespace Microsoft.Build.Experimental.Client
             _exitResult.MSBuildClientExitType = MSBuildClientExitType.Success;
             _exitResult.MSBuildAppExitTypeString = response.ExitType;
             _buildFinished = true;
+
+            // Terminate packet pump thread.
+            _terminatePacketPumpEvent.Set();
         }
 
 #region INodePacketFactory Members
@@ -431,27 +448,24 @@ namespace Microsoft.Build.Experimental.Client
         /// <param name="packet">The packet.</param>
         void INodePacketHandler.PacketReceived(int node, INodePacket packet)
         {
-            _receivedPackets.Enqueue(packet);
+            _receivedPacketsQueue.Enqueue(packet);
             _packetReceivedEvent.Set();
         }
 
 #endregion
 
 
-#region Packet pump
+#region Packet Pump
         /// <summary>
         /// Initializes the packet pump thread and the supporting events as well as the packet queue.
         /// </summary>
         private void InitializeAsyncPacketThread()
         {
-            lock (_asyncDataMonitor)
-            {
-                _packetPump = new Thread(PacketPumpProc);
-                _packetPump.IsBackground = true;
-                _packetPump.Name = "MSbuild Client Packet Pump";
-                _terminatePacketPump = new ManualResetEvent(false);
-                _packetPump.Start();
-            }
+            _packetPump = new Thread(PacketPumpProc);
+            _packetPump.IsBackground = true;
+            _packetPump.Name = "MSbuild Client Packet Pump";
+            _terminatePacketPumpEvent = new ManualResetEvent(false);
+            _packetPump.Start();
         }
 
 
@@ -462,7 +476,7 @@ namespace Microsoft.Build.Experimental.Client
         /// </summary>
         private void PacketPumpProc()
         {
-            ManualResetEvent localTerminatePacketPump = _terminatePacketPump;
+            ManualResetEvent localTerminatePacketPump = _terminatePacketPumpEvent;
             RunReadLoop(_nodeStream, localTerminatePacketPump);
         }
 
@@ -509,6 +523,9 @@ namespace Microsoft.Build.Experimental.Client
                                 // Lost communications.  Abort (but allow node reuse)
                                 CommunicationsUtilities.Trace("Exception reading from server.  {0}", e);
                                 ExceptionHandling.DumpExceptionToFile(e);
+
+                                _packetPumpShutdownEvent.Set();
+                                continueReading = false;
                                 break;
                             }
 
@@ -517,13 +534,15 @@ namespace Microsoft.Build.Experimental.Client
                                 // Incomplete read.  Abort.
                                 if (bytesRead == 0)
                                 {
-                                    CommunicationsUtilities.Trace("Parent disconnected abruptly");
+                                    CommunicationsUtilities.Trace("Server disconnected abruptly");
                                 }
                                 else
                                 {
                                     CommunicationsUtilities.Trace("Incomplete header read from server.  {0} of {1} bytes read", bytesRead, headerByte.Length);
                                 }
 
+                                _packetPumpShutdownEvent.Set();
+                                continueReading = false;
                                 break;
                             }
 
@@ -536,11 +555,15 @@ namespace Microsoft.Build.Experimental.Client
                             catch (Exception e)
                             {
                                 // Error while deserializing or handling packet.  Abort.
-                                CommunicationsUtilities.Trace("Exception while deserializing packet {0}: {1}", packetType, e);
+                                CommunicationsUtilities.Trace("Packet factory failed to recieve package. Exception while deserializing packet {0}: {1}", packetType, e);
                                 ExceptionHandling.DumpExceptionToFile(e);
+
+                                _packetPumpShutdownEvent.Set();
+                                continueReading = false;
                                 break;
                             }
 
+                            // Start reading the next package header.
 #if FEATURE_APM
                             result = localPipe.BeginRead(headerByte, 0, headerByte.Length, null, null);
 #else
@@ -551,13 +574,15 @@ namespace Microsoft.Build.Experimental.Client
                         break;
 
                     case 1:
-                        // Terminate a message pump.
+                        // Fulfill the request for termination of the message pump.
                         CommunicationsUtilities.Trace("Terminate message pump thread.");
                         continueReading = false;
                         break;
 
                     default:
+                        // Ignore unknown package.
                         ErrorUtilities.ThrowInternalError("waitId {0} out of range.", waitId);
+                        // TODO: cover this case with ETW.
                         break;
                 }
             }
@@ -565,7 +590,6 @@ namespace Microsoft.Build.Experimental.Client
 
             CommunicationsUtilities.Trace("Ending read loop");
         }
-
 #endregion
 
 
@@ -607,32 +631,6 @@ namespace Microsoft.Build.Experimental.Client
             }
 
             return true;
-        }
-
-        private Process LaunchNode()
-        {
-            string[] msBuildServerOptions = new[] {
-                _dllLocation,
-                "/nologo",
-                "/nodemode:8"
-            }.ToArray();
-
-            ProcessStartInfo processStartInfo = new ProcessStartInfo
-            {
-                FileName = _exeLocation,
-                Arguments = string.Join(" ", msBuildServerOptions),
-                UseShellExecute = false
-            };
-
-            foreach (var entry in ServerEnvironmentVariables)
-            {
-                processStartInfo.Environment[entry.Key] = entry.Value;
-            }
-
-            processStartInfo.CreateNoWindow = true;
-            processStartInfo.UseShellExecute = false;
-
-            return Process.Start(processStartInfo) ?? throw new InvalidOperationException("MSBuild server node failed to lunch");
         }
 
         private void WritePacket(Stream nodeStream, INodePacket packet)

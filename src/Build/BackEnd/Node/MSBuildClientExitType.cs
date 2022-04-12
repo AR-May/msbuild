@@ -21,7 +21,7 @@ namespace Microsoft.Build.Experimental.Client
         /// </summary>
         ConnectionError,
         /// <summary>
-        /// Client was unable to launch to the server.
+        /// Client was unable to launch the server.
         /// </summary>
         LaunchError,
         /// <summary>
