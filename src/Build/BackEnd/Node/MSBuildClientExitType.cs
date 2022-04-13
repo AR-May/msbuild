@@ -1,4 +1,7 @@
-﻿#nullable enable 
+﻿// Copyright (c) Microsoft. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
+#nullable enable 
 
 namespace Microsoft.Build.Experimental.Client
 {
@@ -9,13 +12,9 @@ namespace Microsoft.Build.Experimental.Client
         /// </summary>
         Success,
         /// <summary>
-        /// Server is busy. This return value should cause fallback to old MSBuildApp execution.
+        /// Server is busy.
         /// </summary>
         ServerBusy,
-        /// <summary>
-        /// Client was shutted down.
-        /// </summary>
-        Shutdown,
         /// <summary>
         /// Client was unable to connect to the server.
         /// </summary>

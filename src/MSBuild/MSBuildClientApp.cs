@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Copyright (c) Microsoft. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
+using System;
 using Microsoft.Build.Shared;
 using Microsoft.Build.Experimental.Client;
 
@@ -10,7 +13,7 @@ using System.Diagnostics;
 namespace Microsoft.Build.CommandLine
 {
     /// <summary>
-    /// This class implements the client for MSBuild server. It
+    /// This class implements client for MSBuild server. It
     /// 1. starts the MSBuild server in a separate process if it does not yet exist.
     /// 2. establishes a connection with MSBuild server and sends a build request.
     /// 3. if server is busy, it falls back to old build behavior.
