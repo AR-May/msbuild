@@ -152,6 +152,9 @@
     <Compile Include="BackEnd\Components\SdkResolution\TranslationHelpers.cs" />
     <Compile Include="FileSystem\*.cs" />
     <Compile Include="BackEnd\Node\ConsoleOutput.cs" />
+    <Compile Include="BackEnd\Node\MSBuildClientExitType.cs" />
+    <Compile Include="BackEnd\Node\MSBuildClientExitResult.cs" />
+    <Compile Include="BackEnd\Node\MSBuildClient.cs" />
     <Compile Include="BackEnd\Node\ServerNodeBuildCommand.cs" />
     <Compile Include="BackEnd\Node\ServerNodeConsoleWrite.cs" />
     <Compile Include="BackEnd\Node\ServerNodeBuildResult.cs" />
