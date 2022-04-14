@@ -10,3 +10,21 @@ Microsoft.Build.Execution.OutOfProcServerNode.OutOfProcServerNode(System.Func<st
 Microsoft.Build.Execution.OutOfProcServerNode.Run(bool enableReuse, bool lowPriority, out System.Exception shutdownException) -> Microsoft.Build.Execution.NodeEngineShutdownReason
 Microsoft.Build.Execution.OutOfProcServerNode.Run(bool enableReuse, out System.Exception shutdownException) -> Microsoft.Build.Execution.NodeEngineShutdownReason
 Microsoft.Build.Execution.OutOfProcServerNode.Run(out System.Exception shutdownException) -> Microsoft.Build.Execution.NodeEngineShutdownReason
+Microsoft.Build.Experimental.Client.MSBuildClient
+Microsoft.Build.Experimental.Client.MSBuildClient.Execute(string commandLine) -> Microsoft.Build.Experimental.Client.MSBuildClientExitResult
+Microsoft.Build.Experimental.Client.MSBuildClient.MSBuildClient(string msbuildLocation, string exeLocation, string dllLocation) -> void
+Microsoft.Build.Experimental.Client.MSBuildClient.ServerEnvironmentVariables.get -> System.Collections.Generic.Dictionary<string, string>
+Microsoft.Build.Experimental.Client.MSBuildClient.ServerEnvironmentVariables.set -> void
+Microsoft.Build.Experimental.Client.MSBuildClientExitResult
+Microsoft.Build.Experimental.Client.MSBuildClientExitResult.MSBuildAppExitTypeString.get -> string
+Microsoft.Build.Experimental.Client.MSBuildClientExitResult.MSBuildAppExitTypeString.set -> void
+Microsoft.Build.Experimental.Client.MSBuildClientExitResult.MSBuildClientExitResult() -> void
+Microsoft.Build.Experimental.Client.MSBuildClientExitResult.MSBuildClientExitType.get -> Microsoft.Build.Experimental.Client.MSBuildClientExitType
+Microsoft.Build.Experimental.Client.MSBuildClientExitResult.MSBuildClientExitType.set -> void
+Microsoft.Build.Experimental.Client.MSBuildClientExitType
+Microsoft.Build.Experimental.Client.MSBuildClientExitType.Cancelled = 5 -> Microsoft.Build.Experimental.Client.MSBuildClientExitType
+Microsoft.Build.Experimental.Client.MSBuildClientExitType.ConnectionError = 2 -> Microsoft.Build.Experimental.Client.MSBuildClientExitType
+Microsoft.Build.Experimental.Client.MSBuildClientExitType.LaunchError = 3 -> Microsoft.Build.Experimental.Client.MSBuildClientExitType
+Microsoft.Build.Experimental.Client.MSBuildClientExitType.ServerBusy = 1 -> Microsoft.Build.Experimental.Client.MSBuildClientExitType
+Microsoft.Build.Experimental.Client.MSBuildClientExitType.Success = 0 -> Microsoft.Build.Experimental.Client.MSBuildClientExitType
+Microsoft.Build.Experimental.Client.MSBuildClientExitType.Unexpected = 4 -> Microsoft.Build.Experimental.Client.MSBuildClientExitType
