@@ -258,6 +258,9 @@ namespace Microsoft.Build.Experimental.Client
                 processStartInfo.Environment[entry.Key] = entry.Value;
             }
 
+            // We remove env MSBUILDRUNSERVERCLIENT that might be equal to 1, so we do not get an infinite recursion here. 
+            processStartInfo.Environment["MSBUILDRUNSERVERCLIENT"] = "0";
+
             processStartInfo.CreateNoWindow = true;
             processStartInfo.UseShellExecute = false;
 
@@ -287,6 +290,9 @@ namespace Microsoft.Build.Experimental.Client
             {
                 envVars[pair.Key] = pair.Value;
             }
+
+            // We remove env MSBUILDRUNSERVERCLIENT that might be equal to 1, so we do not get an infinite recursion here. 
+            envVars["MSBUILDRUNSERVERCLIENT"] = "0";
 
             return new ServerNodeBuildCommand(
                         commandLine,
