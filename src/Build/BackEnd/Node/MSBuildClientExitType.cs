@@ -27,6 +27,10 @@ namespace Microsoft.Build.Experimental.Client
         /// The build stopped unexpectedly, for example,
         /// because a named pipe between the server and the client was unexpectedly closed.
         /// </summary>
-        Unexpected
+        Unexpected,
+        /// <summary>
+        /// The build was cancelled.
+        /// </summary>
+        Cancelled
     }
 }

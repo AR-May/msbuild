@@ -82,6 +82,11 @@ namespace Microsoft.Build.Experimental.Client
         /// A binary writer to help write into <see cref="_packetMemoryStream"/>
         /// </summary>
         private BinaryWriter _binaryWriter;
+
+        /// <summary>
+        /// Cancel when handling Ctrl-C
+        /// </summary>
+        private readonly CancellationTokenSource _cts = new CancellationTokenSource();
         #endregion
 
         // TODO: work on eleminating extra parameters or making them more clearly described at least.
@@ -154,6 +159,13 @@ namespace Microsoft.Build.Experimental.Client
                 return _exitResult;
             }
 
+
+            // Build in client.
+
+            // Add cancellation handler function.
+            ConsoleCancelEventHandler cancelHandler = Console_CancelKeyPress;
+            Console.CancelKeyPress += cancelHandler;
+
             // Send build command.
             // Let's send it outside the packet pump so that we easier and quicklier deal with possible issues with connection to server.
             SendBuildCommand(commandLine, _nodeStream);
@@ -163,7 +175,10 @@ namespace Microsoft.Build.Experimental.Client
             (packetPump as INodePacketFactory).RegisterPacketHandler(NodePacketType.ServerNodeBuildResult, ServerNodeBuildResult.FactoryForDeserialization, packetPump);
             packetPump.Start();
 
-            var waitHandles = new WaitHandle[] { packetPump.PacketPumpErrorEvent, packetPump.PacketReceivedEvent };
+            var waitHandles = new WaitHandle[] {
+                _cts.Token.WaitHandle,
+                packetPump.PacketPumpErrorEvent,
+                packetPump.PacketReceivedEvent };
 
             // Get the current directory before doing any work. We need this so we can restore the directory when the node shutsdown.
             while (!_buildFinished)
@@ -172,11 +187,17 @@ namespace Microsoft.Build.Experimental.Client
                 switch (index)
                 {
                     case 0:
-                        HandlePacketPumpError(packetPump);
+                        HandleCancellation();
                         break;
 
                     case 1:
-                        while (packetPump.ReceivedPacketsQueue.TryDequeue(out INodePacket? packet) && (!_buildFinished))
+                        HandlePacketPumpError(packetPump);
+                        break;
+
+                    case 2:
+                        while (packetPump.ReceivedPacketsQueue.TryDequeue(out INodePacket? packet)
+                            && (!_buildFinished)
+                            && (!_cts.Token.IsCancellationRequested))
                         {
                             if (packet != null)
                             {
@@ -200,10 +221,26 @@ namespace Microsoft.Build.Experimental.Client
 
             // Stop packet pump.
             packetPump.Stop();
+            Console.CancelKeyPress -= cancelHandler;
 
             CommunicationsUtilities.Trace("Build finished.");
             return _exitResult;
         }
+
+        /// <summary>
+        /// Handler for when CTRL-C or CTRL-BREAK is called.
+        /// </summary>
+        private void Console_CancelKeyPress(object sender, ConsoleCancelEventArgs e)
+        {
+            Console.WriteLine("Cancelling...");
+
+            // Send cancellation command to server.
+            // SendCancelCommand(_nodeStream);
+
+            _cts.Cancel();
+        }
+
+        private void SendCancelCommand(NamedPipeClientStream nodeStream) => throw new NotImplementedException();
 
         /// <summary>
         /// Launches MSBuild server. 
@@ -311,7 +348,18 @@ namespace Microsoft.Build.Experimental.Client
         }
 
         /// <summary>
-        /// Handles the packet pump error.
+        /// Handle cancellation.
+        /// </summary>
+        private void HandleCancellation()
+        {
+            Console.WriteLine("MSBuild client cancelled.");
+            CommunicationsUtilities.Trace("MSBuild client cancelled.");
+            _exitResult.MSBuildClientExitType = MSBuildClientExitType.Cancelled;
+            _buildFinished = true;
+        }
+
+        /// <summary>
+        /// Handle packet pump error.
         /// </summary>
         private void HandlePacketPumpError(MSBuildClientPacketPump packetPump)
         {
