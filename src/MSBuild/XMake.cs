@@ -222,13 +222,26 @@ namespace Microsoft.Build.CommandLine
             }
 
             // return 0 on success, non-zero on failure
-            int exitCode = ((s_initialized && Execute(
+            int exitCode = 0;
+
+            if (Environment.GetEnvironmentVariable("MSBUILDRUNSERVERCLIENT") == "1")
+            {
+                exitCode = ((s_initialized && MSBuildClientApp.Run(
+#if !FEATURE_GET_COMMANDLINE
+                args
+#endif
+                ) == 0) ? 0 : 1);
+            }
+            else
+            {
+                exitCode = ((s_initialized && Execute(
 #if FEATURE_GET_COMMANDLINE
                 Environment.CommandLine
 #else
                 ConstructArrayArg(args)
 #endif
-            ) == ExitType.Success) ? 0 : 1);
+                ) == ExitType.Success) ? 0 : 1);
+            }
 
             if (Environment.GetEnvironmentVariable("MSBUILDDUMPPROCESSCOUNTERS") == "1")
             {
