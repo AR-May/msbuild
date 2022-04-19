@@ -15,7 +15,7 @@ using System.Threading.Tasks;
 
 namespace Microsoft.Build.BackEnd.Node
 {
-    internal class MSBuildClientPacketPump : INodePacketHandler, INodePacketFactory
+    internal sealed class MSBuildClientPacketPump : INodePacketHandler, INodePacketFactory
     {
         /// <summary>
         /// The queue of packets we have received but which have not yet been processed.
@@ -42,7 +42,7 @@ namespace Microsoft.Build.BackEnd.Node
         /// </summary>
         internal Exception? PacketPumpException { get; set; }
 
-        #region Private data
+
         /// <summary>
         /// The packet factory.
         /// </summary>
@@ -72,7 +72,7 @@ namespace Microsoft.Build.BackEnd.Node
         /// Shared read buffer for binary reader.
         /// </summary>
         SharedReadBuffer _sharedReadBuffer;
-        #endregion
+
 
         internal MSBuildClientPacketPump(Stream stream)
         {
@@ -157,7 +157,7 @@ namespace Microsoft.Build.BackEnd.Node
         {
             _packetPumpThread = new Thread(PacketPumpProc);
             _packetPumpThread.IsBackground = true;
-            _packetPumpThread.Name = "MSbuild Client Packet Pump";
+            _packetPumpThread.Name = "MSBuild Client Packet Pump";
             _packetPumpThread.Start();
         }
 
@@ -229,18 +229,12 @@ namespace Microsoft.Build.BackEnd.Node
                                 headerBytesRead = readTask.Result;
 #endif
 
-                                if ((headerBytesRead != headerByte.Length) && (!localPacketPumpShutdownEvent.WaitOne(0)))
+                                if ((headerBytesRead != headerByte.Length) && !localPacketPumpShutdownEvent.WaitOne(0))
                                 {
                                     // Incomplete read. Abort.
                                     if (headerBytesRead == 0)
                                     {
-                                        // TODO: discuss this code path with server side. I presume after sending build results server closes a pipe before
-                                        // client is able to deserialise it and understand that was a last package.
-                                        // therefore, we are finished but the read loop does not know that and fail here.
-
-                                        // ErrorUtilities.ThrowInternalError("Server disconnected abruptly");
-                                        continueReading = false;
-                                        break;
+                                        ErrorUtilities.ThrowInternalError("Server disconnected abruptly");
                                     }
                                     else
                                     {
@@ -276,12 +270,19 @@ namespace Microsoft.Build.BackEnd.Node
                                     throw;
                                 }
 
-                                // Start reading the next package header.
+                                if (packetType == NodePacketType.ServerNodeBuildResult)
+                                {
+                                    continueReading = false;
+                                }
+                                else
+                                {
+                                    // Start reading the next package header.
 #if FEATURE_APM
-                                result = localStream.BeginRead(headerByte, 0, headerByte.Length, null, null);
+                                    result = localStream.BeginRead(headerByte, 0, headerByte.Length, null, null);
 #else
                                 readTask = CommunicationsUtilities.ReadAsync(localStream, headerByte, headerByte.Length);
 #endif
+                                }
                             }
                             break;
 

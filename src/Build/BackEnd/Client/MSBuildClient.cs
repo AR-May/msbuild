@@ -3,13 +3,11 @@
 
 using System;
 using System.Collections;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.IO.Pipes;
-using System.Linq;
 using System.Threading;
 using Microsoft.Build.BackEnd;
 using Microsoft.Build.BackEnd.Node;
@@ -17,13 +15,12 @@ using Microsoft.Build.Internal;
 using Microsoft.Build.Shared;
 using static Microsoft.Build.Execution.OutOfProcServerNode;
 
-namespace Microsoft.Build.Experimental.Client
+namespace Microsoft.Build.Execution
 {
     /// <summary>
-    /// This class implements client for MSBuild server. It processes
-    /// command-line arguments and invokes the build engine.
+    /// This class is the public entry point for executing builds in msbuild server.
+    /// It processes command-line arguments and invokes the build engine.
     /// </summary>
-    /// // TODO: Add argument/attribute saying that it is an experimental API
     public class MSBuildClient 
     {
         /// <summary>
@@ -32,11 +29,6 @@ namespace Microsoft.Build.Experimental.Client
         /// </summary>
         public Dictionary<string, string> ServerEnvironmentVariables { get; set; }
 
-#region Private fields
-        /// <summary>
-        /// Location of msbuild dll or exe.
-        /// </summary>
-        private string _msBuildLocation;
 
         /// <summary>
         /// Location of executable file to launch the server process. That should be either dotnet.exe or MSBuild.exe location.
@@ -83,28 +75,20 @@ namespace Microsoft.Build.Experimental.Client
         /// </summary>
         private BinaryWriter _binaryWriter;
 
-        /// <summary>
-        /// Cancel when handling Ctrl-C
-        /// </summary>
-        private readonly CancellationTokenSource _cts = new CancellationTokenSource();
-        #endregion
 
-        // TODO: work on eleminating extra parameters or making them more clearly described at least.
         /// <summary>
         /// Public constructor with parameters.
         /// </summary>
-        /// <param name="msbuildLocation">Location of msbuild dll or exe.</param>
         /// <param name="exeLocation">Location of executable file to launch the server process.
         /// That should be either dotnet.exe or MSBuild.exe location.</param>
         /// <param name="dllLocation">Location of dll file to launch the server process if needed.
         /// Empty if executable is msbuild.exe and not empty if dotnet.exe.</param>
-        public MSBuildClient(string msbuildLocation, string exeLocation, string dllLocation)
+        public MSBuildClient(string exeLocation, string dllLocation)
         {
             ServerEnvironmentVariables = new();
             _exitResult = new();
 
             // dll & exe locations
-            _msBuildLocation = msbuildLocation;
             _exeLocation = exeLocation;
             _dllLocation = dllLocation;
 
@@ -128,9 +112,10 @@ namespace Microsoft.Build.Experimental.Client
         /// <param name="commandLine">The command line to process. The first argument
         /// on the command line is assumed to be the name/path of the executable, and
         /// is ignored.</param>
+        /// <param name="ct">Cancellation token.</param>
         /// <returns>A value of type <see cref="MSBuildClientExitResult"/> that indicates whether the build succeeded,
         /// or the manner in which it failed.</returns>
-        public MSBuildClientExitResult Execute(string commandLine)
+        public MSBuildClientExitResult Execute(string commandLine, CancellationToken ct)
         {
             string serverRunningMutexName = $@"Global\server-running-{_pipeName}";
             string serverBusyMutexName = $@"Global\server-busy-{_pipeName}";
@@ -159,85 +144,71 @@ namespace Microsoft.Build.Experimental.Client
                 return _exitResult;
             }
 
-
-            // Build in client.
-
-            // Add cancellation handler function.
-            ConsoleCancelEventHandler cancelHandler = Console_CancelKeyPress;
-            Console.CancelKeyPress += cancelHandler;
-
             // Send build command.
             // Let's send it outside the packet pump so that we easier and quicklier deal with possible issues with connection to server.
-            SendBuildCommand(commandLine, _nodeStream);
+            if (!TrySendBuildCommand(commandLine, _nodeStream))
+            {
+                CommunicationsUtilities.Trace("Failure to connect to a server.");
+                _exitResult.MSBuildClientExitType = MSBuildClientExitType.ConnectionError;
+                return _exitResult;
+            }
 
-            MSBuildClientPacketPump packetPump = new MSBuildClientPacketPump(_nodeStream);
-            (packetPump as INodePacketFactory).RegisterPacketHandler(NodePacketType.ServerNodeConsoleWrite, ServerNodeConsoleWrite.FactoryForDeserialization, packetPump);
-            (packetPump as INodePacketFactory).RegisterPacketHandler(NodePacketType.ServerNodeBuildResult, ServerNodeBuildResult.FactoryForDeserialization, packetPump);
-            packetPump.Start();
+            MSBuildClientPacketPump? packetPump = null;
 
-            var waitHandles = new WaitHandle[] {
-                _cts.Token.WaitHandle,
+            try
+            {
+
+                // Start packet pump
+                packetPump = new MSBuildClientPacketPump(_nodeStream);
+                (packetPump as INodePacketFactory).RegisterPacketHandler(NodePacketType.ServerNodeConsoleWrite, ServerNodeConsoleWrite.FactoryForDeserialization, packetPump);
+                (packetPump as INodePacketFactory).RegisterPacketHandler(NodePacketType.ServerNodeBuildResult, ServerNodeBuildResult.FactoryForDeserialization, packetPump);
+                packetPump.Start();
+
+                var waitHandles = new WaitHandle[] {
+                ct.WaitHandle,
                 packetPump.PacketPumpErrorEvent,
                 packetPump.PacketReceivedEvent };
 
-            // Get the current directory before doing any work. We need this so we can restore the directory when the node shutsdown.
-            while (!_buildFinished)
-            {
-                int index = WaitHandle.WaitAny(waitHandles);
-                switch (index)
+                while (!_buildFinished)
                 {
-                    case 0:
-                        HandleCancellation();
-                        break;
+                    int index = WaitHandle.WaitAny(waitHandles);
+                    switch (index)
+                    {
+                        case 0:
+                            HandleCancellation();
+                            break;
 
-                    case 1:
-                        HandlePacketPumpError(packetPump);
-                        break;
+                        case 1:
+                            HandlePacketPumpError(packetPump);
+                            break;
 
-                    case 2:
-                        while (packetPump.ReceivedPacketsQueue.TryDequeue(out INodePacket? packet)
-                            && (!_buildFinished)
-                            && (!_cts.Token.IsCancellationRequested))
-                        {
-                            if (packet != null)
+                        case 2:
+                            while (packetPump.ReceivedPacketsQueue.TryDequeue(out INodePacket? packet)
+                                && !_buildFinished
+                                && !ct.IsCancellationRequested)
                             {
-                                try
+                                if (packet != null)
                                 {
                                     HandlePacket(packet);
                                 }
-                                catch (Exception ex)
-                                {
-                                    CommunicationsUtilities.Trace($"MSBuild client error: problem during packet handling occured: {0}.", ex);
-                                    _exitResult.MSBuildClientExitType = MSBuildClientExitType.Unexpected;
-                                    _buildFinished = true;
-                                    break;
-                                }
                             }
-                        }
 
-                        break;
+                            break;
+                    }
                 }
             }
-
-            // Stop packet pump.
-            packetPump.Stop();
-            Console.CancelKeyPress -= cancelHandler;
+            catch (Exception ex)
+            {
+                CommunicationsUtilities.Trace($"MSBuild client error: problem during packet handling occured: {0}.", ex);
+                _exitResult.MSBuildClientExitType = MSBuildClientExitType.Unexpected;
+            }
+            finally
+            {
+                packetPump?.Stop();
+            }
 
             CommunicationsUtilities.Trace("Build finished.");
             return _exitResult;
-        }
-
-        /// <summary>
-        /// Handler for when CTRL-C or CTRL-BREAK is called.
-        /// </summary>
-        private void Console_CancelKeyPress(object sender, ConsoleCancelEventArgs e)
-        {
-            Console.WriteLine("Cancelling...");
-
-            // Send cancellation command to server.
-            // SendCancelCommand(_nodeStream);
-
-            _cts.Cancel();
         }
 
         private void SendCancelCommand(NamedPipeClientStream nodeStream) => throw new NotImplementedException();
@@ -288,15 +259,13 @@ namespace Microsoft.Build.Experimental.Client
                 UseShellExecute = false
             };
 
-            // TODO: do we really need to start msbuild server with these variables, performance-wise and theoretically thinking?
-            // We are sending them in build command as well.
             foreach (var entry in serverEnvironmentVariables)
             {
                 processStartInfo.Environment[entry.Key] = entry.Value;
             }
 
-            // We remove env MSBUILDRUNSERVERCLIENT that might be equal to 1, so we do not get an infinite recursion here. 
-            processStartInfo.Environment["MSBUILDRUNSERVERCLIENT"] = "0";
+            // We remove env USEMSBUILDSERVER that might be equal to 1, so we do not get an infinite recursion here. 
+            processStartInfo.Environment["USEMSBUILDSERVER"] = "0";
 
             processStartInfo.CreateNoWindow = true;
             processStartInfo.UseShellExecute = false;
@@ -305,11 +274,22 @@ namespace Microsoft.Build.Experimental.Client
         }
 
 
-        private void SendBuildCommand(string commandLine, NamedPipeClientStream nodeStream)
+        private bool TrySendBuildCommand(string commandLine, NamedPipeClientStream nodeStream)
         {
-            ServerNodeBuildCommand buildCommand = GetServerNodeBuildCommand(commandLine);
-            WritePacket(_nodeStream, buildCommand);
-            CommunicationsUtilities.Trace("Build command send...");
+            try
+            {
+                ServerNodeBuildCommand buildCommand = GetServerNodeBuildCommand(commandLine);
+                WritePacket(_nodeStream, buildCommand);
+                CommunicationsUtilities.Trace("Build command send...");
+            }
+            catch (Exception ex)
+            {
+                CommunicationsUtilities.Trace($"Failed to send build command to server: {ex.Message}");
+                _exitResult.MSBuildClientExitType = MSBuildClientExitType.ConnectionError;
+                return false;
+            }
+
+            return true;
         }
 
         private ServerNodeBuildCommand GetServerNodeBuildCommand(string commandLine)
@@ -329,7 +309,7 @@ namespace Microsoft.Build.Experimental.Client
             }
 
             // We remove env MSBUILDRUNSERVERCLIENT that might be equal to 1, so we do not get an infinite recursion here. 
-            envVars["MSBUILDRUNSERVERCLIENT"] = "0";
+            envVars["USEMSBUILDSERVER"] = "0";
 
             return new ServerNodeBuildCommand(
                         commandLine,
@@ -343,7 +323,7 @@ namespace Microsoft.Build.Experimental.Client
         {
             return new ServerNodeHandshake(
                 CommunicationsUtilities.GetHandshakeOptions(taskHost: false, is64Bit: EnvironmentUtilities.Is64BitProcess),
-                _msBuildLocation
+                string.IsNullOrEmpty(_dllLocation) ? _exeLocation : _dllLocation
             );
         }
 
@@ -352,6 +332,10 @@ namespace Microsoft.Build.Experimental.Client
         /// </summary>
         private void HandleCancellation()
         {
+            // TODO.
+            // Send cancellation command to server.
+            // SendCancelCommand(_nodeStream);
+
             Console.WriteLine("MSBuild client cancelled.");
             CommunicationsUtilities.Trace("MSBuild client cancelled.");
             _exitResult.MSBuildClientExitType = MSBuildClientExitType.Cancelled;
@@ -364,8 +348,7 @@ namespace Microsoft.Build.Experimental.Client
         private void HandlePacketPumpError(MSBuildClientPacketPump packetPump)
         {
             CommunicationsUtilities.Trace("MSBuild client error: packet pump unexpectedly shutted down: {0}", packetPump.PacketPumpException);
-            _exitResult.MSBuildClientExitType = MSBuildClientExitType.Unexpected;
-            _buildFinished = true;
+            throw packetPump.PacketPumpException != null ? packetPump.PacketPumpException : new Exception("Packet pump unexpectedly shutted down");
         }
 
         /// <summary>
@@ -452,6 +435,7 @@ namespace Microsoft.Build.Experimental.Client
         private void WritePacket(Stream nodeStream, INodePacket packet)
         {
             MemoryStream memoryStream = _packetMemoryStream;
+            _packetMemoryStream.Position = 0;
             memoryStream.SetLength(0);
 
             ITranslator writeTranslator = BinaryTranslator.GetWriteTranslator(memoryStream);
