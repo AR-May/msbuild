@@ -4,6 +4,7 @@
 using System;
 using Microsoft.Build.Shared;
 using Microsoft.Build.Experimental.Client;
+using System.Threading;
 
 #if RUNTIME_TYPE_NETCORE || MONO
 using System.IO;
@@ -20,6 +21,11 @@ namespace Microsoft.Build.CommandLine
     /// </summary>
     public static class MSBuildClientApp
     {
+        /// <summary>
+        /// Cancel when handling Ctrl-C
+        /// </summary>
+        private static CancellationTokenSource _cts = new CancellationTokenSource();
+
         /// <summary>
         /// This is the entry point for the MSBuild client.
         /// </summary>
@@ -123,6 +129,11 @@ namespace Microsoft.Build.CommandLine
                 return MSBuildApp.Execute(commandLine);
             }
 
+
+            // Add cancellation handler function.
+            ConsoleCancelEventHandler cancelHandler = Console_CancelKeyPress;
+            Console.CancelKeyPress += cancelHandler;
+
             // MSBuild client orchestration.
 #if !FEATURE_GET_COMMANDLINE
             string commandLineString = string.Join(" ", commandLine); 
@@ -130,7 +141,11 @@ namespace Microsoft.Build.CommandLine
             string commandLineString = commandLine;
 #endif
             MSBuildClient msbuildClient = new MSBuildClient(msbuildLocation, exeLocation, dllLocation); 
-            MSBuildClientExitResult exitResult = msbuildClient.Execute(commandLineString);
+            MSBuildClientExitResult exitResult = msbuildClient.Execute(commandLineString, _cts.Token);
+
+            // Remove cancellation handler function.
+            Console.CancelKeyPress -= cancelHandler;
+            _cts?.Dispose();
 
             if (exitResult.MSBuildClientExitType == MSBuildClientExitType.ServerBusy
                 || exitResult.MSBuildClientExitType == MSBuildClientExitType.ConnectionError
@@ -151,6 +166,16 @@ namespace Microsoft.Build.CommandLine
             }
 
             return MSBuildApp.ExitType.MSBuildClientFailure;
+        }
+
+
+        /// <summary>
+        /// Handler for when CTRL-C or CTRL-BREAK is called.
+        /// </summary>
+        private static void Console_CancelKeyPress(object sender, ConsoleCancelEventArgs e)
+        {
+            Console.WriteLine("Cancelling..."); // TODO:remove
+            _cts?.Cancel();
         }
 
         /// <summary>

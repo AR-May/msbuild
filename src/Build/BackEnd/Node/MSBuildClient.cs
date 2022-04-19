@@ -82,11 +82,6 @@ namespace Microsoft.Build.Experimental.Client
         /// A binary writer to help write into <see cref="_packetMemoryStream"/>
         /// </summary>
         private BinaryWriter _binaryWriter;
-
-        /// <summary>
-        /// Cancel when handling Ctrl-C
-        /// </summary>
-        private CancellationTokenSource? _cts;
         #endregion
 
         // TODO: work on eleminating extra parameters or making them more clearly described at least.
@@ -128,9 +123,10 @@ namespace Microsoft.Build.Experimental.Client
         /// <param name="commandLine">The command line to process. The first argument
         /// on the command line is assumed to be the name/path of the executable, and
         /// is ignored.</param>
+        /// <param name="ct">Cancellation token.</param>
         /// <returns>A value of type <see cref="MSBuildClientExitResult"/> that indicates whether the build succeeded,
         /// or the manner in which it failed.</returns>
-        public MSBuildClientExitResult Execute(string commandLine)
+        public MSBuildClientExitResult Execute(string commandLine, CancellationToken ct)
         {
             string serverRunningMutexName = $@"Global\server-running-{_pipeName}";
             string serverBusyMutexName = $@"Global\server-busy-{_pipeName}";
@@ -170,21 +166,17 @@ namespace Microsoft.Build.Experimental.Client
 
             MSBuildClientPacketPump? packetPump = null;
 
-
             try
             {
-                // Add cancellation handler function.
-                _cts = new CancellationTokenSource();
-                ConsoleCancelEventHandler cancelHandler = Console_CancelKeyPress;
-                Console.CancelKeyPress += cancelHandler;
 
+                // Start packet pump
                 packetPump = new MSBuildClientPacketPump(_nodeStream);
                 (packetPump as INodePacketFactory).RegisterPacketHandler(NodePacketType.ServerNodeConsoleWrite, ServerNodeConsoleWrite.FactoryForDeserialization, packetPump);
                 (packetPump as INodePacketFactory).RegisterPacketHandler(NodePacketType.ServerNodeBuildResult, ServerNodeBuildResult.FactoryForDeserialization, packetPump);
                 packetPump.Start();
 
                 var waitHandles = new WaitHandle[] {
-                _cts.Token.WaitHandle,
+                ct.WaitHandle,
                 packetPump.PacketPumpErrorEvent,
                 packetPump.PacketReceivedEvent };
 
@@ -195,6 +187,7 @@ namespace Microsoft.Build.Experimental.Client
                     switch (index)
                     {
                         case 0:
+                            Console.WriteLine("AAAAAAAAAA");
                             HandleCancellation();
                             break;
 
@@ -205,7 +198,7 @@ namespace Microsoft.Build.Experimental.Client
                         case 2:
                             while (packetPump.ReceivedPacketsQueue.TryDequeue(out INodePacket? packet)
                                 && (!_buildFinished)
-                                && (!_cts.Token.IsCancellationRequested))
+                                && (!ct.IsCancellationRequested))
                             {
                                 if (packet != null)
                                 {
@@ -216,8 +209,6 @@ namespace Microsoft.Build.Experimental.Client
                             break;
                     }
                 }
-
-                Console.CancelKeyPress -= cancelHandler;
             }
             catch (Exception ex)
             {
@@ -228,24 +219,11 @@ namespace Microsoft.Build.Experimental.Client
             {
                 Console.WriteLine("Shutting down - finally");
                 packetPump?.Stop();
-                _cts?.Dispose();
             }
-            
+
+            Console.WriteLine("Build finished.");
             CommunicationsUtilities.Trace("Build finished.");
             return _exitResult;
-        }
-
-        /// <summary>
-        /// Handler for when CTRL-C or CTRL-BREAK is called.
-        /// </summary>
-        private void Console_CancelKeyPress(object sender, ConsoleCancelEventArgs e)
-        {
-            Console.WriteLine("Cancelling...");
-
-            // Send cancellation command to server.
-            // SendCancelCommand(_nodeStream);
-
-            _cts?.Cancel();
         }
 
         private void SendCancelCommand(NamedPipeClientStream nodeStream) => throw new NotImplementedException();
@@ -371,6 +349,10 @@ namespace Microsoft.Build.Experimental.Client
         /// </summary>
         private void HandleCancellation()
         {
+            // TODO.
+            // Send cancellation command to server.
+            // SendCancelCommand(_nodeStream);
+
             Console.WriteLine("MSBuild client cancelled.");
             CommunicationsUtilities.Trace("MSBuild client cancelled.");
             _exitResult.MSBuildClientExitType = MSBuildClientExitType.Cancelled;
