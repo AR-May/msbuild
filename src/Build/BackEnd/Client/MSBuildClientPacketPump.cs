@@ -15,7 +15,7 @@ using System.Threading.Tasks;
 
 namespace Microsoft.Build.BackEnd.Node
 {
-    internal class MSBuildClientPacketPump : INodePacketHandler, INodePacketFactory
+    internal sealed class MSBuildClientPacketPump : INodePacketHandler, INodePacketFactory
     {
         /// <summary>
         /// The queue of packets we have received but which have not yet been processed.

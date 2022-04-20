@@ -6,7 +6,7 @@ namespace Microsoft.Build.Execution
     /// <summary>
     /// Enumeration of the various ways in which the MSBuildClient execution can exit.
     /// </summary>
-    public class MSBuildClientExitResult
+    public sealed class MSBuildClientExitResult
     {
         /// <summary>
         /// The MSBuild client exit type.
