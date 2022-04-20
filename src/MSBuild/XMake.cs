@@ -220,19 +220,22 @@ namespace Microsoft.Build.CommandLine
                 DumpCounters(true /* initialize only */);
             }
 
-            // return 0 on success, non-zero on failure
-            int exitCode = 0;
-
-            if (Environment.GetEnvironmentVariable("MSBUILDRUNSERVERCLIENT") == "1")
+            int exitCode;
+            if (Environment.GetEnvironmentVariable("USEMSBUILDSERVER") == "1")
             {
-                exitCode = ((s_initialized && MSBuildClientApp.Run(
-#if !FEATURE_GET_COMMANDLINE
-                args
+                // Use the client app to execute build in msbuild server. 
+                exitCode = ((s_initialized && MSBuildClientApp.Execute(
+#if FEATURE_GET_COMMANDLINE
+                Environment.CommandLine,
+#else
+                ConstructArrayArg(args),
 #endif
-                ) == 0) ? 0 : 1);
+                s_buildCancellationSource.Token
+                ) == ExitType.Success) ? 0 : 1);
             }
             else
             {
+                // return 0 on success, non-zero on failure
                 exitCode = ((s_initialized && Execute(
 #if FEATURE_GET_COMMANDLINE
                 Environment.CommandLine

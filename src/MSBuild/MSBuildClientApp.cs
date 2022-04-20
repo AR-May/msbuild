@@ -2,8 +2,8 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System;
+using Microsoft.Build.Execution;
 using Microsoft.Build.Shared;
-using Microsoft.Build.Experimental.Client;
 using System.Threading;
 
 #if RUNTIME_TYPE_NETCORE || MONO
@@ -19,120 +19,88 @@ namespace Microsoft.Build.CommandLine
     /// 2. establishes a connection with MSBuild server and sends a build request.
     /// 3. if server is busy, it falls back to old build behavior.
     /// </summary>
-    public static class MSBuildClientApp
+    internal static class MSBuildClientApp
     {
         /// <summary>
-        /// Cancel when handling Ctrl-C
-        /// </summary>
-        private static CancellationTokenSource _cts = new CancellationTokenSource();
-
-        /// <summary>
         /// This is the entry point for the MSBuild client.
         /// </summary>
-        /// <remark>
-        /// The locations of msbuild exe/dll and dotnet.exe are automatically detected.
-        /// </remark>
-        /// <returns>0 on success, 1 on failure</returns>
-        public static int Run(
-#if !FEATURE_GET_COMMANDLINE
-            string[] args
+        /// <param name="commandLine">The command line to process. The first argument
+        /// on the command line is assumed to be the name/path of the executable, and
+        /// is ignored.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <param name="exeLocation">Location of executable file to launch the server process.
+        /// That should be either dotnet.exe or MSBuild.exe location.</param>
+        /// <param name="dllLocation">Location of dll file to launch the server process if needed.
+        /// Empty if executable is msbuild.exe and not empty if dotnet.exe.</param>
+        /// <returns>A value of type <see cref="MSBuildApp.ExitType"/> that indicates whether the build succeeded,
+        /// or the manner in which it failed.</returns>
+        /// <remarks>
+        /// The locations of msbuild exe/dll and dotnet.exe would be automatically detected if any of them is null.
+        /// </remarks>
+        internal static MSBuildApp.ExitType Execute(
+#if FEATURE_GET_COMMANDLINE
+            string commandLine,
+#else
+            string[] commandLine,
 #endif
+            CancellationToken ct,
+            string? exeLocation = null,
+            string? dllLocation = null
             )
         {
-            string msBuildLocation = BuildEnvironmentHelper.Instance.CurrentMSBuildExePath;
-            string dllLocation = string.Empty;
-            string exeLocation = string.Empty;
-
-            // TODO: check the detection.
-
+            if (exeLocation == null || dllLocation == null)
+            {
+                // Detect exeLocation and dllLocation for msbuild server launch.
 #if RUNTIME_TYPE_NETCORE || MONO
-            // Run the child process with the same host as the currently-running process.
-            // Mono automagically uses the current mono, to execute a managed assembly.
-            if (!NativeMethodsShared.IsMono)
-            {
-                // _exeFileLocation consists the msbuild dll instead.
-                dllLocation = msBuildLocation;
-                exeLocation = GetCurrentHost();
+                // Run the child process with the same host as the currently-running process.
+                // Mono automagically uses the current mono, to execute a managed assembly.
+                if (!NativeMethodsShared.IsMono)
+                {
+                    // _exeFileLocation consists the msbuild dll instead.
+                    dllLocation = BuildEnvironmentHelper.Instance.CurrentMSBuildExePath;;
+                    exeLocation = GetCurrentHost();
+                }
+                else
+                {
+                    // _exeFileLocation consists the msbuild dll instead.
+                    exeLocation = BuildEnvironmentHelper.Instance.CurrentMSBuildExePath;
+                    dllLocation = String.Empty;
+                }
+#else
+                exeLocation = BuildEnvironmentHelper.Instance.CurrentMSBuildExePath;
+                dllLocation = String.Empty;
+#endif
             }
-            else
-            {
-                // _exeFileLocation consists the msbuild dll instead.
-                exeLocation = msBuildLocation;
-            }
-#else
-            exeLocation = msBuildLocation;
-#endif
 
-            int exitCode = (Execute(
-#if FEATURE_GET_COMMANDLINE
-                Environment.CommandLine,
-#else
-                ConstructArrayArg(args),
-#endif
-                msBuildLocation,
+            return PrivateExecute(
+                commandLine,
                 exeLocation,
-                dllLocation
-            ) == MSBuildApp.ExitType.Success) ? 0 : 1;
-            return exitCode;
-        }
-
-        /// <summary>
-        /// This is the entry point for the MSBuild client.
-        /// </summary>
-        /// <returns>0 on success, 1 on failure</returns>
-        public static int Run(
-#if !FEATURE_GET_COMMANDLINE
-            string[] args,
-#endif
-            string msbuildLocation,
-            string exeLocation,
-            string dllLocation
-            )
-        {
-            int exitCode = (Execute(
-#if FEATURE_GET_COMMANDLINE
-                Environment.CommandLine,
-#else
-                ConstructArrayArg(args),
-#endif
-                msbuildLocation,
-                exeLocation,
-                dllLocation
-            ) == MSBuildApp.ExitType.Success) ? 0 : 1;
-            return exitCode;
+                dllLocation,
+                ct
+            );
         }
 
         /// <summary>
         /// Orchestrates the execution of the msbuild client, and is also responsible
         /// for escape hatches and fallbacks.
         /// </summary>
-        /// <param name="commandLine">The command line to process. The first argument
-        /// on the command line is assumed to be the name/path of the executable, and
-        /// is ignored.</param>
-        /// <returns>A value of type MSBuildApp.ExitType that indicates whether the build succeeded,
-        /// or the manner in which it failed.</returns>
-        public static MSBuildApp.ExitType Execute(
+        private static MSBuildApp.ExitType PrivateExecute(
 #if FEATURE_GET_COMMANDLINE
             string commandLine,
 #else
             string[] commandLine,
 #endif
-            string msbuildLocation,
             string exeLocation,
-            string dllLocation
-            )
+            string dllLocation,
+            CancellationToken ct
+        )
         {
             // Escape hatch to an old behavior.
-            bool runMsbuildInServer = Environment.GetEnvironmentVariable("RUN_MSBUILD_IN_SERVER") == "1";
+            bool runMsbuildInServer = Environment.GetEnvironmentVariable("USEMSBUILDSERVER") == "1";
             if (!runMsbuildInServer)
             {
                 return MSBuildApp.Execute(commandLine);
             }
-
-
-            // Add cancellation handler function.
-            ConsoleCancelEventHandler cancelHandler = Console_CancelKeyPress;
-            Console.CancelKeyPress += cancelHandler;
 
             // MSBuild client orchestration.
 #if !FEATURE_GET_COMMANDLINE
@@ -140,22 +108,15 @@ namespace Microsoft.Build.CommandLine
 #else
             string commandLineString = commandLine;
 #endif
-            MSBuildClient msbuildClient = new MSBuildClient(msbuildLocation, exeLocation, dllLocation); 
-            MSBuildClientExitResult exitResult = msbuildClient.Execute(commandLineString, _cts.Token);
-
-            // Remove cancellation handler function.
-            Console.CancelKeyPress -= cancelHandler;
-            _cts?.Dispose();
+            MSBuildClient msbuildClient = new MSBuildClient(exeLocation, dllLocation); 
+            MSBuildClientExitResult exitResult = msbuildClient.Execute(commandLineString, ct);
 
             if (exitResult.MSBuildClientExitType == MSBuildClientExitType.ServerBusy
                 || exitResult.MSBuildClientExitType == MSBuildClientExitType.ConnectionError
             )
             {
-                // TODO: debug, remove it.
-                throw new Exception("NOT CONNECTED TO SERVER.");
-
                 // Server is busy, fallback to old behavior.
-                // return MSBuildApp.Execute(commandLine);
+                return MSBuildApp.Execute(commandLine);
             }
             else if ((exitResult.MSBuildClientExitType == MSBuildClientExitType.Success)
                     && Enum.TryParse(exitResult.MSBuildAppExitTypeString, out MSBuildApp.ExitType MSBuildAppExitType))
@@ -168,33 +129,7 @@ namespace Microsoft.Build.CommandLine
             return MSBuildApp.ExitType.MSBuildClientFailure;
         }
 
-
-        /// <summary>
-        /// Handler for when CTRL-C or CTRL-BREAK is called.
-        /// </summary>
-        private static void Console_CancelKeyPress(object sender, ConsoleCancelEventArgs e)
-        {
-            Console.WriteLine("Cancelling..."); // TODO:remove
-            _cts?.Cancel();
-        }
-
-        /// <summary>
-        /// Insert the command executable path as the first element of the args array.
-        /// </summary>
-        /// <param name="args"></param>
-        /// <returns></returns>
-        private static string[] ConstructArrayArg(string[] args)
-        {
-            string[] newArgArray = new string[args.Length + 1];
-
-            newArgArray[0] = BuildEnvironmentHelper.Instance.CurrentMSBuildExePath;
-            Array.Copy(args, 0, newArgArray, 1, args.Length);
-
-            return newArgArray;
-        }
-
-
-        // Copied from NodeProviderOutOfProc. TODO: Refactor this?
+        // Copied from NodeProviderOutOfProcBase.cs
 #if RUNTIME_TYPE_NETCORE || MONO
         private static string? CurrentHost;
         private static string GetCurrentHost()

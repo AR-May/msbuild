@@ -3,13 +3,11 @@
 
 using System;
 using System.Collections;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.IO.Pipes;
-using System.Linq;
 using System.Threading;
 using Microsoft.Build.BackEnd;
 using Microsoft.Build.BackEnd.Node;
@@ -17,13 +15,12 @@ using Microsoft.Build.Internal;
 using Microsoft.Build.Shared;
 using static Microsoft.Build.Execution.OutOfProcServerNode;
 
-namespace Microsoft.Build.Experimental.Client
+namespace Microsoft.Build.Execution
 {
     /// <summary>
-    /// This class implements client for MSBuild server. It processes
-    /// command-line arguments and invokes the build engine.
+    /// This class is the public entry point for executing builds in msbuild server.
+    /// It processes command-line arguments and invokes the build engine.
     /// </summary>
-    /// // TODO: Add argument/attribute saying that it is an experimental API
     public class MSBuildClient 
     {
         /// <summary>
@@ -33,10 +30,6 @@ namespace Microsoft.Build.Experimental.Client
         public Dictionary<string, string> ServerEnvironmentVariables { get; set; }
 
 #region Private fields
-        /// <summary>
-        /// Location of msbuild dll or exe.
-        /// </summary>
-        private string _msBuildLocation;
 
         /// <summary>
         /// Location of executable file to launch the server process. That should be either dotnet.exe or MSBuild.exe location.
@@ -88,18 +81,16 @@ namespace Microsoft.Build.Experimental.Client
         /// <summary>
         /// Public constructor with parameters.
         /// </summary>
-        /// <param name="msbuildLocation">Location of msbuild dll or exe.</param>
         /// <param name="exeLocation">Location of executable file to launch the server process.
         /// That should be either dotnet.exe or MSBuild.exe location.</param>
         /// <param name="dllLocation">Location of dll file to launch the server process if needed.
         /// Empty if executable is msbuild.exe and not empty if dotnet.exe.</param>
-        public MSBuildClient(string msbuildLocation, string exeLocation, string dllLocation)
+        public MSBuildClient(string exeLocation, string dllLocation)
         {
             ServerEnvironmentVariables = new();
             _exitResult = new();
 
             // dll & exe locations
-            _msBuildLocation = msbuildLocation;
             _exeLocation = exeLocation;
             _dllLocation = dllLocation;
 
@@ -187,7 +178,6 @@ namespace Microsoft.Build.Experimental.Client
                     switch (index)
                     {
                         case 0:
-                            Console.WriteLine("AAAAAAAAAA");
                             HandleCancellation();
                             break;
 
@@ -282,7 +272,7 @@ namespace Microsoft.Build.Experimental.Client
             }
 
             // We remove env MSBUILDRUNSERVERCLIENT that might be equal to 1, so we do not get an infinite recursion here. 
-            processStartInfo.Environment["MSBUILDRUNSERVERCLIENT"] = "0";
+            processStartInfo.Environment["USEMSBUILDSERVER"] = "0";
 
             processStartInfo.CreateNoWindow = true;
             processStartInfo.UseShellExecute = false;
@@ -326,7 +316,7 @@ namespace Microsoft.Build.Experimental.Client
             }
 
             // We remove env MSBUILDRUNSERVERCLIENT that might be equal to 1, so we do not get an infinite recursion here. 
-            envVars["MSBUILDRUNSERVERCLIENT"] = "0";
+            envVars["USEMSBUILDSERVER"] = "0";
 
             return new ServerNodeBuildCommand(
                         commandLine,
@@ -340,7 +330,7 @@ namespace Microsoft.Build.Experimental.Client
         {
             return new ServerNodeHandshake(
                 CommunicationsUtilities.GetHandshakeOptions(taskHost: false, is64Bit: EnvironmentUtilities.Is64BitProcess),
-                _msBuildLocation
+                string.IsNullOrEmpty(_dllLocation) ? _exeLocation : _dllLocation
             );
         }
 
