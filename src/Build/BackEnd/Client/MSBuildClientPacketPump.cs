@@ -234,13 +234,7 @@ namespace Microsoft.Build.BackEnd.Node
                                     // Incomplete read. Abort.
                                     if (headerBytesRead == 0)
                                     {
-                                        // TODO: discuss this code path with server side. I presume after sending build results server closes a pipe before
-                                        // client is able to deserialise it and understand that was a last package.
-                                        // therefore, we are finished but the read loop does not know that and fail here.
-
-                                        // ErrorUtilities.ThrowInternalError("Server disconnected abruptly");
-                                        continueReading = false;
-                                        break;
+                                        ErrorUtilities.ThrowInternalError("Server disconnected abruptly");
                                     }
                                     else
                                     {
@@ -276,12 +270,19 @@ namespace Microsoft.Build.BackEnd.Node
                                     throw;
                                 }
 
-                                // Start reading the next package header.
+                                if (packetType == NodePacketType.ServerNodeBuildResult)
+                                {
+                                    continueReading = false;
+                                }
+                                else
+                                {
+                                    // Start reading the next package header.
 #if FEATURE_APM
-                                result = localStream.BeginRead(headerByte, 0, headerByte.Length, null, null);
+                                    result = localStream.BeginRead(headerByte, 0, headerByte.Length, null, null);
 #else
                                 readTask = CommunicationsUtilities.ReadAsync(localStream, headerByte, headerByte.Length);
 #endif
+                                }
                             }
                             break;
 

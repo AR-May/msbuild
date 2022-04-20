@@ -77,7 +77,6 @@ namespace Microsoft.Build.Execution
         private BinaryWriter _binaryWriter;
         #endregion
 
-        // TODO: work on eleminating extra parameters or making them more clearly described at least.
         /// <summary>
         /// Public constructor with parameters.
         /// </summary>
@@ -207,11 +206,9 @@ namespace Microsoft.Build.Execution
             }
             finally
             {
-                Console.WriteLine("Shutting down - finally");
                 packetPump?.Stop();
             }
 
-            Console.WriteLine("Build finished.");
             CommunicationsUtilities.Trace("Build finished.");
             return _exitResult;
         }
