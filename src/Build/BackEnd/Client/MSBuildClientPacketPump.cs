@@ -42,7 +42,7 @@ namespace Microsoft.Build.BackEnd.Node
         /// </summary>
         internal Exception? PacketPumpException { get; set; }
 
-        #region Private data
+
         /// <summary>
         /// The packet factory.
         /// </summary>
@@ -72,7 +72,7 @@ namespace Microsoft.Build.BackEnd.Node
         /// Shared read buffer for binary reader.
         /// </summary>
         SharedReadBuffer _sharedReadBuffer;
-        #endregion
+
 
         internal MSBuildClientPacketPump(Stream stream)
         {
@@ -157,7 +157,7 @@ namespace Microsoft.Build.BackEnd.Node
         {
             _packetPumpThread = new Thread(PacketPumpProc);
             _packetPumpThread.IsBackground = true;
-            _packetPumpThread.Name = "MSbuild Client Packet Pump";
+            _packetPumpThread.Name = "MSBuild Client Packet Pump";
             _packetPumpThread.Start();
         }
 
@@ -229,7 +229,7 @@ namespace Microsoft.Build.BackEnd.Node
                                 headerBytesRead = readTask.Result;
 #endif
 
-                                if ((headerBytesRead != headerByte.Length) && (!localPacketPumpShutdownEvent.WaitOne(0)))
+                                if ((headerBytesRead != headerByte.Length) && !localPacketPumpShutdownEvent.WaitOne(0))
                                 {
                                     // Incomplete read. Abort.
                                     if (headerBytesRead == 0)

@@ -29,7 +29,6 @@ namespace Microsoft.Build.Execution
         /// </summary>
         public Dictionary<string, string> ServerEnvironmentVariables { get; set; }
 
-#region Private fields
 
         /// <summary>
         /// Location of executable file to launch the server process. That should be either dotnet.exe or MSBuild.exe location.
@@ -75,7 +74,7 @@ namespace Microsoft.Build.Execution
         /// A binary writer to help write into <see cref="_packetMemoryStream"/>
         /// </summary>
         private BinaryWriter _binaryWriter;
-        #endregion
+
 
         /// <summary>
         /// Public constructor with parameters.
@@ -170,7 +169,6 @@ namespace Microsoft.Build.Execution
                 packetPump.PacketPumpErrorEvent,
                 packetPump.PacketReceivedEvent };
 
-                // Get the current directory before doing any work. We need this so we can restore the directory when the node shutsdown.
                 while (!_buildFinished)
                 {
                     int index = WaitHandle.WaitAny(waitHandles);
@@ -186,8 +184,8 @@ namespace Microsoft.Build.Execution
 
                         case 2:
                             while (packetPump.ReceivedPacketsQueue.TryDequeue(out INodePacket? packet)
-                                && (!_buildFinished)
-                                && (!ct.IsCancellationRequested))
+                                && !_buildFinished
+                                && !ct.IsCancellationRequested)
                             {
                                 if (packet != null)
                                 {
@@ -261,14 +259,12 @@ namespace Microsoft.Build.Execution
                 UseShellExecute = false
             };
 
-            // TODO: do we really need to start msbuild server with these variables, performance-wise and theoretically thinking?
-            // We are sending them in build command as well.
             foreach (var entry in serverEnvironmentVariables)
             {
                 processStartInfo.Environment[entry.Key] = entry.Value;
             }
 
-            // We remove env MSBUILDRUNSERVERCLIENT that might be equal to 1, so we do not get an infinite recursion here. 
+            // We remove env USEMSBUILDSERVER that might be equal to 1, so we do not get an infinite recursion here. 
             processStartInfo.Environment["USEMSBUILDSERVER"] = "0";
 
             processStartInfo.CreateNoWindow = true;
@@ -439,6 +435,7 @@ namespace Microsoft.Build.Execution
         private void WritePacket(Stream nodeStream, INodePacket packet)
         {
             MemoryStream memoryStream = _packetMemoryStream;
+            _packetMemoryStream.Position = 0;
             memoryStream.SetLength(0);
 
             ITranslator writeTranslator = BinaryTranslator.GetWriteTranslator(memoryStream);
