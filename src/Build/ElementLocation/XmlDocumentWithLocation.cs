@@ -203,8 +203,7 @@ namespace Microsoft.Build.Construction
                 text = String.Empty;
             }
 
-            string interned = Strings.WeakIntern(text);
-            return base.CreateWhitespace(interned);
+            return base.CreateWhitespace(text);
         }
 
         /// <summary>
@@ -219,8 +218,7 @@ namespace Microsoft.Build.Construction
                 text = String.Empty;
             }
 
-            string interned = Strings.WeakIntern(text);
-            return base.CreateSignificantWhitespace(interned);
+            return base.CreateSignificantWhitespace(text);
         }
 
         /// <summary>
@@ -229,8 +227,7 @@ namespace Microsoft.Build.Construction
         /// </summary>
         public override XmlText CreateTextNode(string text)
         {
-            string textNode = Strings.WeakIntern(text);
-            return base.CreateTextNode(textNode);
+            return base.CreateTextNode(text);
         }
 
         /// <summary>
@@ -244,8 +241,7 @@ namespace Microsoft.Build.Construction
                 data = String.Empty;
             }
 
-            string interned = Strings.WeakIntern(data);
-            return base.CreateComment(interned);
+            return base.CreateComment(data);
         }
 
         /// <summary>
