@@ -9,6 +9,8 @@ using Microsoft.Build.Framework;
 using Microsoft.Build.Shared;
 using System.Text.RegularExpressions;
 using System.Diagnostics;
+using System.Xml.Linq;
+
 
 #if NET7_0_OR_GREATER
 using System.Diagnostics.CodeAnalysis;
@@ -201,6 +203,12 @@ internal sealed partial class TerminalLogger : INodeLogger
         Terminal = new Terminal();
     }
 
+    public TerminalLogger(LoggerVerbosity verbosity)
+        : this()
+    {
+        _verbosity = verbosity;
+    }
+
     /// <summary>
     /// Internal constructor accepting a custom <see cref="ITerminal"/> for testing.
     /// </summary>
@@ -212,8 +220,14 @@ internal sealed partial class TerminalLogger : INodeLogger
 
     #region INodeLogger implementation
 
+    private LoggerVerbosity _verbosity = LoggerVerbosity.Minimal;
+
     /// <inheritdoc/>
-    public LoggerVerbosity Verbosity { get => LoggerVerbosity.Minimal; set { } }
+    public LoggerVerbosity Verbosity
+    {
+        get { return _verbosity; }
+        set { _verbosity = value; }
+    }
 
     /// <inheritdoc/>
     public string Parameters
@@ -715,6 +729,10 @@ internal sealed partial class TerminalLogger : INodeLogger
 
                 RenderImmediateMessage(message);
                 _loggedPreviewMessage = true;
+            }
+            else if (Verbosity > LoggerVerbosity.Minimal && hasProject)
+            {
+                project!.AddBuildMessage(MessageSeverity.Message, message);
             }
         }
     }
