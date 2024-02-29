@@ -9,12 +9,10 @@ using Microsoft.Build.Framework;
 using Microsoft.Build.Shared;
 using System.Text.RegularExpressions;
 using System.Diagnostics;
-using System.Xml.Linq;
 
 
 #if NET7_0_OR_GREATER
 using System.Diagnostics.CodeAnalysis;
-using System.Reflection;
 
 #endif
 #if NETFRAMEWORK
