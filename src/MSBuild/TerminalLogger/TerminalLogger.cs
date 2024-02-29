@@ -309,11 +309,11 @@ internal sealed partial class TerminalLogger : INodeLogger
 
         _projects.Clear();
 
-        // Add project summary to the static part of the Console only if verbosity is higher than Quiet. 
-        if (Verbosity > LoggerVerbosity.Quiet)
+        Terminal.BeginUpdate();
+        try
         {
-            Terminal.BeginUpdate();
-            try
+            // Add project summary to the static part of the Console only if verbosity is higher than Quiet. 
+            if (Verbosity > LoggerVerbosity.Quiet)
             {
                 string duration = (e.Timestamp - _buildStartTime).TotalSeconds.ToString("F1");
                 string buildResult = RenderBuildResult(e.Succeeded, _buildHasErrors, _buildHasWarnings);
@@ -353,15 +353,15 @@ internal sealed partial class TerminalLogger : INodeLogger
                         testDuration));
                 }
             }
-            finally
+        }
+        finally
+        {
+            if (Terminal.SupportsProgressReporting)
             {
-                if (Terminal.SupportsProgressReporting)
-                {
-                    Terminal.Write(AnsiCodes.RemoveProgress);
-                }
-
-                Terminal.EndUpdate();
+                Terminal.Write(AnsiCodes.RemoveProgress);
             }
+
+            Terminal.EndUpdate();
         }
 
         _testRunSummaries.Clear();
