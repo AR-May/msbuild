@@ -9,10 +9,11 @@ using Microsoft.Build.Framework;
 using Microsoft.Build.Shared;
 using System.Text.RegularExpressions;
 using System.Diagnostics;
-
+using Microsoft.Build.Framework.Logging;
 
 #if NET7_0_OR_GREATER
 using System.Diagnostics.CodeAnalysis;
+
 
 #endif
 #if NETFRAMEWORK
@@ -241,6 +242,8 @@ internal sealed partial class TerminalLogger : INodeLogger
     /// <inheritdoc/>
     public void Initialize(IEventSource eventSource)
     {
+        ParseParameters();
+
         eventSource.BuildStarted += BuildStarted;
         eventSource.BuildFinished += BuildFinished;
         eventSource.ProjectStarted += ProjectStarted;
@@ -256,6 +259,56 @@ internal sealed partial class TerminalLogger : INodeLogger
         if (eventSource is IEventSource4 eventSource4)
         {
             eventSource4.IncludeEvaluationPropertiesAndItems();
+        }
+    }
+
+    /// <summary>
+    /// Parses out the logger parameters from the Parameters string.
+    /// </summary>
+    public void ParseParameters()
+    {
+        var parameters = LoggerParametersHelper.ParseParameters(Parameters);
+
+        foreach (var parameter in parameters)
+        {
+            ApplyParameter(parameter.Key, parameter.Value);
+        }
+    }
+
+    /// <summary>
+    /// Apply a terminal logger parameter.
+    /// parameterValue may be null, if there is no parameter value.
+    /// </summary>
+    private bool ApplyParameter(string parameterName, string? parameterValue)
+    {
+        ErrorUtilities.VerifyThrowArgumentNull(parameterName, nameof(parameterName));
+
+        switch (parameterName.ToUpperInvariant())
+        {
+            case "V":
+            case "VERBOSITY":
+                return ApplyVerbosityParameter(parameterValue);
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Apply the verbosity value
+    /// </summary>
+    private bool ApplyVerbosityParameter(string? parameterValue)
+    {
+        if (parameterValue is not null && LoggerParametersHelper.TryParseVerbosityParameter(parameterValue, out LoggerVerbosity? verbosity))
+        {
+            Verbosity = (LoggerVerbosity)verbosity!;
+            return true;
+        }
+        else
+        {
+            string errorCode;
+            string helpKeyword;
+            string message = ResourceUtilities.FormatResourceStringStripCodeAndKeyword(out errorCode, out helpKeyword, "InvalidVerbosity", parameterValue);
+            throw new LoggerException(message, null, errorCode, helpKeyword);
         }
     }
 
