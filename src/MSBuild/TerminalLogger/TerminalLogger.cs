@@ -197,6 +197,11 @@ internal sealed partial class TerminalLogger : INodeLogger
     private DateTime? _testEndTime;
 
     /// <summary>
+    /// Whether to show TaskCommandLineEventArgs high-priority messages. 
+    /// </summary>
+    private bool _showCommandLine = false;
+
+    /// <summary>
     /// Default constructor, used by the MSBuild logger infra.
     /// </summary>
     public TerminalLogger()
@@ -285,6 +290,8 @@ internal sealed partial class TerminalLogger : INodeLogger
             case "V":
             case "VERBOSITY":
                 return ApplyVerbosityParameter(parameterValue);
+            case "SHOWCOMMANDLINE":
+                return ApplyShowCommandLineParameter(parameterValue);
         }
 
         return false;
@@ -308,6 +315,31 @@ internal sealed partial class TerminalLogger : INodeLogger
             throw new LoggerException(message, null, errorCode, helpKeyword);
         }
     }
+
+    /// <summary>
+    /// Apply the show command Line value
+    /// </summary>
+    private bool ApplyShowCommandLineParameter(string? parameterValue)
+    {
+        if (String.IsNullOrEmpty(parameterValue))
+        {
+            _showCommandLine = true;
+        }
+        else
+        {
+            try
+            {
+                _showCommandLine = ConversionUtilities.ConvertStringToBool(parameterValue);
+            }
+            catch (ArgumentException)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
 
     /// <inheritdoc/>
     public void Shutdown()
@@ -801,6 +833,11 @@ internal sealed partial class TerminalLogger : INodeLogger
 
             if (Verbosity > LoggerVerbosity.Normal)
             {
+                if (e is TaskCommandLineEventArgs && !_showCommandLine)
+                {
+                    return;
+                }
+
                 if (hasProject)
                 {
                     project!.AddBuildMessage(MessageSeverity.Message, message);
