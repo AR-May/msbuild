@@ -225,10 +225,7 @@ internal sealed partial class TerminalLogger : INodeLogger
     public LoggerVerbosity Verbosity { get; set; } = LoggerVerbosity.Minimal;
 
     /// <inheritdoc/>
-    public string Parameters
-    {
-        get => ""; set { }
-    }
+    public string? Parameters { get; set; } = null;
 
     /// <inheritdoc/>
     public void Initialize(IEventSource eventSource, int nodeCount)
