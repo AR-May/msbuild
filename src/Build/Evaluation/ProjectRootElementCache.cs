@@ -69,9 +69,6 @@ namespace Microsoft.Build.Evaluation
         /// something like 80-90 imports. This was observed to give a noticeable
         /// performance improvement compared to a mid-17.0 MSBuild with the old
         /// value of 50.
-        ///
-        /// If this number is increased much higher, the datastructure may
-        /// need to be changed from a linked list, since it's currently O(n).
         /// </remarks>
         private static readonly int s_maximumStrongCacheSize =
             int.TryParse(Environment.GetEnvironmentVariable("MSBUILDPROJECTROOTELEMENTCACHESIZE"), out int cacheSize) ? cacheSize : 200;
@@ -134,7 +131,13 @@ namespace Microsoft.Build.Evaluation
         /// <summary>
         /// The list of strongly-held ProjectRootElement's
         /// </summary>
-        private LinkedList<ProjectRootElement> _strongCache;
+        private LinkedList<ProjectRootElement> _strongCacheList;
+
+        /// <summary>
+        /// The map of strongly-held ProjectRootElement's
+        /// </summary>
+        // MAKE IT Concurrent?
+        private Dictionary<ProjectRootElement, LinkedListNode<ProjectRootElement>> _strongCache;
 
         /// <summary>
         /// Whether the cache should check the timestamp of the file on disk
@@ -156,7 +159,8 @@ namespace Microsoft.Build.Evaluation
             DebugTraceCache("Constructing with autoreload from disk: ", autoReloadFromDisk);
 
             _weakCache = new WeakValueDictionary<string, ProjectRootElement>(StringComparer.OrdinalIgnoreCase);
-            _strongCache = new LinkedList<ProjectRootElement>();
+            _strongCacheList = new LinkedList<ProjectRootElement>();
+            _strongCache = new Dictionary<ProjectRootElement, LinkedListNode<ProjectRootElement>>();
             _fileLoadLocks = new ConcurrentDictionary<string, object>(StringComparer.OrdinalIgnoreCase);
             _autoReloadFromDisk = autoReloadFromDisk;
             LoadProjectsReadOnly = loadProjectsReadOnly;
@@ -436,10 +440,11 @@ namespace Microsoft.Build.Evaluation
         {
             lock (_locker)
             {
-                DebugTraceCache("Clearing strong refs: ", _strongCache.Count);
+                DebugTraceCache("Clearing strong refs: ", _strongCacheList.Count);
 
-                LinkedList<ProjectRootElement> oldStrongCache = _strongCache;
-                _strongCache = new LinkedList<ProjectRootElement>();
+                LinkedList<ProjectRootElement> oldStrongCache = _strongCacheList;
+                _strongCacheList = new LinkedList<ProjectRootElement>();
+                _strongCache = new Dictionary<ProjectRootElement, LinkedListNode<ProjectRootElement>>();
 
                 foreach (ProjectRootElement projectRootElement in oldStrongCache)
                 {
@@ -461,9 +466,10 @@ namespace Microsoft.Build.Evaluation
             {
                 if (Traits.Instance.EscapeHatches.AlwaysDoImmutableFilesUpToDateCheck)
                 {
-                    LinkedList<ProjectRootElement> oldStrongCache = _strongCache;
+                    LinkedList<ProjectRootElement> oldStrongCache = _strongCacheList;
                     _weakCache = new WeakValueDictionary<string, ProjectRootElement>(StringComparer.OrdinalIgnoreCase);
-                    _strongCache = new LinkedList<ProjectRootElement>();
+                    _strongCacheList = new LinkedList<ProjectRootElement>();
+                    _strongCache = new Dictionary<ProjectRootElement, LinkedListNode<ProjectRootElement>>();
 
                     foreach (ProjectRootElement projectRootElement in oldStrongCache)
                     {
@@ -473,7 +479,7 @@ namespace Microsoft.Build.Evaluation
                 else
                 {
                     // Manually iterate through LinkedList so we can remove items during this iteration
-                    for (var listNode = _strongCache.First; listNode != null;)
+                    for (var listNode = _strongCacheList.First; listNode != null;)
                     {
                         var nextNode = listNode.Next;
 
@@ -483,7 +489,8 @@ namespace Microsoft.Build.Evaluation
                         if (!FileClassifier.Shared.IsNonModifiable(projectRootElement.FullPath))
                         {
                             _weakCache.Remove(projectRootElement.FullPath);
-                            _strongCache.Remove(listNode);
+                            _strongCacheList.Remove(listNode);
+                            _strongCache.Remove(listNode.Value);
                             RaiseProjectRootElementRemovedFromStrongCache(projectRootElement);
                         }
 
@@ -491,7 +498,7 @@ namespace Microsoft.Build.Evaluation
                     }
 
                     // From weak list remove all which is not in strong list anymore
-                    IList<string> toBeRemovedFromWeakRefs = _weakCache.Keys.Except(_strongCache.Select(i => i.FullPath)).ToList();
+                    IList<string> toBeRemovedFromWeakRefs = _weakCache.Keys.Except(_strongCacheList.Select(i => i.FullPath)).ToList();
                     foreach (string victim in toBeRemovedFromWeakRefs)
                     {
                         _weakCache.Remove(victim);
@@ -519,8 +526,9 @@ namespace Microsoft.Build.Evaluation
                 WeakValueDictionary<string, ProjectRootElement> oldWeakCache = _weakCache;
                 _weakCache = new WeakValueDictionary<string, ProjectRootElement>(StringComparer.OrdinalIgnoreCase);
 
-                LinkedList<ProjectRootElement> oldStrongCache = _strongCache;
-                _strongCache = new LinkedList<ProjectRootElement>();
+                LinkedList<ProjectRootElement> oldStrongCache = _strongCacheList;
+                _strongCacheList = new LinkedList<ProjectRootElement>();
+                _strongCache = new();
 
                 foreach (KeyValuePair<string, ProjectRootElement> kvp in oldWeakCache)
                 {
@@ -538,7 +546,7 @@ namespace Microsoft.Build.Evaluation
                     {
                         if (kvp.Value.IsExplicitlyLoaded)
                         {
-                            _strongCache.AddFirst(kvp.Value);
+                            _strongCache[kvp.Value] = _strongCacheList.AddFirst(kvp.Value);
                         }
                         else
                         {
@@ -607,6 +615,7 @@ namespace Microsoft.Build.Evaluation
 
             if (existingWeakEntry != null && !object.ReferenceEquals(existingWeakEntry, projectRootElement))
             {
+                _strongCacheList.Remove(existingWeakEntry);
                 _strongCache.Remove(existingWeakEntry);
                 RaiseProjectRootElementRemovedFromStrongCache(existingWeakEntry);
             }
@@ -623,37 +632,28 @@ namespace Microsoft.Build.Evaluation
         /// Otherwise, just add it to the top.
         /// If the list is too large, remove an entry from the bottom.
         /// </summary>
-        /// <remarks>
-        /// Must be called within the cache lock.
-        /// If the size of strong cache gets large, this needs a faster data structure
-        /// than a linked list. It's currently O(n).
-        /// </remarks>
         private void BoostEntryInStrongCache(ProjectRootElement projectRootElement)
         {
-            LinkedListNode<ProjectRootElement> node = _strongCache.First;
+            LinkedListNode<ProjectRootElement> node;
 
-            while (node != null)
+            if (_strongCache.ContainsKey(projectRootElement))
             {
-                if (Object.ReferenceEquals(node.Value, projectRootElement))
-                {
-                    // DebugTraceCache("Boosting: ", projectRootElement.FullPath);
-                    _strongCache.Remove(node);
-                    _strongCache.AddFirst(node);
-
-                    return;
-                }
-
-                node = node.Next;
+                node = _strongCache[projectRootElement];
+                // DebugTraceCache("Boosting: ", projectRootElement.FullPath);
+                _strongCacheList.Remove(node);
+                _strongCacheList.AddFirst(node);
+                return;
             }
 
-            _strongCache.AddFirst(projectRootElement);
+            _strongCache[projectRootElement] = _strongCacheList.AddFirst(projectRootElement);
 
-            if (_strongCache.Count > s_maximumStrongCacheSize)
+            if (_strongCacheList.Count > s_maximumStrongCacheSize)
             {
-                node = _strongCache.Last;
+                node = _strongCacheList.Last;
 
-                DebugTraceCache("Shedding: ", node.Value.FullPath);
-                _strongCache.Remove(node);
+                // DebugTraceCache("Shedding: ", node.Value.FullPath);
+                _strongCacheList.Remove(node);
+                _strongCache.Remove(node.Value);
                 RaiseProjectRootElementRemovedFromStrongCache(node.Value);
             }
         }
@@ -670,11 +670,11 @@ namespace Microsoft.Build.Evaluation
 
             _weakCache.Remove(projectRootElement.FullPath);
 
-            LinkedListNode<ProjectRootElement> strongCacheEntry = _strongCache.Find(projectRootElement);
-            if (strongCacheEntry != null)
+            if (_strongCache.ContainsKey(projectRootElement))
             {
-                _strongCache.Remove(strongCacheEntry);
-                RaiseProjectRootElementRemovedFromStrongCache(strongCacheEntry.Value);
+                _strongCacheList.Remove(_strongCache[projectRootElement]);
+                _strongCache.Remove(projectRootElement);
+                RaiseProjectRootElementRemovedFromStrongCache(projectRootElement);
             }
 
             DebugTraceCache("Out of date dropped from XML cache: ", projectRootElement.FullPath);
