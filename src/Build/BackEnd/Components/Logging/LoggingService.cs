@@ -1757,10 +1757,11 @@ namespace Microsoft.Build.BackEnd.Logging
             {
                 Build.Logging.ConsoleLogger consoleLogger => consoleLogger.GetMinimumMessageImportance(),
                 Build.Logging.ConfigurableForwardingLogger forwardingLogger => forwardingLogger.GetMinimumMessageImportance(),
+                BuildCheck.Infrastructure.BuildCheckConnectorLogger => MessageImportance.High,
 
                 // Central forwarding loggers are used in worker nodes if logging verbosity could not be optimized, i.e. in cases
                 // where we must log everything. They can be ignored in inproc nodes.
-                CentralForwardingLogger => (_nodeId > 1 ? MessageImportance.Low : null),
+                CentralForwardingLogger => (_nodeId > 1 ? MessageImportance.High : null),
 
                 // The null logger has no effect on minimum verbosity.
                 Execution.BuildManager.NullLogger => null,
