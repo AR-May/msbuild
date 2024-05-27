@@ -16,6 +16,9 @@ namespace Microsoft.Build.Experimental.BuildCheck.Infrastructure;
 /// For now we jus want to forward all events, while disable verbose logging of tasks.
 /// In the future we may need more specific behavior.
 /// </summary>
+/// <remarks>
+/// Keep this logger synchronized with <see cref="BuildCheckConnectorLogger"/>
+/// </remarks>
 internal class BuildCheckForwardingLogger : IForwardingLogger
 {
     public IEventRedirector? BuildEventRedirector { get; set; }
@@ -26,12 +29,18 @@ internal class BuildCheckForwardingLogger : IForwardingLogger
     public void Initialize(IEventSource eventSource, int nodeCount) => Initialize(eventSource);
     public void Initialize(IEventSource eventSource)
     {
-        eventSource.AnyEventRaised += EventSource_AnyEventRaised;
-    }
+        IEventSource5? eventSource5 = eventSource as IEventSource5;
+        if (eventSource5 != null)
+        {
+            eventSource5.TaskParameterLogged += EventSource5_TaskParameterEventRaised;
+            eventSource5.BuildCheckEventRaised += EventSource5_BuildCheckEventRaised;
+        }
 
-    public void EventSource_AnyEventRaised(object sender, BuildEventArgs buildEvent)
+        eventSource.StatusEventRaised  += EventSource_BuildStatus;
+    }
+    private void EventSource_BuildStatus(object sender, BuildStatusEventArgs buildStatusEvent)
     {
-        switch (buildEvent)
+        switch (buildStatusEvent)
         {
             case ProjectEvaluationFinishedEventArgs e:
                 BuildEventRedirector?.ForwardEvent(e);
@@ -45,10 +54,7 @@ internal class BuildCheckForwardingLogger : IForwardingLogger
             case ProjectFinishedEventArgs e:
                 BuildEventRedirector?.ForwardEvent(e);
                 break;
-            case BuildCheckTracingEventArgs e:
-                BuildEventRedirector?.ForwardEvent(e);
-                break;
-            case BuildCheckAcquisitionEventArgs e:
+            case BuildFinishedEventArgs e:
                 BuildEventRedirector?.ForwardEvent(e);
                 break;
             case TaskStartedEventArgs e:
@@ -57,13 +63,17 @@ internal class BuildCheckForwardingLogger : IForwardingLogger
             case TaskFinishedEventArgs e:
                 BuildEventRedirector?.ForwardEvent(e);
                 break;
-            case TaskParameterEventArgs e:
-                BuildEventRedirector?.ForwardEvent(e);
-                break;
-            case BuildFinishedEventArgs e:
-                BuildEventRedirector?.ForwardEvent(e);
-                break;
         }
+    }
+
+    public void EventSource5_BuildCheckEventRaised(object sender, BuildCheckEventArgs e)
+    {
+        BuildEventRedirector?.ForwardEvent(e);
+    }
+
+    public void EventSource5_TaskParameterEventRaised(object sender, TaskParameterEventArgs taskParameter)
+    {
+        BuildEventRedirector?.ForwardEvent(taskParameter);
     }
 
     public void Shutdown()

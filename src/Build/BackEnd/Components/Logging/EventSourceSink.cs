@@ -20,7 +20,7 @@ namespace Microsoft.Build.BackEnd.Logging
 #if FEATURE_APPDOMAIN
         MarshalByRefObject,
 #endif
-        IEventSource4, IBuildEventSink
+        IEventSource5, IBuildEventSink
     {
         #region Events
 
@@ -101,10 +101,9 @@ namespace Microsoft.Build.BackEnd.Logging
         /// </summary>
         public event TelemetryEventHandler TelemetryLogged;
 
-        /// <summary>
-        /// This event is raised to log BuildCheck events.
-        /// </summary>
-        internal event BuildCheckEventHandler BuildCheckEventRaised;
+        public event TaskParameterEventHandler TaskParameterLogged;
+
+        public event BuildCheckEventHandler BuildCheckEventRaised;
         #endregion
 
         #region Properties
@@ -226,6 +225,9 @@ namespace Microsoft.Build.BackEnd.Logging
         {
             switch (buildEvent)
             {
+                case TaskParameterEventArgs taskParameterEvent:
+                    RaiseTaskParameterEvent(null, taskParameterEvent);
+                    break;
                 case BuildMessageEventArgs buildMessageEvent:
                     RaiseMessageEvent(null, buildMessageEvent);
                     break;
@@ -312,6 +314,7 @@ namespace Microsoft.Build.BackEnd.Logging
             AnyEventRaised = null;
             TelemetryLogged = null;
             BuildCheckEventRaised = null;
+            TaskParameterLogged = null;
         }
 
         #endregion
@@ -443,6 +446,41 @@ namespace Microsoft.Build.BackEnd.Logging
 
             RaiseAnyEvent(sender, buildEvent);
         }
+
+        private void RaiseTaskParameterEvent(object sender, TaskParameterEventArgs taskParameterEvent)
+        {
+            if (TaskParameterLogged != null)
+            {
+                try
+                {
+                    TaskParameterLogged(sender, taskParameterEvent);
+                }
+                catch (LoggerException)
+                {
+                    // if a logger has failed politely, abort immediately
+                    // first unregister all loggers, since other loggers may receive remaining events in unexpected orderings
+                    // if a fellow logger is throwing in an event handler.
+                    this.UnregisterAllEventHandlers();
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    // first unregister all loggers, since other loggers may receive remaining events in unexpected orderings
+                    // if a fellow logger is throwing in an event handler.
+                    this.UnregisterAllEventHandlers();
+
+                    if (ExceptionHandling.IsCriticalException(exception))
+                    {
+                        throw;
+                    }
+
+                    InternalLoggerException.Throw(exception, taskParameterEvent, "FatalErrorWhileLogging", false);
+                }
+            }
+
+            RaiseMessageEvent(sender, taskParameterEvent);
+        }
+
 
         /// <summary>
         /// Raises a "build started" event to all registered loggers.

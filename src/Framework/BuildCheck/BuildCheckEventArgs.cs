@@ -16,7 +16,7 @@ namespace Microsoft.Build.Experimental.BuildCheck;
 /// Base class for all build check event args.
 /// Not intended to be extended by external code.
 /// </summary>
-internal abstract class BuildCheckEventArgs : BuildEventArgs
+public abstract class BuildCheckEventArgs : BuildEventArgs
 { }
 
 /// <summary>

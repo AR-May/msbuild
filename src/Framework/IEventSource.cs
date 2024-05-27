@@ -78,11 +78,6 @@ namespace Microsoft.Build.Framework
     public delegate void AnyEventHandler(object sender, BuildEventArgs e);
 
     /// <summary>
-    /// Type of handler for BuildCheckEventRaised events
-    /// </summary>
-    internal delegate void BuildCheckEventHandler(object sender, BuildCheckEventArgs e);
-
-    /// <summary>
     /// This interface defines the events raised by the build engine.
     /// Loggers use this interface to subscribe to the events they
     /// are interested in receiving.
