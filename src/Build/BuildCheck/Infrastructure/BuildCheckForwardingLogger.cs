@@ -13,9 +13,12 @@ namespace Microsoft.Build.Experimental.BuildCheck.Infrastructure;
 
 /// <summary>
 /// Forwarding logger for the build check infrastructure.
-/// For now we jus want to forward all events, while disable verbose logging of tasks.
+/// For now we just want to forward all events that are needed for BuildCheckConnectorLogger and filter out all other.
 /// In the future we may need more specific behavior.
 /// </summary>
+/// <remarks>
+/// Ensure that events filtering is in sync with <see cref="BuildCheckConnectorLogger"/>
+/// </remarks>
 internal class BuildCheckForwardingLogger : IForwardingLogger
 {
     public IEventRedirector? BuildEventRedirector { get; set; }
