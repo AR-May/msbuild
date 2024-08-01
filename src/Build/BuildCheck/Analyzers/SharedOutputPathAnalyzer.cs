@@ -21,6 +21,12 @@ internal sealed class SharedOutputPathAnalyzer : BuildAnalyzer
         "Projects {0} and {1} have conflicting output paths: {2}.",
         new BuildAnalyzerConfiguration() { RuleId = RuleId, Severity = BuildAnalyzerResultSeverity.Warning });
 
+    private const string RuleId2 = "BC0001";
+    public static BuildAnalyzerRule SupportedRule2 = new BuildAnalyzerRule(RuleId2, "NonConflictingOutputPath",
+        "Two projects should not share their OutputPath nor IntermediateOutputPath locations",
+        "Projects {0} and {1} does not have conflicting output paths: {2}.",
+        new BuildAnalyzerConfiguration() { RuleId = RuleId2, Severity = BuildAnalyzerResultSeverity.Warning });
+
     public override string FriendlyName => "MSBuild.SharedOutputPathAnalyzer";
 
     public override IReadOnlyList<BuildAnalyzerRule> SupportedRules { get; } = [SupportedRule];
@@ -90,6 +96,13 @@ internal sealed class SharedOutputPathAnalyzer : BuildAnalyzer
         }
         else
         {
+            context.ReportResult(BuildCheckResult.Create(
+                SupportedRule2,
+                // Populating precise location tracked via https://github.com/orgs/dotnet/projects/373/views/1?pane=issue&itemId=58661732
+                ElementLocation.EmptyLocation,
+                Path.GetFileName(projectPath),
+                Path.GetFileName(projectPath),
+                path!));
             _projectsPerOutputPath[path!] = projectPath;
         }
 
