@@ -138,7 +138,7 @@ internal sealed class BuildCheckManagerProvider : IBuildCheckManagerProvider
         [
             // BuildCheckDataSource.EventArgs
             [
-                ([SharedOutputPathAnalyzer.SupportedRule.Id], SharedOutputPathAnalyzer.SupportedRule.DefaultConfiguration.IsEnabled ?? false, Construct<SharedOutputPathAnalyzer>),
+                ([SomeAnalyzer.SupportedRule.Id], SomeAnalyzer.SupportedRule.DefaultConfiguration.IsEnabled ?? false, Construct<SomeAnalyzer>),
                 ([DoubleWritesAnalyzer.SupportedRule.Id], DoubleWritesAnalyzer.SupportedRule.DefaultConfiguration.IsEnabled ?? false, Construct<DoubleWritesAnalyzer>),
                 ([NoEnvironmentVariablePropertyAnalyzer.SupportedRule.Id], NoEnvironmentVariablePropertyAnalyzer.SupportedRule.DefaultConfiguration.IsEnabled ?? false, Construct<NoEnvironmentVariablePropertyAnalyzer>)
             ],
