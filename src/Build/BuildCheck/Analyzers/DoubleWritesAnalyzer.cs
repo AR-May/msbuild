@@ -46,6 +46,9 @@ internal sealed class DoubleWritesAnalyzer : BuildAnalyzer
     /// </summary>
     private readonly Dictionary<string, (string projectFilePath, string taskName)> _filesWritten = new(StringComparer.CurrentCultureIgnoreCase);
 
+    private int _reportsCount = 0;
+    private int _maxReportsCount = 20;
+
     private void TaskInvocationAction(BuildCheckDataContext<TaskInvocationAnalysisData> context)
     {
         // This analyzer uses a hard-coded list of tasks known to write files.
@@ -60,6 +63,11 @@ internal sealed class DoubleWritesAnalyzer : BuildAnalyzer
 
     private void AnalyzeCompilerTask(BuildCheckDataContext<TaskInvocationAnalysisData> context)
     {
+        if (_reportsCount >= _maxReportsCount)
+        {
+            return;
+        }
+
         var taskParameters = context.Data.Parameters;
 
         // Compiler tasks have several parameters representing files being written.
@@ -80,6 +88,11 @@ internal sealed class DoubleWritesAnalyzer : BuildAnalyzer
 
     private void AnalyzeCopyTask(BuildCheckDataContext<TaskInvocationAnalysisData> context)
     {
+        if (_reportsCount >= _maxReportsCount)
+        {
+            return;
+        }
+
         var taskParameters = context.Data.Parameters;
 
         // The destination is specified as either DestinationFolder or DestinationFiles.
@@ -103,6 +116,11 @@ internal sealed class DoubleWritesAnalyzer : BuildAnalyzer
 
     private void AnalyzeWrite(BuildCheckDataContext<TaskInvocationAnalysisData> context, string fileBeingWritten)
     {
+        if (_reportsCount >= _maxReportsCount)
+        {
+            return;
+        }
+
         if (!string.IsNullOrEmpty(fileBeingWritten))
         {
             // Absolutize the path. Note that if a path used during a build is relative, it is relative to the directory
@@ -112,13 +130,15 @@ internal sealed class DoubleWritesAnalyzer : BuildAnalyzer
             if (_filesWritten.TryGetValue(fileBeingWritten, out (string projectFilePath, string taskName) existingEntry))
             {
                 context.ReportResult(BuildCheckResult.Create(
-                    SupportedRule,
-                    context.Data.TaskInvocationLocation,
-                    context.Data.TaskName,
-                    existingEntry.taskName,
-                    Path.GetFileName(context.Data.ProjectFilePath),
-                    Path.GetFileName(existingEntry.projectFilePath),
-                    fileBeingWritten));
+                        SupportedRule,
+                        context.Data.TaskInvocationLocation,
+                        context.Data.TaskName,
+                        existingEntry.taskName,
+                        Path.GetFileName(context.Data.ProjectFilePath),
+                        Path.GetFileName(existingEntry.projectFilePath),
+                        fileBeingWritten));
+
+                _reportsCount++;
             }
             else
             {

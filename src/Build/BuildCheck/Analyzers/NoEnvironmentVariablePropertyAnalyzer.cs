@@ -26,6 +26,8 @@ internal sealed class NoEnvironmentVariablePropertyAnalyzer : BuildAnalyzer
     private readonly HashSet<EnvironmentVariableIdentityKey> _environmentVariablesReported = new HashSet<EnvironmentVariableIdentityKey>();
 
     private bool _isVerboseEnvVarOutput;
+    private int _reportsCount = 0;
+    private int _maxReportsCount = 20;
 
     public override string FriendlyName => "MSBuild.NoEnvironmentVariablePropertyAnalyzer";
 
@@ -44,10 +46,20 @@ internal sealed class NoEnvironmentVariablePropertyAnalyzer : BuildAnalyzer
 
     private void ProcessEnvironmentVariableReadAction(BuildCheckDataContext<EvaluatedPropertiesAnalysisData> context)
     {
+        if (_reportsCount >= _maxReportsCount)
+        {
+            return;
+        }
+
         if (context.Data.EvaluatedEnvironmentVariables.Count != 0)
         {
             foreach (var envVariableData in context.Data.EvaluatedEnvironmentVariables)
             {
+                if (_reportsCount >= _maxReportsCount)
+                {
+                    return;
+                }
+
                 EnvironmentVariableIdentityKey identityKey = new(envVariableData.Key, envVariableData.Value.File, envVariableData.Value.Line, envVariableData.Value.Column);
                 if (!_environmentVariablesReported.Contains(identityKey))
                 {

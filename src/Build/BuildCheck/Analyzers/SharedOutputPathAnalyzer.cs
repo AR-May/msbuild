@@ -37,9 +37,16 @@ internal sealed class SharedOutputPathAnalyzer : BuildAnalyzer
 
     private readonly Dictionary<string, string> _projectsPerOutputPath = new(StringComparer.CurrentCultureIgnoreCase);
     private readonly HashSet<string> _projects = new(StringComparer.CurrentCultureIgnoreCase);
+    private int _reportsCount = 0;
+    private int _maxReportsCount = 20;
 
     private void EvaluatedPropertiesAction(BuildCheckDataContext<EvaluatedPropertiesAnalysisData> context)
     {
+        if (_reportsCount >= _maxReportsCount)
+        {
+            return;
+        }
+
         if (!_projects.Add(context.Data.ProjectFilePath))
         {
             return;
@@ -52,6 +59,11 @@ internal sealed class SharedOutputPathAnalyzer : BuildAnalyzer
 
         string? absoluteBinPath = CheckAndAddFullOutputPath(binPath, context);
         // Check objPath only if it is different from binPath
+        if (_reportsCount >= _maxReportsCount)
+        {
+            return;
+        }
+
         if (
             !string.IsNullOrEmpty(objPath) && !string.IsNullOrEmpty(absoluteBinPath) &&
             !objPath.Equals(binPath, StringComparison.CurrentCultureIgnoreCase)
