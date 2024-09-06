@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using Microsoft.Build.BuildCheck.Infrastructure;
+using Microsoft.Build.Experimental.BuildCheck.Infrastructure;
 using Microsoft.Build.Shared;
 
 namespace Microsoft.Build.Experimental.BuildCheck.Checks;
@@ -33,6 +34,8 @@ internal sealed class NoEnvironmentVariablePropertyCheck : Check
 
     public override string FriendlyName => "MSBuild.NoEnvironmentVariablePropertyCheck";
 
+    public BuildCheckResultsLimiter? ResultsLimiter;
+
     public override IReadOnlyList<CheckRule> SupportedRules { get; } = [SupportedRule];
 
     public override void Initialize(ConfigurationContext configurationContext)
@@ -45,6 +48,8 @@ internal sealed class NoEnvironmentVariablePropertyCheck : Check
         }
 
         CheckScopeClassifier.NotifyOnScopingReadiness += HandleScopeReadiness;
+
+        ResultsLimiter = new BuildCheckResultsLimiter();
     }
 
     public override void RegisterActions(IBuildCheckRegistrationContext registrationContext) => registrationContext.RegisterEnvironmentVariableReadAction(ProcessEnvironmentVariableReadAction);
@@ -61,10 +66,11 @@ internal sealed class NoEnvironmentVariablePropertyCheck : Check
             }
             else if (CheckScopeClassifier.IsActionInObservedScope(_scope, context.Data.EnvironmentVariableLocation.File, context.Data.ProjectFilePath))
             {
-                context.ReportResult(BuildCheckResult.Create(
+                ResultsLimiter?.ProcessAndReportResult(
+                    context,
                     SupportedRule,
                     context.Data.EnvironmentVariableLocation,
-                    GetFormattedMessage(context.Data.EnvironmentVariableName, context.Data.EnvironmentVariableValue)));
+                    GetFormattedMessage(context.Data.EnvironmentVariableName, context.Data.EnvironmentVariableValue));
             }
 
             _environmentVariablesCache.Add(identityKey);
@@ -86,10 +92,11 @@ internal sealed class NoEnvironmentVariablePropertyCheck : Check
                 continue;
             }
 
-            context.ReportResult(BuildCheckResult.Create(
+            ResultsLimiter?.ProcessAndReportResult(
+                context,
                 SupportedRule,
                 context.Data.EnvironmentVariableLocation,
-                GetFormattedMessage(context.Data.EnvironmentVariableName, context.Data.EnvironmentVariableValue)));
+                GetFormattedMessage(context.Data.EnvironmentVariableName, context.Data.EnvironmentVariableValue));
         }
 
         CheckScopeClassifier.NotifyOnScopingReadiness -= HandleScopeReadiness;
