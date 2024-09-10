@@ -37,8 +37,6 @@ internal class PropertiesUsageCheck : InternalCheck
 
     public override IReadOnlyList<CheckRule> SupportedRules => SupportedRulesList;
 
-    public BuildCheckResultsLimiter? ResultsLimiter;
-
     private const string _allowUninitPropsInConditionsKey = "AllowUninitializedPropertiesInConditions";
     private bool _allowUninitPropsInConditions = false;
     // Each check can have it's scope and enablement
@@ -91,8 +89,6 @@ internal class PropertiesUsageCheck : InternalCheck
         {
             _allowUninitPropsInConditions = allowUninitPropsInConditionsRule1 ?? allowUninitPropsInConditionsRule2 ?? false;
         }
-
-        ResultsLimiter = new BuildCheckResultsLimiter();
     }
 
     private static bool? GetAllowUninitPropsInConditionsConfig(CustomConfigurationData customConfigurationData,
@@ -150,11 +146,10 @@ internal class PropertiesUsageCheck : InternalCheck
             {
                 _uninitializedReadsInScope.Remove(writeData.PropertyName);
 
-                ResultsLimiter?.ProcessAndReportResult(
-                    context,
+                context.ReportResult(BuildCheckResult.Create(
                     _initializedAfterUsedRule,
                     uninitInScopeReadLocation,
-                    writeData.PropertyName, writeData.ElementLocation?.LocationString ?? string.Empty);
+                    writeData.PropertyName, writeData.ElementLocation?.LocationString ?? string.Empty));
             }
 
             if (CheckScopeClassifier.IsActionInObservedScope(_initializedAfterUseScope,
@@ -163,11 +158,10 @@ internal class PropertiesUsageCheck : InternalCheck
             {
                 _uninitializedReadsOutOfScope.Remove(writeData.PropertyName);
 
-                ResultsLimiter?.ProcessAndReportResult(
-                    context,
+                context.ReportResult(BuildCheckResult.Create(
                     _initializedAfterUsedRule,
                     uninitOutScopeReadLocation,
-                    writeData.PropertyName, writeData.ElementLocation?.LocationString ?? string.Empty);
+                    writeData.PropertyName, writeData.ElementLocation?.LocationString ?? string.Empty));
             }
         }
     }
@@ -209,11 +203,10 @@ internal class PropertiesUsageCheck : InternalCheck
                          readData.ElementLocation, readData.ProjectFilePath))
             {
                 // report immediately
-                ResultsLimiter?.ProcessAndReportResult(
-                    context,
+                context.ReportResult(BuildCheckResult.Create(
                     _usedBeforeInitializedRule,
                     readData.ElementLocation,
-                    readData.PropertyName);
+                    readData.PropertyName));
             }
         }
     }
@@ -225,11 +218,10 @@ internal class PropertiesUsageCheck : InternalCheck
         {
             if (propWithLocation.Value != null && !_readProperties.Contains(propWithLocation.Key))
             {
-                ResultsLimiter?.ProcessAndReportResult(
-                    context,
+                context.ReportResult(BuildCheckResult.Create(
                     _unusedPropertyRule,
                     propWithLocation.Value,
-                    propWithLocation.Key);
+                    propWithLocation.Key));
             }
         }
 
@@ -237,11 +229,10 @@ internal class PropertiesUsageCheck : InternalCheck
         //  uninitialized reads immediately (instead we wait if they are attempted to be initialized late).
         foreach (var uninitializedRead in _uninitializedReadsInScope)
         {
-            ResultsLimiter?.ProcessAndReportResult(
-                context,
+            context.ReportResult(BuildCheckResult.Create(
                 _usedBeforeInitializedRule,
                 uninitializedRead.Value,
-                uninitializedRead.Key);
+                uninitializedRead.Key));
         }
 
         _readProperties = new HashSet<string>(MSBuildNameIgnoreCaseComparer.Default);

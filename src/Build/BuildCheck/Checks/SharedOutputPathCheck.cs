@@ -25,11 +25,9 @@ internal sealed class SharedOutputPathCheck : Check
 
     public override IReadOnlyList<CheckRule> SupportedRules { get; } = [SupportedRule];
 
-    public BuildCheckResultsLimiter? ResultsLimiter;
-
     public override void Initialize(ConfigurationContext configurationContext)
     {
-        ResultsLimiter = new BuildCheckResultsLimiter();
+        /* This is it - no custom configuration */
     }
 
     public override void RegisterActions(IBuildCheckRegistrationContext registrationContext)
@@ -83,14 +81,13 @@ internal sealed class SharedOutputPathCheck : Check
 
         if (_projectsPerOutputPath.TryGetValue(path!, out string? conflictingProject))
         {
-            ResultsLimiter?.ProcessAndReportResult(
-                context,
+            context.ReportResult(BuildCheckResult.Create(
                 SupportedRule,
                 // Populating precise location tracked via https://github.com/orgs/dotnet/projects/373/views/1?pane=issue&itemId=58661732
                 ElementLocation.EmptyLocation,
                 Path.GetFileName(projectPath),
                 Path.GetFileName(conflictingProject),
-                path!);
+                path!));
         }
         else
         {

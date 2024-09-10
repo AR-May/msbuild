@@ -29,13 +29,11 @@ internal sealed class DoubleWritesCheck : Check
 
     public override string FriendlyName => "MSBuild.DoubleWritesCheck";
 
-    public BuildCheckResultsLimiter? ResultsLimiter;
-
     public override IReadOnlyList<CheckRule> SupportedRules { get; } = [SupportedRule];
 
     public override void Initialize(ConfigurationContext configurationContext)
     {
-        ResultsLimiter = new BuildCheckResultsLimiter();
+        /* This is it - no custom configuration */
     }
 
     public override void RegisterActions(IBuildCheckRegistrationContext registrationContext)
@@ -113,15 +111,14 @@ internal sealed class DoubleWritesCheck : Check
 
             if (_filesWritten.TryGetValue(fileBeingWritten, out (string projectFilePath, string taskName) existingEntry))
             {
-                ResultsLimiter?.ProcessAndReportResult(
-                    context,
+                context.ReportResult(BuildCheckResult.Create(
                     SupportedRule,
                     context.Data.TaskInvocationLocation,
                     context.Data.TaskName,
                     existingEntry.taskName,
                     Path.GetFileName(context.Data.ProjectFilePath),
                     Path.GetFileName(existingEntry.projectFilePath),
-                    fileBeingWritten);
+                    fileBeingWritten));
             }
             else
             {
