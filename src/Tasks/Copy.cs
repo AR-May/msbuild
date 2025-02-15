@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -428,15 +429,35 @@ namespace Microsoft.Build.Tasks
             // (no need to create all the parallel infrastructure for that case).
             bool success = false;
 
+            string currentDirectoryPath = null;
+            if (Traits.Instance.UseFullPathsCopyTask)
+            {
+                currentDirectoryPath = NativeMethodsShared.GetCurrentDirectory();
+            }
+
+            if (Traits.Instance.YieldCopyTask)
+            {
+                BuildEngine3.Yield();
+                Log.LogMessage(MessageImportance.Normal, $"Yielding the copy task. Process {Process.GetCurrentProcess().Id}, thread {Thread.CurrentThread.ManagedThreadId}.");
+            }
+
             try
             {
                 success = parallelism == 1 || DestinationFiles.Length == 1
-                    ? CopySingleThreaded(copyFile, out destinationFilesSuccessfullyCopied)
-                    : CopyParallel(copyFile, parallelism, out destinationFilesSuccessfullyCopied);
+                    ? CopySingleThreaded(copyFile, currentDirectoryPath , out destinationFilesSuccessfullyCopied)
+                    : CopyParallel(copyFile, parallelism, currentDirectoryPath, out destinationFilesSuccessfullyCopied);
             }
             catch (OperationCanceledException)
             {
                 return false;
+            }
+            finally
+            {
+                if (Traits.Instance.YieldCopyTask)
+                {
+                    BuildEngine3.Reacquire();
+                    Log.LogMessage(MessageImportance.Normal, $"Reacquiring the copy task. Process {Process.GetCurrentProcess().Id}, thread {Thread.CurrentThread.ManagedThreadId}.");
+                }
             }
 
             // copiedFiles contains only the copies that were successful.
@@ -451,6 +472,7 @@ namespace Microsoft.Build.Tasks
         /// </summary>
         private bool CopySingleThreaded(
             CopyFileWithState copyFile,
+            string currentDirectoryPath,
             out List<ITaskItem> destinationFilesSuccessfullyCopied)
         {
             bool success = true;
@@ -482,7 +504,24 @@ namespace Microsoft.Build.Tasks
 
                 if (!copyComplete)
                 {
-                    if (DoCopyIfNecessary(new FileState(SourceFiles[i].ItemSpec), new FileState(DestinationFiles[i].ItemSpec), copyFile))
+                    bool copySucceeded = false;
+                    if (Traits.Instance.UseFullPathsCopyTask && !string.IsNullOrEmpty(currentDirectoryPath))
+                    {
+                        // Switch to full paths.
+                        copySucceeded = DoCopyIfNecessary(
+                            new FileState(Path.Combine(currentDirectoryPath, SourceFiles[i].ItemSpec)),
+                            new FileState(Path.Combine(currentDirectoryPath, DestinationFiles[i].ItemSpec)),
+                            copyFile);
+                    }
+                    else
+                    {
+                        copySucceeded = DoCopyIfNecessary(
+                            new FileState(SourceFiles[i].ItemSpec),
+                            new FileState(DestinationFiles[i].ItemSpec),
+                            copyFile);
+                    }
+
+                    if (copySucceeded)
                     {
                         filesActuallyCopied[destPath] = SourceFiles[i].ItemSpec;
                         copyComplete = true;
@@ -517,6 +556,7 @@ namespace Microsoft.Build.Tasks
         private bool CopyParallel(
             CopyFileWithState copyFile,
             int parallelism,
+            string currentDirectoryPath,
             out List<ITaskItem> destinationFilesSuccessfullyCopied)
         {
             bool success = true;
@@ -578,6 +618,7 @@ namespace Microsoft.Build.Tasks
                         string sourcePath = sourceItem.ItemSpec;
 
                         // Check if we just copied from this location to the destination, don't copy again.
+                        // TODO: check how many times it is really used - maybe drop it?
                         MSBuildEventSource.Log.CopyUpToDateStart(destItem.ItemSpec);
                         bool copyComplete = partitionIndex > 0 &&
                                             String.Equals(
@@ -587,10 +628,24 @@ namespace Microsoft.Build.Tasks
 
                         if (!copyComplete)
                         {
-                            if (DoCopyIfNecessary(
-                                new FileState(sourceItem.ItemSpec),
-                                new FileState(destItem.ItemSpec),
-                                copyFile))
+                            bool copySucceeded = false;
+                            if (Traits.Instance.UseFullPathsCopyTask && string.IsNullOrEmpty(currentDirectoryPath))
+                            {
+                                // Switch to full paths.
+                                copySucceeded = DoCopyIfNecessary(
+                                    new FileState(Path.Combine(currentDirectoryPath, sourceItem.ItemSpec)),
+                                    new FileState(Path.Combine(currentDirectoryPath, destItem.ItemSpec)),
+                                    copyFile);
+                            }
+                            else
+                            {
+                                copySucceeded = DoCopyIfNecessary(
+                                    new FileState(sourceItem.ItemSpec),
+                                    new FileState(destItem.ItemSpec),
+                                    copyFile);
+                            }
+
+                            if (copySucceeded)
                             {
                                 copyComplete = true;
                             }
@@ -1054,7 +1109,14 @@ namespace Microsoft.Build.Tasks
             int parallelism = Traits.Instance.CopyTaskParallelism;
             if (parallelism < 0)
             {
-                parallelism = DefaultCopyParallelism;
+                if (Traits.Instance.RaiseThreadsCountCopyTask)
+                {
+                    parallelism = 2 * DefaultCopyParallelism;
+                }
+                else
+                {
+                    parallelism = DefaultCopyParallelism;
+                }
             }
             else if (parallelism == 0)
             {
