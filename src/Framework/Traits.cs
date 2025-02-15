@@ -134,6 +134,8 @@ namespace Microsoft.Build.Framework
 
         public readonly bool InProcNodeDisabled = Environment.GetEnvironmentVariable("MSBUILDNOINPROCNODE") == "1";
 
+        public readonly bool YieldCopyTask = Environment.GetEnvironmentVariable("MSBUILDYIELDCOPYTASK") == "1";
+
         public static void UpdateFromEnvironment()
         {
             // Re-create Traits instance to update values in Traits according to current environment.

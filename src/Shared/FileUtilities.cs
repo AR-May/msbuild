@@ -490,7 +490,7 @@ namespace Microsoft.Build.Shared
                     string message = ResourceUtilities.FormatString(AssemblyResources.GetString("Shared.PathTooLong"), path, NativeMethodsShared.MaxPath);
                     throw new PathTooLongException(message);
                 }
-
+                 
                 // We really don't care about extensions here, but Path.HasExtension provides a great way to
                 // invoke the CLR's invalid path checks (these are independent of path length)
                 Path.HasExtension(uncheckedFullPath);
