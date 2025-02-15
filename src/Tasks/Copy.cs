@@ -428,6 +428,7 @@ namespace Microsoft.Build.Tasks
             // (no need to create all the parallel infrastructure for that case).
             bool success = false;
 
+            BuildEngine3.Yield();
             try
             {
                 success = parallelism == 1 || DestinationFiles.Length == 1
@@ -437,6 +438,10 @@ namespace Microsoft.Build.Tasks
             catch (OperationCanceledException)
             {
                 return false;
+            }
+            finally
+            {
+                BuildEngine3.Reacquire();
             }
 
             // copiedFiles contains only the copies that were successful.
