@@ -135,6 +135,8 @@ namespace Microsoft.Build.Framework
         public readonly bool InProcNodeDisabled = Environment.GetEnvironmentVariable("MSBUILDNOINPROCNODE") == "1";
 
         public readonly bool YieldCopyTask = Environment.GetEnvironmentVariable("MSBUILDYIELDCOPYTASK") == "1";
+        public readonly bool UseFullPathsCopyTask = Environment.GetEnvironmentVariable("MSBUILDUSEFULLPATHSCOPYTASK") == "1";
+        public readonly bool RaiseThreadsCountCopyTask = Environment.GetEnvironmentVariable("MSBUILDRAISETHREADSCOUNTCOPYTASK") == "1";
 
         public static void UpdateFromEnvironment()
         {

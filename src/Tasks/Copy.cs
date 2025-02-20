@@ -345,6 +345,13 @@ namespace Microsoft.Build.Tasks
                 // Do not log a fake command line as well, as it's superfluous, and also potentially expensive
                 Log.LogMessage(MessageImportance.Normal, FileComment, sourceFileState.FileNameFullPath, destinationFileState.FileNameFullPath);
 
+                // TODO: debugging code, remove it
+                // Custom logging to a specified file
+                using (StreamWriter writer = new StreamWriter("C:/Users/alinama/work/testRepos/logfile.txt", true))
+                {
+                    writer.WriteLine($"Copying file from {sourceFileState.FileNameFullPath} to {destinationFileState.FileNameFullPath}");
+                }
+
                 File.Copy(sourceFileState.Name, destinationFileState.Name, true);
             }
 
@@ -430,9 +437,13 @@ namespace Microsoft.Build.Tasks
             bool success = false;
 
             string currentDirectoryPath = null;
-            if (Traits.Instance.YieldCopyTask)
+            if (Traits.Instance.UseFullPathsCopyTask)
             {
                 currentDirectoryPath = NativeMethodsShared.GetCurrentDirectory();
+            }
+
+            if (Traits.Instance.YieldCopyTask)
+            {
                 BuildEngine3.Yield();
                 Log.LogMessage(MessageImportance.Normal, $"Yielding the copy task. Process {Process.GetCurrentProcess().Id}, thread {Thread.CurrentThread.ManagedThreadId}.");
             }
@@ -501,7 +512,7 @@ namespace Microsoft.Build.Tasks
                 if (!copyComplete)
                 {
                     bool copySucceeded = false;
-                    if (Traits.Instance.YieldCopyTask && !string.IsNullOrEmpty(currentDirectoryPath))
+                    if (Traits.Instance.UseFullPathsCopyTask && !string.IsNullOrEmpty(currentDirectoryPath))
                     {
                         // Switch to full paths.
                         copySucceeded = DoCopyIfNecessary(
@@ -625,7 +636,7 @@ namespace Microsoft.Build.Tasks
                         if (!copyComplete)
                         {
                             bool copySucceeded = false;
-                            if (Traits.Instance.YieldCopyTask && string.IsNullOrEmpty(currentDirectoryPath))
+                            if (Traits.Instance.UseFullPathsCopyTask && string.IsNullOrEmpty(currentDirectoryPath))
                             {
                                 // Switch to full paths.
                                 copySucceeded = DoCopyIfNecessary(
@@ -1105,7 +1116,14 @@ namespace Microsoft.Build.Tasks
             int parallelism = Traits.Instance.CopyTaskParallelism;
             if (parallelism < 0)
             {
-                parallelism = DefaultCopyParallelism;
+                if (Traits.Instance.RaiseThreadsCountCopyTask)
+                {
+                    parallelism = 2 * DefaultCopyParallelism;
+                }
+                else
+                {
+                    parallelism = DefaultCopyParallelism;
+                }
             }
             else if (parallelism == 0)
             {
