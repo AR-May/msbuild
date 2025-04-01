@@ -140,7 +140,7 @@
     <IBCMergeBranch>lab/d15.9stg</IBCMergeBranch>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(GenerateReferenceAssemblySources)' != 'true'">
+  <PropertyGroup Condition="'$(GenerateReferenceAssemblySource)' != 'true'">
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <DocumentationFile/>
   </PropertyGroup>
