@@ -113,17 +113,17 @@ namespace Microsoft.Build.Utilities
     public delegate bool DependencyFilter(string fullPath);
     public enum DotNetFrameworkArchitecture
     {
+        Current = 0,
         Bitness32 = 1,
         Bitness64 = 2,
-        Current = 0,
     }
     public enum ExecutableType
     {
-        Managed32Bit = 3,
-        Managed64Bit = 4,
-        ManagedIL = 2,
         Native32Bit = 0,
         Native64Bit = 1,
+        ManagedIL = 2,
+        Managed32Bit = 3,
+        Managed64Bit = 4,
         SameAsCurrentProcess = 5,
     }
     public static partial class FileTracker
@@ -199,10 +199,10 @@ namespace Microsoft.Build.Utilities
     }
     public enum HostObjectInitializationStatus
     {
-        NoActionReturnFailure = 3,
-        NoActionReturnSuccess = 2,
-        UseAlternateToolToExecute = 1,
         UseHostObjectToExecute = 0,
+        UseAlternateToolToExecute = 1,
+        NoActionReturnSuccess = 2,
+        NoActionReturnFailure = 3,
     }
     public abstract partial class Logger : Microsoft.Build.Framework.ILogger
     {
@@ -218,8 +218,8 @@ namespace Microsoft.Build.Utilities
     public enum MultipleVersionSupport
     {
         Allow = 0,
-        Error = 2,
         Warning = 1,
+        Error = 2,
     }
     public partial class MuxLogger : Microsoft.Build.Framework.ILogger, Microsoft.Build.Framework.INodeLogger
     {
@@ -300,14 +300,13 @@ namespace Microsoft.Build.Utilities
     }
     public enum SDKType
     {
-        External = 1,
-        Framework = 3,
-        Platform = 2,
         Unspecified = 0,
+        External = 1,
+        Platform = 2,
+        Framework = 3,
     }
     public enum TargetDotNetFrameworkVersion
     {
-        Latest = 9999,
         Version11 = 0,
         Version20 = 1,
         Version30 = 2,
@@ -315,14 +314,15 @@ namespace Microsoft.Build.Utilities
         Version40 = 4,
         Version45 = 5,
         Version451 = 6,
-        Version452 = 9,
         Version46 = 7,
         Version461 = 8,
+        Version452 = 9,
         Version462 = 10,
+        VersionLatest = 10,
         Version47 = 11,
         Version471 = 12,
         Version472 = 13,
-        VersionLatest = 10,
+        Latest = 9999,
     }
     public partial class TargetPlatformSDK : System.IEquatable<Microsoft.Build.Utilities.TargetPlatformSDK>
     {
@@ -386,7 +386,7 @@ namespace Microsoft.Build.Utilities
         public string HelpKeywordPrefix { [System.Runtime.CompilerServices.CompilerGeneratedAttribute]get { throw null; } [System.Runtime.CompilerServices.CompilerGeneratedAttribute]set { } }
         protected string TaskName { [System.Runtime.CompilerServices.CompilerGeneratedAttribute]get { throw null; } }
         public System.Resources.ResourceManager TaskResources { [System.Runtime.CompilerServices.CompilerGeneratedAttribute]get { throw null; } [System.Runtime.CompilerServices.CompilerGeneratedAttribute]set { } }
-        public string ExtractMessageCode(string message, out string messageWithoutCodePrefix) { messageWithoutCodePrefix = default(string); throw null; }
+        public string ExtractMessageCode(string message, out string messageWithoutCodePrefix) { throw null; }
         public virtual string FormatResourceString(string resourceName, params object[] args) { throw null; }
         public virtual string FormatString(string unformatted, params object[] args) { throw null; }
         public virtual string GetResourceMessage(string resourceName) { throw null; }
@@ -502,7 +502,7 @@ namespace Microsoft.Build.Utilities
         public static System.Collections.Generic.IEnumerable<string> GetPlatformsForSDK(string sdkIdentifier, System.Version sdkVersion) { throw null; }
         public static System.Collections.Generic.IEnumerable<string> GetPlatformsForSDK(string sdkIdentifier, System.Version sdkVersion, string[] diskRoots, string registryRoot) { throw null; }
         public static string GetProgramFilesReferenceAssemblyRoot() { throw null; }
-        public static string GetSDKContentFolderPath(string sdkIdentifier, string sdkVersion, string targetPlatformIdentifier, string targetPlatformMinVersion, string targetPlatformVersion, string folderName, string diskRoot=null) { throw null; }
+        public static string GetSDKContentFolderPath(string sdkIdentifier, string sdkVersion, string targetPlatformIdentifier, string targetPlatformMinVersion, string targetPlatformVersion, string folderName, string diskRoot = null) { throw null; }
         public static System.Collections.Generic.IList<string> GetSDKDesignTimeFolders(string sdkRoot) { throw null; }
         public static System.Collections.Generic.IList<string> GetSDKDesignTimeFolders(string sdkRoot, string targetConfiguration, string targetArchitecture) { throw null; }
         public static System.Collections.Generic.IList<string> GetSDKRedistFolders(string sdkRoot) { throw null; }
@@ -574,8 +574,8 @@ namespace Microsoft.Build.Utilities
     public enum UpToDateCheckType
     {
         InputNewerThanOutput = 0,
-        InputNewerThanTracking = 2,
         InputOrOutputNewerThanTracking = 1,
+        InputNewerThanTracking = 2,
     }
     public enum VisualStudioVersion
     {

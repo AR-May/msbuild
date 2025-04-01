@@ -4,7 +4,9 @@ namespace Microsoft.Build.Framework
     [System.Runtime.InteropServices.StructLayoutAttribute(System.Runtime.InteropServices.LayoutKind.Sequential)]
     public partial struct BuildEngineResult
     {
-        public BuildEngineResult(bool result, System.Collections.Generic.List<System.Collections.Generic.IDictionary<string, Microsoft.Build.Framework.ITaskItem[]>> targetOutputsPerProject) { throw null;}
+        private object _dummy;
+        private int _dummyPrimitive;
+        public BuildEngineResult(bool result, System.Collections.Generic.List<System.Collections.Generic.IDictionary<string, Microsoft.Build.Framework.ITaskItem[]>> targetOutputsPerProject) { throw null; }
         public bool Result { get { throw null; } }
         public System.Collections.Generic.IList<System.Collections.Generic.IDictionary<string, Microsoft.Build.Framework.ITaskItem[]>> TargetOutputsPerProject { get { throw null; } }
     }
@@ -276,7 +278,7 @@ namespace Microsoft.Build.Framework
     }
     [System.Runtime.InteropServices.ComVisibleAttribute(true)]
     [System.Runtime.InteropServices.GuidAttribute("9049A481-D0E9-414f-8F92-D4F67A0359A6")]
-    [System.Runtime.InteropServices.InterfaceTypeAttribute((System.Runtime.InteropServices.ComInterfaceType)(1))]
+    [System.Runtime.InteropServices.InterfaceTypeAttribute(System.Runtime.InteropServices.ComInterfaceType.InterfaceIsIUnknown)]
     public partial interface ITaskHost
     {
     }
@@ -309,7 +311,7 @@ namespace Microsoft.Build.Framework
         public LazyFormattedBuildEventArgs(string message, string helpKeyword, string senderName, System.DateTime eventTimestamp, params object[] messageArgs) { }
         public override string Message { get { throw null; } }
     }
-    [System.AttributeUsageAttribute((System.AttributeTargets)(4), AllowMultiple=false, Inherited=true)]
+    [System.AttributeUsageAttribute(System.AttributeTargets.Class, AllowMultiple=false, Inherited=true)]
     public sealed partial class LoadInSeparateAppDomainAttribute : System.Attribute
     {
         public LoadInSeparateAppDomainAttribute() { }
@@ -329,24 +331,24 @@ namespace Microsoft.Build.Framework
     [System.Runtime.InteropServices.ComVisibleAttribute(true)]
     public enum LoggerVerbosity
     {
-        Detailed = 3,
-        Diagnostic = 4,
+        Quiet = 0,
         Minimal = 1,
         Normal = 2,
-        Quiet = 0,
+        Detailed = 3,
+        Diagnostic = 4,
     }
     public enum MessageImportance
     {
         High = 0,
-        Low = 2,
         Normal = 1,
+        Low = 2,
     }
     public partial class MetaprojectGeneratedEventArgs : Microsoft.Build.Framework.BuildMessageEventArgs
     {
         public string metaprojectXml;
         public MetaprojectGeneratedEventArgs(string metaprojectXml, string metaprojectPath, string message) { }
     }
-    [System.AttributeUsageAttribute((System.AttributeTargets)(128), AllowMultiple=false, Inherited=false)]
+    [System.AttributeUsageAttribute(System.AttributeTargets.Property, AllowMultiple=false, Inherited=false)]
     public sealed partial class OutputAttribute : System.Attribute
     {
         public OutputAttribute() { }
@@ -355,7 +357,7 @@ namespace Microsoft.Build.Framework
     {
         public ProjectEvaluationFinishedEventArgs() { }
         public ProjectEvaluationFinishedEventArgs(string message, params object[] messageArgs) { }
-        public System.Nullable<Microsoft.Build.Framework.Profiler.ProfilerResult> ProfilerResult { [System.Runtime.CompilerServices.CompilerGeneratedAttribute]get { throw null; } [System.Runtime.CompilerServices.CompilerGeneratedAttribute]set { } }
+        public Microsoft.Build.Framework.Profiler.ProfilerResult? ProfilerResult { [System.Runtime.CompilerServices.CompilerGeneratedAttribute]get { throw null; } [System.Runtime.CompilerServices.CompilerGeneratedAttribute]set { } }
         public string ProjectFile { [System.Runtime.CompilerServices.CompilerGeneratedAttribute]get { throw null; } [System.Runtime.CompilerServices.CompilerGeneratedAttribute]set { } }
     }
     public partial class ProjectEvaluationStartedEventArgs : Microsoft.Build.Framework.BuildStatusEventArgs
@@ -402,26 +404,26 @@ namespace Microsoft.Build.Framework
     public delegate void ProjectStartedEventHandler(object sender, Microsoft.Build.Framework.ProjectStartedEventArgs e);
     public enum RegisteredTaskObjectLifetime
     {
-        AppDomain = 1,
         Build = 0,
+        AppDomain = 1,
     }
-    [System.AttributeUsageAttribute((System.AttributeTargets)(128), AllowMultiple=false, Inherited=false)]
+    [System.AttributeUsageAttribute(System.AttributeTargets.Property, AllowMultiple=false, Inherited=false)]
     public sealed partial class RequiredAttribute : System.Attribute
     {
         public RequiredAttribute() { }
     }
-    [System.AttributeUsageAttribute((System.AttributeTargets)(4), AllowMultiple=false, Inherited=false)]
+    [System.AttributeUsageAttribute(System.AttributeTargets.Class, AllowMultiple=false, Inherited=false)]
     public sealed partial class RequiredRuntimeAttribute : System.Attribute
     {
         public RequiredRuntimeAttribute(string runtimeVersion) { }
         public string RuntimeVersion { get { throw null; } }
     }
-    [System.AttributeUsageAttribute((System.AttributeTargets)(4), AllowMultiple=false, Inherited=false)]
+    [System.AttributeUsageAttribute(System.AttributeTargets.Class, AllowMultiple=false, Inherited=false)]
     public sealed partial class RunInMTAAttribute : System.Attribute
     {
         public RunInMTAAttribute() { }
     }
-    [System.AttributeUsageAttribute((System.AttributeTargets)(4), AllowMultiple=false, Inherited=false)]
+    [System.AttributeUsageAttribute(System.AttributeTargets.Class, AllowMultiple=false, Inherited=false)]
     public sealed partial class RunInSTAAttribute : System.Attribute
     {
         public RunInSTAAttribute() { }
@@ -429,7 +431,7 @@ namespace Microsoft.Build.Framework
     public abstract partial class SdkLogger
     {
         protected SdkLogger() { }
-        public abstract void LogMessage(string message, Microsoft.Build.Framework.MessageImportance messageImportance=(Microsoft.Build.Framework.MessageImportance)(2));
+        public abstract void LogMessage(string message, Microsoft.Build.Framework.MessageImportance messageImportance = Microsoft.Build.Framework.MessageImportance.Low);
     }
     public sealed partial class SdkReference : System.IEquatable<Microsoft.Build.Framework.SdkReference>
     {
@@ -441,7 +443,7 @@ namespace Microsoft.Build.Framework
         public override bool Equals(object obj) { throw null; }
         public override int GetHashCode() { throw null; }
         public override string ToString() { throw null; }
-        public static bool TryParse(string sdk, out Microsoft.Build.Framework.SdkReference sdkReference) { sdkReference = default(Microsoft.Build.Framework.SdkReference); throw null; }
+        public static bool TryParse(string sdk, out Microsoft.Build.Framework.SdkReference sdkReference) { throw null; }
     }
     public abstract partial class SdkResolver
     {
@@ -471,15 +473,15 @@ namespace Microsoft.Build.Framework
     public abstract partial class SdkResultFactory
     {
         protected SdkResultFactory() { }
-        public abstract Microsoft.Build.Framework.SdkResult IndicateFailure(System.Collections.Generic.IEnumerable<string> errors, System.Collections.Generic.IEnumerable<string> warnings=null);
-        public abstract Microsoft.Build.Framework.SdkResult IndicateSuccess(string path, string version, System.Collections.Generic.IEnumerable<string> warnings=null);
+        public abstract Microsoft.Build.Framework.SdkResult IndicateFailure(System.Collections.Generic.IEnumerable<string> errors, System.Collections.Generic.IEnumerable<string> warnings = null);
+        public abstract Microsoft.Build.Framework.SdkResult IndicateSuccess(string path, string version, System.Collections.Generic.IEnumerable<string> warnings = null);
     }
     public enum TargetBuiltReason
     {
-        AfterTargets = 3,
+        None = 0,
         BeforeTargets = 1,
         DependsOn = 2,
-        None = 0,
+        AfterTargets = 3,
     }
     public partial class TargetFinishedEventArgs : Microsoft.Build.Framework.BuildStatusEventArgs
     {
@@ -566,9 +568,11 @@ namespace Microsoft.Build.Framework.Profiler
     [System.Runtime.InteropServices.StructLayoutAttribute(System.Runtime.InteropServices.LayoutKind.Sequential)]
     public partial struct EvaluationLocation
     {
-        public EvaluationLocation(Microsoft.Build.Framework.Profiler.EvaluationPass evaluationPass, string evaluationPassDescription, string file, System.Nullable<int> line, string elementName, string elementDescription, Microsoft.Build.Framework.Profiler.EvaluationLocationKind kind) { throw null;}
-        public EvaluationLocation(long id, System.Nullable<long> parentId, Microsoft.Build.Framework.Profiler.EvaluationPass evaluationPass, string evaluationPassDescription, string file, System.Nullable<int> line, string elementName, string elementDescription, Microsoft.Build.Framework.Profiler.EvaluationLocationKind kind) { throw null;}
-        public EvaluationLocation(System.Nullable<long> parentId, Microsoft.Build.Framework.Profiler.EvaluationPass evaluationPass, string evaluationPassDescription, string file, System.Nullable<int> line, string elementName, string elementDescription, Microsoft.Build.Framework.Profiler.EvaluationLocationKind kind) { throw null;}
+        private object _dummy;
+        private int _dummyPrimitive;
+        public EvaluationLocation(Microsoft.Build.Framework.Profiler.EvaluationPass evaluationPass, string evaluationPassDescription, string file, int? line, string elementName, string elementDescription, Microsoft.Build.Framework.Profiler.EvaluationLocationKind kind) { throw null; }
+        public EvaluationLocation(long id, long? parentId, Microsoft.Build.Framework.Profiler.EvaluationPass evaluationPass, string evaluationPassDescription, string file, int? line, string elementName, string elementDescription, Microsoft.Build.Framework.Profiler.EvaluationLocationKind kind) { throw null; }
+        public EvaluationLocation(long? parentId, Microsoft.Build.Framework.Profiler.EvaluationPass evaluationPass, string evaluationPassDescription, string file, int? line, string elementName, string elementDescription, Microsoft.Build.Framework.Profiler.EvaluationLocationKind kind) { throw null; }
         public string ElementDescription { [System.Runtime.CompilerServices.CompilerGeneratedAttribute]get { throw null; } }
         public string ElementName { [System.Runtime.CompilerServices.CompilerGeneratedAttribute]get { throw null; } }
         public static Microsoft.Build.Framework.Profiler.EvaluationLocation EmptyLocation { [System.Runtime.CompilerServices.CompilerGeneratedAttribute]get { throw null; } }
@@ -578,44 +582,45 @@ namespace Microsoft.Build.Framework.Profiler
         public long Id { [System.Runtime.CompilerServices.CompilerGeneratedAttribute]get { throw null; } }
         public bool IsEvaluationPass { get { throw null; } }
         public Microsoft.Build.Framework.Profiler.EvaluationLocationKind Kind { [System.Runtime.CompilerServices.CompilerGeneratedAttribute]get { throw null; } }
-        public System.Nullable<int> Line { [System.Runtime.CompilerServices.CompilerGeneratedAttribute]get { throw null; } }
-        public System.Nullable<long> ParentId { [System.Runtime.CompilerServices.CompilerGeneratedAttribute]get { throw null; } }
+        public int? Line { [System.Runtime.CompilerServices.CompilerGeneratedAttribute]get { throw null; } }
+        public long? ParentId { [System.Runtime.CompilerServices.CompilerGeneratedAttribute]get { throw null; } }
         public static Microsoft.Build.Framework.Profiler.EvaluationLocation CreateLocationForAggregatedGlob() { throw null; }
-        public static Microsoft.Build.Framework.Profiler.EvaluationLocation CreateLocationForCondition(System.Nullable<long> parentId, Microsoft.Build.Framework.Profiler.EvaluationPass evaluationPass, string evaluationDescription, string file, System.Nullable<int> line, string condition) { throw null; }
-        public static Microsoft.Build.Framework.Profiler.EvaluationLocation CreateLocationForGlob(System.Nullable<long> parentId, Microsoft.Build.Framework.Profiler.EvaluationPass evaluationPass, string evaluationDescription, string file, System.Nullable<int> line, string globDescription) { throw null; }
-        public static Microsoft.Build.Framework.Profiler.EvaluationLocation CreateLocationForProject(System.Nullable<long> parentId, Microsoft.Build.Framework.Profiler.EvaluationPass evaluationPass, string evaluationDescription, string file, System.Nullable<int> line, Microsoft.Build.Framework.IProjectElement element) { throw null; }
+        public static Microsoft.Build.Framework.Profiler.EvaluationLocation CreateLocationForCondition(long? parentId, Microsoft.Build.Framework.Profiler.EvaluationPass evaluationPass, string evaluationDescription, string file, int? line, string condition) { throw null; }
+        public static Microsoft.Build.Framework.Profiler.EvaluationLocation CreateLocationForGlob(long? parentId, Microsoft.Build.Framework.Profiler.EvaluationPass evaluationPass, string evaluationDescription, string file, int? line, string globDescription) { throw null; }
+        public static Microsoft.Build.Framework.Profiler.EvaluationLocation CreateLocationForProject(long? parentId, Microsoft.Build.Framework.Profiler.EvaluationPass evaluationPass, string evaluationDescription, string file, int? line, Microsoft.Build.Framework.IProjectElement element) { throw null; }
         public override bool Equals(object obj) { throw null; }
         public override int GetHashCode() { throw null; }
         public override string ToString() { throw null; }
-        public Microsoft.Build.Framework.Profiler.EvaluationLocation WithEvaluationPass(Microsoft.Build.Framework.Profiler.EvaluationPass evaluationPass, string passDescription=null) { throw null; }
+        public Microsoft.Build.Framework.Profiler.EvaluationLocation WithEvaluationPass(Microsoft.Build.Framework.Profiler.EvaluationPass evaluationPass, string passDescription = null) { throw null; }
         public Microsoft.Build.Framework.Profiler.EvaluationLocation WithFile(string file) { throw null; }
-        public Microsoft.Build.Framework.Profiler.EvaluationLocation WithFileLineAndCondition(string file, System.Nullable<int> line, string condition) { throw null; }
-        public Microsoft.Build.Framework.Profiler.EvaluationLocation WithFileLineAndElement(string file, System.Nullable<int> line, Microsoft.Build.Framework.IProjectElement element) { throw null; }
+        public Microsoft.Build.Framework.Profiler.EvaluationLocation WithFileLineAndCondition(string file, int? line, string condition) { throw null; }
+        public Microsoft.Build.Framework.Profiler.EvaluationLocation WithFileLineAndElement(string file, int? line, Microsoft.Build.Framework.IProjectElement element) { throw null; }
         public Microsoft.Build.Framework.Profiler.EvaluationLocation WithGlob(string globDescription) { throw null; }
-        public Microsoft.Build.Framework.Profiler.EvaluationLocation WithParentId(System.Nullable<long> parentId) { throw null; }
+        public Microsoft.Build.Framework.Profiler.EvaluationLocation WithParentId(long? parentId) { throw null; }
     }
     public enum EvaluationLocationKind : byte
     {
-        Condition = (byte)1,
         Element = (byte)0,
+        Condition = (byte)1,
         Glob = (byte)2,
     }
     public enum EvaluationPass : byte
     {
+        TotalEvaluation = (byte)0,
+        TotalGlobbing = (byte)1,
         InitialProperties = (byte)2,
+        Properties = (byte)3,
         ItemDefinitionGroups = (byte)4,
         Items = (byte)5,
         LazyItems = (byte)6,
-        Properties = (byte)3,
-        Targets = (byte)8,
-        TotalEvaluation = (byte)0,
-        TotalGlobbing = (byte)1,
         UsingTasks = (byte)7,
+        Targets = (byte)8,
     }
     [System.Runtime.InteropServices.StructLayoutAttribute(System.Runtime.InteropServices.LayoutKind.Sequential)]
     public partial struct ProfiledLocation
     {
-        public ProfiledLocation(System.TimeSpan inclusiveTime, System.TimeSpan exclusiveTime, int numberOfHits) { throw null;}
+        private int _dummyPrimitive;
+        public ProfiledLocation(System.TimeSpan inclusiveTime, System.TimeSpan exclusiveTime, int numberOfHits) { throw null; }
         public System.TimeSpan ExclusiveTime { [System.Runtime.CompilerServices.CompilerGeneratedAttribute]get { throw null; } }
         public System.TimeSpan InclusiveTime { [System.Runtime.CompilerServices.CompilerGeneratedAttribute]get { throw null; } }
         public int NumberOfHits { [System.Runtime.CompilerServices.CompilerGeneratedAttribute]get { throw null; } }
@@ -626,7 +631,8 @@ namespace Microsoft.Build.Framework.Profiler
     [System.Runtime.InteropServices.StructLayoutAttribute(System.Runtime.InteropServices.LayoutKind.Sequential)]
     public partial struct ProfilerResult
     {
-        public ProfilerResult(System.Collections.Generic.IDictionary<Microsoft.Build.Framework.Profiler.EvaluationLocation, Microsoft.Build.Framework.Profiler.ProfiledLocation> profiledLocations) { throw null;}
+        private object _dummy;
+        public ProfilerResult(System.Collections.Generic.IDictionary<Microsoft.Build.Framework.Profiler.EvaluationLocation, Microsoft.Build.Framework.Profiler.ProfiledLocation> profiledLocations) { throw null; }
         public System.Collections.Generic.IReadOnlyDictionary<Microsoft.Build.Framework.Profiler.EvaluationLocation, Microsoft.Build.Framework.Profiler.ProfiledLocation> ProfiledLocations { [System.Runtime.CompilerServices.CompilerGeneratedAttribute]get { throw null; } }
         public override bool Equals(object obj) { throw null; }
         public override int GetHashCode() { throw null; }
@@ -737,8 +743,8 @@ namespace Microsoft.Build.Framework.XamlTypes
     }
     public enum DefaultValueSourceLocation
     {
-        AfterContext = 1,
         BeforeContext = 0,
+        AfterContext = 1,
     }
     public sealed partial class DynamicEnumProperty : Microsoft.Build.Framework.XamlTypes.BaseProperty
     {
@@ -781,8 +787,8 @@ namespace Microsoft.Build.Framework.XamlTypes
     public sealed partial class IntProperty : Microsoft.Build.Framework.XamlTypes.BaseProperty
     {
         public IntProperty() { }
-        public System.Nullable<int> MaxValue { [System.Runtime.CompilerServices.CompilerGeneratedAttribute]get { throw null; } [System.Runtime.CompilerServices.CompilerGeneratedAttribute]set { } }
-        public System.Nullable<int> MinValue { [System.Runtime.CompilerServices.CompilerGeneratedAttribute]get { throw null; } [System.Runtime.CompilerServices.CompilerGeneratedAttribute]set { } }
+        public int? MaxValue { [System.Runtime.CompilerServices.CompilerGeneratedAttribute]get { throw null; } [System.Runtime.CompilerServices.CompilerGeneratedAttribute]set { } }
+        public int? MinValue { [System.Runtime.CompilerServices.CompilerGeneratedAttribute]get { throw null; } [System.Runtime.CompilerServices.CompilerGeneratedAttribute]set { } }
         public override void EndInit() { }
     }
     public partial interface IProjectSchemaNode
@@ -869,8 +875,8 @@ namespace Microsoft.Build.Framework.XamlTypes
     }
     public enum RuleOverrideMode
     {
-        Extend = 1,
         Replace = 0,
+        Extend = 1,
     }
     public abstract partial class RuleSchema
     {
