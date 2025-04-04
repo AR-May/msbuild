@@ -1840,6 +1840,14 @@ namespace Microsoft.Build.BackEnd
             int nodeForResults = (request.Parent != null) ? request.Parent.AssignedNode : InvalidNodeId;
 
             // Do we already have results?  If so, just return them.
+
+            TraceScheduler(
+                "Trying to satisfy request {0} from cache  (node request {1} for project {2}) with targets ({3}).",
+                request.BuildRequest.GlobalRequestId,
+                request.BuildRequest.NodeRequestId,
+                _configCache[request.BuildRequest.ConfigurationId].ProjectFullPath,
+                string.Join(";", request.BuildRequest.Targets));
+
             ScheduleResponse response = TrySatisfyRequestFromCache(nodeForResults, request.BuildRequest, skippedResultsDoNotCauseCacheMiss: _componentHost.BuildParameters.SkippedResultsDoNotCauseCacheMiss());
             if (response != null)
             {
@@ -2128,9 +2136,10 @@ namespace Microsoft.Build.BackEnd
             nodeContext.LogRequestHandledFromCache(request, configuration, result);
 
             TraceScheduler(
-                "Request {0} (node request {1}) with targets ({2}) satisfied from cache",
+                "Request {0} (node request {1} for project {2}) with targets ({3}) satisfied from cache",
                 request.GlobalRequestId,
                 request.NodeRequestId,
+                _configCache[request.ConfigurationId].ProjectFullPath,
                 string.Join(";", request.Targets));
         }
 

@@ -331,6 +331,7 @@ namespace Microsoft.Build.BackEnd
         /// <returns>True if the requests were satisfied, false if they were aborted.</returns>
         public async Task<BuildResult[]> BuildProjects(string[] projectFiles, PropertyDictionary<ProjectPropertyInstance>[] properties, string[] toolsVersions, string[] targets, bool waitForResults, bool skipNonexistentTargets = false)
         {
+            _projectLoggingContext.LogCommentFromText(MessageImportance.Normal, $"{DateTime.Now.ToString()}: Starting RequestBuilder.BuildProjects for {string.Join(",", projectFiles)} for targets {string.Join(",", targets)}");
             VerifyIsNotZombie();
             ErrorUtilities.VerifyThrowArgumentNull(projectFiles);
             ErrorUtilities.VerifyThrowArgumentNull(properties);
@@ -378,8 +379,10 @@ namespace Microsoft.Build.BackEnd
                         : BuildRequestDataFlags.None);
             }
 
+            _projectLoggingContext.LogCommentFromText(MessageImportance.Normal, $"{DateTime.Now.ToString()}: Build requests created in RequestBuilder.BuildProjects for {string.Join(",", projectFiles)} for targets {string.Join(",", targets)}");
             // Send the requests off
             BuildResult[] results = await StartNewBuildRequests(requests);
+            _projectLoggingContext.LogCommentFromText(MessageImportance.Normal, $"{DateTime.Now.ToString()}: Build requests finished in RequestBuilder.BuildProjects for {string.Join(",", projectFiles)} for targets {string.Join(",", targets)}");
 
             ErrorUtilities.VerifyThrow(requests.Length == results.Length, "# results != # requests");
 
@@ -940,8 +943,12 @@ namespace Microsoft.Build.BackEnd
                 SaveOperatingEnvironment();
             }
 
+            _projectLoggingContext.LogCommentFromText(MessageImportance.Normal, $"{DateTime.Now.ToString()}: Issuing build request in RequestBuilder");
+
             // Issue the requests to the engine
             RaiseOnNewBuildRequests(requests);
+
+            _projectLoggingContext.LogCommentFromText(MessageImportance.Normal, $"{DateTime.Now.ToString()}: Requests issued in RequestBuilder");
 
             // TODO: OPTIMIZATION: By returning null here, we commit to having to unwind the stack all the
             // way back to RequestThreadProc and then shutting down the thread before we can receive the
