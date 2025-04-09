@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Shared;
@@ -232,7 +233,7 @@ namespace Microsoft.Build.BackEnd
         /// <returns>true if all projects build successfully; false if any project fails</returns>
         public async Task<bool> ExecuteInternal()
         {
-            Log.LogMessage(MessageImportance.Normal, $"{DateTime.Now.ToString()}: Starting MSBuild Task on process {Process.GetCurrentProcess().Id}.");
+            Log?.LogMessage(MessageImportance.Normal, $"{DateTime.Now.ToString()}: Starting MSBuild Task on process {Process.GetCurrentProcess().Id}.");
             // If no projects were passed in, just return success.
             if ((Projects == null) || (Projects.Length == 0))
             {
@@ -304,7 +305,7 @@ namespace Microsoft.Build.BackEnd
                 singleProject = new ITaskItem[1];
             }
 
-            Log.LogMessage(MessageImportance.Normal, $"{DateTime.Now.ToString()}: Starting to read prioject files.");
+            Log?.LogMessage(MessageImportance.Normal, $"{DateTime.Now.ToString()}: Starting to read prioject files.");
             // Read in each project file.  If there are any errors opening the file or parsing the XML,
             // raise an event and return False.  If any one of the projects fails to build, return False,
             // otherwise return True. If parallel build is requested we first check for file existence so
@@ -342,7 +343,7 @@ namespace Microsoft.Build.BackEnd
                 if (FileSystems.Default.FileExists(projectPath) || (skipNonExistProjects == SkipNonExistentProjectsBehavior.Build))
                 {
 
-                    Log.LogMessage(MessageImportance.Normal, $"{DateTime.Now.ToString()}: Processing {projectPath}");
+                    Log?.LogMessage(MessageImportance.Normal, $"{DateTime.Now.ToString()}: Processing {projectPath}");
                     if (FileUtilities.IsVCProjFilename(projectPath))
                     {
                         Log.LogErrorWithCodeFromResources("MSBuild.ProjectUpgradeNeededToVcxProj", project.ItemSpec);
@@ -354,7 +355,7 @@ namespace Microsoft.Build.BackEnd
                     // ExecuteTargets once we verified that all projects exist
                     if (!BuildInParallel)
                     {
-                        Log.LogMessage(MessageImportance.Normal, $"{DateTime.Now.ToString()}: Executing target (not parallel) {string.Join(", ", targetLists)}");
+                        Log?.LogMessage(MessageImportance.Normal, $"{DateTime.Now.ToString()}: Executing target (not parallel)");
                         singleProject[0] = project;
                         bool executeResult = await ExecuteTargets(
                                                 singleProject,
@@ -410,7 +411,7 @@ namespace Microsoft.Build.BackEnd
         /// </summary>
         private async Task<bool> BuildProjectsInParallel(Dictionary<string, string> propertiesTable, string[] undefinePropertiesArray, List<string[]> targetLists, bool success, bool[] skipProjects)
         {
-            Log.LogMessage(MessageImportance.Normal, $"{DateTime.Now.ToString()}: Starting to build project in parallel.");
+            Log?.LogMessage(MessageImportance.Normal, $"{DateTime.Now.ToString()}: Starting to build project in parallel.");
 
             // There were some projects that were skipped so we need to recreate the
             // project array with those projects removed
@@ -536,9 +537,9 @@ namespace Microsoft.Build.BackEnd
             bool unloadProjectsOnCompletion,
             string toolsVersion,
             bool skipNonexistentTargets,
-            TaskLoggingHelper Log)
+            TaskLoggingHelper Log = null)
         {
-            Log.LogMessage(MessageImportance.Normal, $"{DateTime.Now.ToString()}: Executing ExecuteTargets func.");
+            Log?.LogMessage(MessageImportance.Normal, $"{DateTime.Now.ToString()}: Executing ExecuteTargets func.");
             bool success = true;
 
             // We don't log a message about the project and targets we're going to
@@ -551,10 +552,10 @@ namespace Microsoft.Build.BackEnd
             var undefinePropertiesPerProject = new List<string>[projects.Length];
 
 
-            Log.LogMessage(MessageImportance.Normal, $"{DateTime.Now.ToString()}: Starting to process projects properties");
+            Log?.LogMessage(MessageImportance.Normal, $"{DateTime.Now.ToString()}: Starting to process projects properties");
             for (int i = 0; i < projectNames.Length; i++)
             {
-                Log.LogMessage(MessageImportance.Normal, $"{DateTime.Now.ToString()}: Processing project number {i}");
+                Log?.LogMessage(MessageImportance.Normal, $"{DateTime.Now.ToString()}: Processing project number {i}");
                 projectNames[i] = null;
                 projectProperties[i] = propertiesTable;
 
@@ -563,7 +564,7 @@ namespace Microsoft.Build.BackEnd
                     // Retrieve projectDirectory only the first time.  It never changes anyway.
                     string projectPath = FileUtilities.AttemptToShortenPath(projects[i].ItemSpec);
 
-                    Log.LogMessage(MessageImportance.Normal, $"{DateTime.Now.ToString()}: project path {projectPath}");
+                    Log?.LogMessage(MessageImportance.Normal, $"{DateTime.Now.ToString()}: project path {projectPath}");
 
                     projectDirectory[i] = Path.GetDirectoryName(projectPath);
                     projectNames[i] = projects[i].ItemSpec;
@@ -673,9 +674,12 @@ namespace Microsoft.Build.BackEnd
 
                 var taskHost = (TaskHost)buildEngine;
 
-                Log.LogMessage(MessageImportance.Normal, $"{DateTime.Now.ToString()}: Sending projects to task host.\nProject names {string.Join(",", projectNames)}\nTarget list {string.Join(",", targetList)} ");
+                string projectStr = projectNames is not null && projectNames.Any(name => !string.IsNullOrEmpty(name)) ? string.Join(",", projectNames.Where(name => !string.IsNullOrEmpty(name))) : string.Empty;
+                string targetStr = targetList is not null && targetList.Any(name => !string.IsNullOrEmpty(name)) ? string.Join(",", targetList.Where(name => !string.IsNullOrEmpty(name))) : string.Empty;
+
+                Log?.LogMessage(MessageImportance.Normal, $"{DateTime.Now.ToString()}: Sending projects to task host.\nProject names {projectStr}\nTarget list {targetStr} ");
                 BuildEngineResult result = await taskHost.InternalBuildProjects(projectNames, targetList, projectProperties, undefinePropertiesPerProject, toolsVersions, true /* ask that target outputs are returned in the buildengineresult */, skipNonexistentTargets, Log);
-                Log.LogMessage(MessageImportance.Normal, $"{DateTime.Now.ToString()}: Got results");
+                Log?.LogMessage(MessageImportance.Normal, $"{DateTime.Now.ToString()}: Got results");
 
                 bool currentTargetResult = result.Result;
                 IList<IDictionary<string, ITaskItem[]>> targetOutputsPerProject = result.TargetOutputsPerProject;

@@ -21,6 +21,7 @@ using Microsoft.Build.Shared;
 using ElementLocation = Microsoft.Build.Construction.ElementLocation;
 using TaskItem = Microsoft.Build.Execution.ProjectItemInstance.TaskItem;
 using TaskLoggingContext = Microsoft.Build.BackEnd.Logging.TaskLoggingContext;
+using System.Linq;
 #if FEATURE_REPORTFILEACCESSES
 using Microsoft.Build.Experimental.FileAccess;
 using Microsoft.Build.FileAccesses;
@@ -1140,7 +1141,11 @@ namespace Microsoft.Build.BackEnd
         /// <returns>A Task returning a structure containing the result of the build, success or failure and the list of target outputs per project</returns>
         private async Task<BuildEngineResult> BuildProjectFilesInParallelAsync(string[] projectFileNames, string[] targetNames, IDictionary[] globalProperties, IList<String>[] undefineProperties, string[] toolsVersion, bool returnTargetOutputs, bool skipNonexistentTargets = false, TaskLoggingHelper Log = null)
         {
-            Log.LogMessage(MessageImportance.Normal, $"{DateTime.Now.ToString()}: Started BuildProjectFilesInParallelAsync for projects {string.Join(",", projectFileNames)} for targets {string.Join(",", targetNames)}");
+
+            string projectStr = projectFileNames is not null && projectFileNames.Any(name => !string.IsNullOrEmpty(name)) ? string.Join(",", projectFileNames.Where(name => !string.IsNullOrEmpty(name))) : string.Empty;
+            string targetStr = targetNames is not null && targetNames.Any(name => !string.IsNullOrEmpty(name)) ? string.Join(",", targetNames.Where(name => !string.IsNullOrEmpty(name))) : string.Empty;
+
+            Log?.LogMessage(MessageImportance.Normal, $"{DateTime.Now.ToString()}: Started BuildProjectFilesInParallelAsync for projects {projectStr} for targets {targetStr}");
             ErrorUtilities.VerifyThrowArgumentNull(projectFileNames);
             ErrorUtilities.VerifyThrowArgumentNull(globalProperties);
             VerifyActiveProxy();
@@ -1155,7 +1160,7 @@ namespace Microsoft.Build.BackEnd
 
                 if (projectFileNames.Length == 1 && projectFileNames[0] == null && globalProperties[0] == null && (undefineProperties == null || undefineProperties[0] == null) && toolsVersion[0] == null)
                 {
-                    Log.LogMessage(MessageImportance.Normal, $"{DateTime.Now.ToString()}: 1");
+                    Log?.LogMessage(MessageImportance.Normal, $"{DateTime.Now.ToString()}: 1");
                     // This is really a legacy CallTarget invocation
                     ITargetResult[] results = await _targetBuilderCallback.LegacyCallTarget(targetNames, ContinueOnError, _taskLocation);
 
@@ -1178,7 +1183,7 @@ namespace Microsoft.Build.BackEnd
                 }
                 else
                 {
-                    Log.LogMessage(MessageImportance.Normal, $"{DateTime.Now.ToString()}: 2");
+                    Log?.LogMessage(MessageImportance.Normal, $"{DateTime.Now.ToString()}: 2");
                     // UNDONE: (Refactor) Investigate making this a ReadOnly collection of some sort.
                     PropertyDictionary<ProjectPropertyInstance>[] propertyDictionaries = new PropertyDictionary<ProjectPropertyInstance>[projectFileNames.Length];
 
@@ -1208,7 +1213,7 @@ namespace Microsoft.Build.BackEnd
 
                     IRequestBuilderCallback builderCallback = _requestEntry.Builder as IRequestBuilderCallback;
 
-                    Log.LogMessage(MessageImportance.Normal, $"{DateTime.Now.ToString()}: 3");
+                    Log?.LogMessage(MessageImportance.Normal, $"{DateTime.Now.ToString()}: 3");
                     BuildResult[] results = await builderCallback.BuildProjects(
                         projectFileNames,
                         propertyDictionaries,
@@ -1217,7 +1222,7 @@ namespace Microsoft.Build.BackEnd
                         waitForResults: true,
                         skipNonexistentTargets: skipNonexistentTargets);
 
-                    Log.LogMessage(MessageImportance.Normal, $"{DateTime.Now.ToString()}: 4");
+                    Log?.LogMessage(MessageImportance.Normal, $"{DateTime.Now.ToString()}: 4");
                     // Even if one of the projects fails to build and therefore has no outputs, it should still have an entry in the results array (albeit with an empty list in it)
                     ErrorUtilities.VerifyThrow(results.Length == projectFileNames.Length, "{0}!={1}.", results.Length, projectFileNames.Length);
 
@@ -1264,13 +1269,13 @@ namespace Microsoft.Build.BackEnd
                         }
                     }
 
-                    Log.LogMessage(MessageImportance.Normal, $"{DateTime.Now.ToString()}: 5");
+                    Log?.LogMessage(MessageImportance.Normal, $"{DateTime.Now.ToString()}: 5");
                     ErrorUtilities.VerifyThrow(results.Length == projectFileNames.Length || !overallSuccess, "The number of results returned {0} cannot be less than the number of project files {1} unless one of the results indicated failure.", results.Length, projectFileNames.Length);
                 }
 
                 BuildRequestsSucceeded = overallSuccess;
 
-                Log.LogMessage(MessageImportance.Normal, $"{DateTime.Now.ToString()}: Finished BuildProjectFilesInParallelAsync for projects {string.Join(",", projectFileNames)} for targets {string.Join(",", targetNames)}");
+                Log?.LogMessage(MessageImportance.Normal, $"{DateTime.Now.ToString()}: Finished BuildProjectFilesInParallelAsync for projects {projectStr} for targets {targetStr}");
                 return new BuildEngineResult(overallSuccess, targetOutputsPerProject);
             }
         }

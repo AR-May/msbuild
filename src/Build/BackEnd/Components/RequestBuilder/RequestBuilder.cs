@@ -331,7 +331,10 @@ namespace Microsoft.Build.BackEnd
         /// <returns>True if the requests were satisfied, false if they were aborted.</returns>
         public async Task<BuildResult[]> BuildProjects(string[] projectFiles, PropertyDictionary<ProjectPropertyInstance>[] properties, string[] toolsVersions, string[] targets, bool waitForResults, bool skipNonexistentTargets = false)
         {
-            _projectLoggingContext.LogCommentFromText(MessageImportance.Normal, $"{DateTime.Now.ToString()}: Starting RequestBuilder.BuildProjects for {string.Join(",", projectFiles)} for targets {string.Join(",", targets)}");
+            string projectStr = projectFiles is not null && projectFiles.Any(name => !string.IsNullOrEmpty(name)) ? string.Join(",", projectFiles.Where(name => !string.IsNullOrEmpty(name))) : string.Empty;
+            string targetStr = targets is not null && targets.Any(name => !string.IsNullOrEmpty(name)) ? string.Join(",", targets.Where(name => !string.IsNullOrEmpty(name))) : string.Empty;
+
+            _projectLoggingContext.LogCommentFromText(MessageImportance.Normal, $"{DateTime.Now.ToString()}: Starting RequestBuilder.BuildProjects for {projectStr} for targets {targetStr}");
             VerifyIsNotZombie();
             ErrorUtilities.VerifyThrowArgumentNull(projectFiles);
             ErrorUtilities.VerifyThrowArgumentNull(properties);
@@ -379,10 +382,10 @@ namespace Microsoft.Build.BackEnd
                         : BuildRequestDataFlags.None);
             }
 
-            _projectLoggingContext.LogCommentFromText(MessageImportance.Normal, $"{DateTime.Now.ToString()}: Build requests created in RequestBuilder.BuildProjects for {string.Join(",", projectFiles)} for targets {string.Join(",", targets)}");
+            _projectLoggingContext.LogCommentFromText(MessageImportance.Normal, $"{DateTime.Now.ToString()}: Build requests created in RequestBuilder.BuildProjects for {projectStr} for targets {targetStr}");
             // Send the requests off
             BuildResult[] results = await StartNewBuildRequests(requests);
-            _projectLoggingContext.LogCommentFromText(MessageImportance.Normal, $"{DateTime.Now.ToString()}: Build requests finished in RequestBuilder.BuildProjects for {string.Join(",", projectFiles)} for targets {string.Join(",", targets)}");
+            _projectLoggingContext.LogCommentFromText(MessageImportance.Normal, $"{DateTime.Now.ToString()}: Build requests finished in RequestBuilder.BuildProjects for {projectStr} for targets {targetStr}");
 
             ErrorUtilities.VerifyThrow(requests.Length == results.Length, "# results != # requests");
 
