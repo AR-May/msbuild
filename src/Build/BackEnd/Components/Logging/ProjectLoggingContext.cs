@@ -1,15 +1,17 @@
-﻿// Copyright (c) Microsoft. All rights reserved.
-// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
 
-using System;
-using System.Collections.Generic;
-using Microsoft.Build.Framework;
-using Microsoft.Build.Execution;
 using System.Collections;
-using Microsoft.Build.Shared;
-using TaskItem = Microsoft.Build.Execution.ProjectItemInstance.TaskItem;
+using System.Collections.Generic;
+using System.Linq;
 using Microsoft.Build.Collections;
-using Microsoft.Build.Utilities;
+using Microsoft.Build.Execution;
+using Microsoft.Build.Framework;
+using Microsoft.Build.Shared;
+using static Microsoft.Build.Execution.ProjectPropertyInstance;
+using TaskItem = Microsoft.Build.Execution.ProjectItemInstance.TaskItem;
+
+#nullable disable
 
 namespace Microsoft.Build.BackEnd.Logging
 {
@@ -24,14 +26,9 @@ namespace Microsoft.Build.BackEnd.Logging
         private string _projectFullPath;
 
         /// <summary>
-        /// The parent node logging context this context was derived from.
-        /// </summary>
-        private NodeLoggingContext _nodeLoggingContext;
-
-        /// <summary>
         /// Constructs a project logging context.
         /// </summary>
-        internal ProjectLoggingContext(NodeLoggingContext nodeLoggingContext, BuildRequestEntry requestEntry, BuildEventContext parentBuildEventContext)
+        internal ProjectLoggingContext(NodeLoggingContext nodeLoggingContext, BuildRequestEntry requestEntry)
             : this
             (
             nodeLoggingContext,
@@ -42,16 +39,21 @@ namespace Microsoft.Build.BackEnd.Logging
             requestEntry.RequestConfiguration.ToolsVersion,
             requestEntry.RequestConfiguration.Project.PropertiesToBuildWith,
             requestEntry.RequestConfiguration.Project.ItemsToBuildWith,
-            parentBuildEventContext,
-            requestEntry.RequestConfiguration.Project.EvaluationId
-            )
+            requestEntry.Request.ParentBuildEventContext,
+            requestEntry.RequestConfiguration.Project.EvaluationId,
+            requestEntry.Request.ProjectContextId)
         {
         }
 
         /// <summary>
         /// Constructs a project logging context.
         /// </summary>
-        internal ProjectLoggingContext(NodeLoggingContext nodeLoggingContext, BuildRequest request, string projectFullPath, string toolsVersion, BuildEventContext parentBuildEventContext, int evaluationId = BuildEventContext.InvalidEvaluationId)
+        internal ProjectLoggingContext(
+            NodeLoggingContext nodeLoggingContext,
+            BuildRequest request,
+            string projectFullPath,
+            string toolsVersion,
+            int evaluationId = BuildEventContext.InvalidEvaluationId)
             : this
             (
             nodeLoggingContext,
@@ -60,54 +62,168 @@ namespace Microsoft.Build.BackEnd.Logging
             projectFullPath,
             request.Targets,
             toolsVersion,
-            null,
-            null,
-            parentBuildEventContext,
-            evaluationId
-            )
+            projectProperties: null,
+            projectItems: null,
+            request.ParentBuildEventContext,
+            evaluationId,
+            request.ProjectContextId)
         {
+        }
+
+        /// <summary>
+        /// Creates ProjectLoggingContext, without logging ProjectStartedEventArgs as a side effect.
+        /// The ProjectStartedEventArgs is returned as well - so that it can be later logged explicitly
+        /// </summary>
+        public static (ProjectStartedEventArgs, ProjectLoggingContext) CreateLoggingContext(
+            NodeLoggingContext nodeLoggingContext, BuildRequestEntry requestEntry)
+        {
+            ProjectStartedEventArgs args = CreateProjectStarted(
+                nodeLoggingContext,
+                requestEntry.Request.SubmissionId,
+                requestEntry.Request.ConfigurationId,
+                requestEntry.RequestConfiguration.ProjectFullPath,
+                requestEntry.Request.Targets,
+                requestEntry.RequestConfiguration.ToolsVersion,
+                requestEntry.RequestConfiguration.Project.PropertiesToBuildWith,
+                requestEntry.RequestConfiguration.Project.ItemsToBuildWith,
+                requestEntry.Request.ParentBuildEventContext,
+                requestEntry.RequestConfiguration.Project.EvaluationId,
+                requestEntry.Request.ProjectContextId);
+
+            return (args, new ProjectLoggingContext(nodeLoggingContext, args));
+        }
+
+        private ProjectLoggingContext(
+            NodeLoggingContext nodeLoggingContext,
+            ProjectStartedEventArgs projectStarted)
+        : base(nodeLoggingContext, projectStarted.BuildEventContext)
+        {
+            _projectFullPath = projectStarted.ProjectFile;
+
+            // No need to log a redundant message in the common case
+            if (projectStarted.ToolsVersion != "Current")
+            {
+                LoggingService.LogComment(this.BuildEventContext, MessageImportance.Low, "ToolsVersionInEffectForBuild", projectStarted.ToolsVersion);
+            }
+
+            this.IsValid = true;
         }
 
         /// <summary>
         /// Constructs a project logging contexts.
         /// </summary>
-        private ProjectLoggingContext(NodeLoggingContext nodeLoggingContext, int submissionId, int configurationId, string projectFullPath, List<string> targets, string toolsVersion, PropertyDictionary<ProjectPropertyInstance> projectProperties, ItemDictionary<ProjectItemInstance> projectItems, BuildEventContext parentBuildEventContext, int evaluationId = BuildEventContext.InvalidEvaluationId)
-            : base(nodeLoggingContext)
+        private ProjectLoggingContext(
+            NodeLoggingContext nodeLoggingContext,
+            int submissionId,
+            int configurationId,
+            string projectFullPath,
+            List<string> targets,
+            string toolsVersion,
+            PropertyDictionary<ProjectPropertyInstance> projectProperties,
+            IItemDictionary<ProjectItemInstance> projectItems,
+            BuildEventContext parentBuildEventContext,
+            int evaluationId,
+            int projectContextId)
+            : base(nodeLoggingContext,
+                CreateInitialContext(nodeLoggingContext,
+                    submissionId,
+                     configurationId,
+                    projectFullPath,
+                    targets,
+                    toolsVersion,
+                    projectProperties,
+                    projectItems,
+                    parentBuildEventContext,
+                    evaluationId,
+                    projectContextId))
         {
-            _nodeLoggingContext = nodeLoggingContext;
             _projectFullPath = projectFullPath;
 
-            ProjectPropertyInstanceEnumeratorProxy properties = null;
-            ProjectItemInstanceEnumeratorProxy items = null;
+            // No need to log a redundant message in the common case
+            if (toolsVersion != "Current")
+            {
+                LoggingService.LogComment(this.BuildEventContext, MessageImportance.Low, "ToolsVersionInEffectForBuild", toolsVersion);
+            }
 
-            IEnumerable<ProjectPropertyInstance> projectPropertiesEnumerator = projectProperties == null ? Array.Empty<ProjectPropertyInstance>() : null;
-            IEnumerable<ProjectItemInstance> projectItemsEnumerator = projectItems == null ? Array.Empty<ProjectItemInstance>() : null;
+            this.IsValid = true;
+        }
 
-            string[] propertiesToSerialize = LoggingService.PropertiesToSerialize;
+        private static BuildEventContext CreateInitialContext(
+            NodeLoggingContext nodeLoggingContext,
+            int submissionId,
+            int configurationId,
+            string projectFullPath,
+            List<string> targets,
+            string toolsVersion,
+            PropertyDictionary<ProjectPropertyInstance> projectProperties,
+            IItemDictionary<ProjectItemInstance> projectItems,
+            BuildEventContext parentBuildEventContext,
+            int evaluationId,
+            int projectContextId)
+        {
+            ProjectStartedEventArgs args = CreateProjectStarted(
+                nodeLoggingContext,
+                submissionId,
+                configurationId,
+                projectFullPath,
+                targets,
+                toolsVersion,
+                projectProperties,
+                projectItems,
+                parentBuildEventContext,
+                evaluationId,
+                projectContextId);
+
+            nodeLoggingContext.LoggingService.LogProjectStarted(args);
+
+            return args.BuildEventContext;
+        }
+
+        private static ProjectStartedEventArgs CreateProjectStarted(
+            NodeLoggingContext nodeLoggingContext,
+            int submissionId,
+            int configurationId,
+            string projectFullPath,
+            List<string> targets,
+            string toolsVersion,
+            PropertyDictionary<ProjectPropertyInstance> projectProperties,
+            IItemDictionary<ProjectItemInstance> projectItems,
+            BuildEventContext parentBuildEventContext,
+            int evaluationId,
+            int projectContextId)
+        {
+            IEnumerable<DictionaryEntry> properties = null;
+            IEnumerable<DictionaryEntry> items = null;
+
+            ILoggingService loggingService = nodeLoggingContext.LoggingService;
+
+            string[] propertiesToSerialize = loggingService.PropertiesToSerialize;
 
             // If we are only logging critical events lets not pass back the items or properties
-            if (!LoggingService.OnlyLogCriticalEvents &&
-                !LoggingService.IncludeEvaluationPropertiesAndItems &&
-                (!LoggingService.RunningOnRemoteNode || LoggingService.SerializeAllProperties))
+            if (!loggingService.OnlyLogCriticalEvents &&
+                loggingService.IncludeEvaluationPropertiesAndItemsInProjectStartedEvent &&
+                (!loggingService.RunningOnRemoteNode || loggingService.SerializeAllProperties))
             {
-                if (projectProperties != null)
+                if (projectProperties is null)
                 {
-                    projectPropertiesEnumerator = projectProperties.GetCopyOnReadEnumerable();
+                    properties = [];
+                }
+                else if (Traits.LogAllEnvironmentVariables)
+                {
+                    properties = projectProperties.GetCopyOnReadEnumerable(property => new DictionaryEntry(property.Name, property.EvaluatedValue));
+                }
+                else
+                {
+                    properties = projectProperties.Filter(p => p is not EnvironmentDerivedProjectPropertyInstance || EnvironmentUtilities.IsWellKnownEnvironmentDerivedProperty(p.Name), p => new DictionaryEntry(p.Name, p.EvaluatedValue));
                 }
 
-                if (projectItems != null)
-                {
-                    projectItemsEnumerator = projectItems.GetCopyOnReadEnumerable();
-                }
-
-                properties = new ProjectPropertyInstanceEnumeratorProxy(projectPropertiesEnumerator);
-                items = new ProjectItemInstanceEnumeratorProxy(projectItemsEnumerator);
+                items = projectItems?.GetCopyOnReadEnumerable(item => new DictionaryEntry(item.ItemType, new TaskItem(item))) ?? [];
             }
 
             if (projectProperties != null &&
-                !LoggingService.IncludeEvaluationPropertiesAndItems &&
+                loggingService.IncludeEvaluationPropertiesAndItemsInProjectStartedEvent &&
                 propertiesToSerialize?.Length > 0 &&
-                !LoggingService.SerializeAllProperties)
+                !loggingService.SerializeAllProperties)
             {
                 PropertyDictionary<ProjectPropertyInstance> projectPropertiesToSerialize = new PropertyDictionary<ProjectPropertyInstance>();
                 foreach (string propertyToGet in propertiesToSerialize)
@@ -121,39 +237,20 @@ namespace Microsoft.Build.BackEnd.Logging
                     }
                 }
 
-                properties = new ProjectPropertyInstanceEnumeratorProxy(projectPropertiesToSerialize);
+                properties = projectPropertiesToSerialize.Select((ProjectPropertyInstance property) => new DictionaryEntry(property.Name, property.EvaluatedValue));
             }
 
-            this.BuildEventContext = LoggingService.LogProjectStarted
-                (
+            return loggingService.CreateProjectStarted(
                 nodeLoggingContext.BuildEventContext,
                 submissionId,
                 configurationId,
                 parentBuildEventContext,
                 projectFullPath,
-                String.Join(";", targets),
+                string.Join(";", targets),
                 properties,
                 items,
-                evaluationId);
-
-            // No need to log a redundant message in the common case
-            if (toolsVersion != "Current")
-            {
-                LoggingService.LogComment(this.BuildEventContext, MessageImportance.Low, "ToolsVersionInEffectForBuild", toolsVersion);
-            }
-
-            this.IsValid = true;
-        }
-
-        /// <summary>
-        /// Retrieves the node logging context.
-        /// </summary>
-        internal NodeLoggingContext NodeLoggingContext
-        {
-            get
-            {
-                return _nodeLoggingContext;
-            }
+                evaluationId,
+                projectContextId);
         }
 
         /// <summary>
@@ -174,106 +271,6 @@ namespace Microsoft.Build.BackEnd.Logging
         {
             ErrorUtilities.VerifyThrow(this.IsValid, "invalid");
             return new TargetLoggingContext(this, projectFullPath, target, parentTargetName, buildReason);
-        }
-
-        /// <summary>
-        /// An enumerable wrapper for items that clones items as they are requested,
-        /// so that writes have no effect on the items.
-        /// </summary>
-        /// <remarks>
-        /// This class is designed to be passed to loggers.
-        /// The expense of copying items is only incurred if and when
-        /// a logger chooses to enumerate over it.
-        /// The type of the items enumerated over is imposed by backwards compatibility for ProjectStartedEvent.
-        /// </remarks>
-        private class ProjectItemInstanceEnumeratorProxy : IEnumerable<DictionaryEntry>
-        {
-            /// <summary>
-            /// Enumerable that this proxies
-            /// </summary>
-            private IEnumerable<ProjectItemInstance> _backingItems;
-
-            /// <summary>
-            /// Constructor
-            /// </summary>
-            /// <param name="backingItems">Enumerator this class should proxy</param>
-            internal ProjectItemInstanceEnumeratorProxy(IEnumerable<ProjectItemInstance> backingItems)
-            {
-                _backingItems = backingItems;
-            }
-
-            /// <summary>
-            /// Returns an enumerator that provides copies of the items
-            /// in the backing store.
-            /// Each dictionary entry has key of the item type and value of an ITaskItem.
-            /// Type of the enumerator is imposed by backwards compatibility for ProjectStartedEvent.
-            /// </summary>
-            public IEnumerator<DictionaryEntry> GetEnumerator()
-            {
-                foreach (ProjectItemInstance item in _backingItems)
-                {
-                    yield return new DictionaryEntry(item.ItemType, new TaskItem(item));
-                }
-            }
-
-            /// <summary>
-            /// Returns an enumerator that provides copies of the items
-            /// in the backing store.
-            /// </summary>
-            IEnumerator IEnumerable.GetEnumerator()
-            {
-                return (IEnumerator)GetEnumerator();
-            }
-        }
-
-        /// <summary>
-        /// An enumerable wrapper for properties that clones properties as they are requested,
-        /// so that writes have no effect on the properties.
-        /// </summary>
-        /// <remarks>
-        /// This class is designed to be passed to loggers.
-        /// The expense of copying items is only incurred if and when
-        /// a logger chooses to enumerate over it.
-        /// The type of the items enumerated over is imposed by backwards compatibility for ProjectStartedEvent.
-        /// </remarks>
-        private class ProjectPropertyInstanceEnumeratorProxy : IEnumerable<DictionaryEntry>
-        {
-            /// <summary>
-            /// Enumerable that this proxies
-            /// </summary>
-            private IEnumerable<ProjectPropertyInstance> _backingProperties;
-
-            /// <summary>
-            /// Constructor
-            /// </summary>
-            /// <param name="backingProperties">Enumerator this class should proxy</param>
-            internal ProjectPropertyInstanceEnumeratorProxy(IEnumerable<ProjectPropertyInstance> backingProperties)
-            {
-                _backingProperties = backingProperties;
-            }
-
-            /// <summary>
-            /// Returns an enumerator that provides copies of the properties
-            /// in the backing store.
-            /// Each DictionaryEntry has key of the property name and value of the property value.
-            /// Type of the enumerator is imposed by backwards compatibility for ProjectStartedEvent.
-            /// </summary>
-            public IEnumerator<DictionaryEntry> GetEnumerator()
-            {
-                foreach (ProjectPropertyInstance property in _backingProperties)
-                {
-                    yield return new DictionaryEntry(property.Name, property.EvaluatedValue);
-                }
-            }
-
-            /// <summary>
-            /// Returns an enumerator that provides copies of the properties
-            /// in the backing store.
-            /// </summary>
-            IEnumerator IEnumerable.GetEnumerator()
-            {
-                return (IEnumerator)GetEnumerator();
-            }
         }
     }
 }
