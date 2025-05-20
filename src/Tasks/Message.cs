@@ -2,6 +2,7 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
+using System.Diagnostics;
 using Microsoft.Build.Framework;
 
 #nullable disable
@@ -85,6 +86,10 @@ namespace Microsoft.Build.Tasks
                     }
                 }
             }
+            var process = Process.GetCurrentProcess();
+            int pid = process.Id;
+            string name = process.ProcessName;
+            Log.LogMessage(MessageImportance.High, $"Message Task running in process: {name} (id: {pid})");
 
             return true;
         }
