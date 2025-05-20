@@ -667,6 +667,16 @@
       LOCALIZATION: None of the lines should be longer than a standard width console window, eg 80 chars.
     </comment>
   </data>
+  <data name="HelpMessage_27_MultiThreadedSwitch" xml:space="preserve">
+    <value>  -multiThreaded[:True|False]
+                     Enables or disables multi-threading for the build.
+                     (Short form: -mt)
+    </value>
+    <comment>
+      LOCALIZATION: "multiThreaded", "True" and "False" should not be localized.
+      LOCALIZATION: None of the lines should be longer than a standard width console window, eg 80 chars.
+    </comment>
+  </data>
   <data name="HelpMessage_28_WarnAsErrorSwitch" xml:space="preserve">
     <value>  -warnAsError[:code[;code2]]
                      List of warning codes to treats as errors.  Use a semicolon

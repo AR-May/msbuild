@@ -286,10 +286,6 @@ namespace Microsoft.Build.Execution
                 TaskPropertyInfo propertyInfo = propertyInfos[i];
                 if (!taskTypeImplementsIGeneratedTask)
                 {
-                    // If the task implements IGeneratedTask, we must use the TaskPropertyInfo the factory gives us.
-                    // Otherwise, we never have to hand the TaskPropertyInfo back to the task or factory, so we replace
-                    // theirs with one of our own that will allow us to cache reflection data per-property.
-                    TaskPropertyInfo propertyInfo = propertyInfos[i];
                     if (!taskTypeImplementsIGeneratedTask)
                     {
                         propertyInfo = new ReflectableTaskPropertyInfo(propertyInfo, _taskFactory.TaskType);
@@ -299,14 +295,14 @@ namespace Microsoft.Build.Execution
                     {
                         lock (_locker)
                         {
-                            if (_propertyInfoCache == null)
+                            if (propertyInfoCache == null)
                             {
-                                _propertyInfoCache = new Dictionary<string, TaskPropertyInfo>(StringComparer.OrdinalIgnoreCase);
+                                propertyInfoCache = new Dictionary<string, TaskPropertyInfo>(StringComparer.OrdinalIgnoreCase);
                             }
 
-                            if (!_propertyInfoCache.ContainsKey(propertyInfo.Name))
+                            if (!propertyInfoCache.ContainsKey(propertyInfo.Name))
                             {
-                                _propertyInfoCache.Add(propertyInfo.Name, propertyInfo);
+                                propertyInfoCache.Add(propertyInfo.Name, propertyInfo);
                             }
                         }
                     }
@@ -317,34 +313,34 @@ namespace Microsoft.Build.Execution
                         // that wouldn't have been thrown unless and until the project actually tried to set this ambiguous parameter.
                         // So rather than fail here, we store a list of ambiguous names and throw later, when one of them
                         // is requested.
-                        if (_namesOfPropertiesWithAmbiguousMatches == null)
+                        if (namesOfPropertiesWithAmbiguousMatches == null)
                         {
-                            _namesOfPropertiesWithAmbiguousMatches = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                            namesOfPropertiesWithAmbiguousMatches = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                         }
 
-                        _namesOfPropertiesWithAmbiguousMatches[propertyInfo.Name] = String.Empty;
+                        namesOfPropertiesWithAmbiguousMatches[propertyInfo.Name] = String.Empty;
                     }
 
                     if (propertyInfos[i].Required)
                     {
-                        if (_namesOfPropertiesWithRequiredAttribute == null)
+                        if (namesOfPropertiesWithRequiredAttribute == null)
                         {
-                            _namesOfPropertiesWithRequiredAttribute = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                            namesOfPropertiesWithRequiredAttribute = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                         }
 
                         // we have a require attribute defined, keep a record of that
-                        _namesOfPropertiesWithRequiredAttribute[propertyInfo.Name] = String.Empty;
+                        namesOfPropertiesWithRequiredAttribute[propertyInfo.Name] = String.Empty;
                     }
 
                     if (propertyInfos[i].Output)
                     {
-                        if (_namesOfPropertiesWithOutputAttribute == null)
+                        if (namesOfPropertiesWithOutputAttribute == null)
                         {
-                            _namesOfPropertiesWithOutputAttribute = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                            namesOfPropertiesWithOutputAttribute = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                         }
 
                         // we have a output attribute defined, keep a record of that
-                        _namesOfPropertiesWithOutputAttribute[propertyInfo.Name] = String.Empty;
+                        namesOfPropertiesWithOutputAttribute[propertyInfo.Name] = String.Empty;
                     }
                 }
             }
