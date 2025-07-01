@@ -211,7 +211,7 @@ With a sidecar TaskHost per node, the fact that much of the MSBuild-level state 
 
 ## Thread-safe tasks
 
-To mark that a task is multithreaded-MSBuild-aware, we will introduce a new interface that tasks can implement. We will provide an object with information about the task invocation, including the current environment and working directory, so that tasks can access the same information they would have in a single-threaded or out-of-process execution.
+To mark that a task is multithreaded-MSBuild-aware, we will introduce a new interface that tasks can implement. We will provide an object with information about the task invocation, including the current environment and working directory, so that tasks can access the same information they would have in a single-threaded or out-of-process execution. For detailed interface definition and implementation examples, see: [IThreadSafeTask.md](IThreadSafeTask.md)
 
 To ease task authoring, we will provide a Roslyn analyzer that will check for known-bad API usage, like `System.Environment.GetEnvironmentVariable` or `System.IO.Directory.SetCurrentDirectory`, and suggest alternatives that use the object provided by the engine.
 
