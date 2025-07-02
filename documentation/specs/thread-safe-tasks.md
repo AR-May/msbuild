@@ -10,7 +10,7 @@ However, with the introduction of multithreaded MSBuild execution, multiple task
 ```csharp
 /// <summary>
 /// Interface for tasks that support multithreaded execution in MSBuild.
-/// Tasks implementing this interface can run concurrently with other tasks
+/// Tasks implementing this interface guarantee that they can run concurrently with other tasks
 /// within the same MSBuild process.
 /// </summary>
 public interface IThreadSafeTask : ITask
@@ -23,6 +23,12 @@ public interface IThreadSafeTask : ITask
     ITaskExecutionContext ExecutionContext { get; set; }
 }
 ```
+
+### Questions and Design Notes
+
+**Question**: Should we expose an `ExecutionContext` property, or should we have an overload for the `Execute` function that takes `ExecutionContext` as a parameter? If we implement `ExecuteAsync` in async tasks, the property approach would be decoupled, while adding an overload would need to be done for both sync and async tasks. Exposing a property is also consistent with how the `BuildEngine` property is available in tasks. The property approach is more extensible if additional parameters need to be passed in the future.
+
+**Question**: I want to prevent customers from setting or modifying the ExecutionContext, but I don't want to create it during task construction.
 
 ## ITaskExecutionContext Interface
 
@@ -59,10 +65,19 @@ public interface ITaskExecutionContext
     /// <param name="name">The environment variable name</param>
     /// <param name="value">The environment variable value</param>
     void SetEnvironmentVariable(string name, string value);
+
+    /// <summary>
+    /// Context-aware File System. All Path/File/Directory calls should be used through it.
+    /// </summary>
+    IContextFileSystem FileSystem { get; }
 }
 ```
 
 
-## Questions and Design Notes
+### Questions and Design Notes
 
-**Question**: Should we use for the `EnvironmentVariables` property `IReadOnlyDictionary<string, string>` with setting function or `IDictionary<string, string>`? Do we want controll over the modifications of the dictionary?
+**Question**: Should we use `IReadOnlyDictionary<string, string>` with setter methods or `IDictionary<string, string>` for the `EnvironmentVariables` property? Do we want control over modifications to the dictionary? Should we even expose the `EnvironmentVariables` dictionary? It might not be thread-safe.
+
+**Note**: Our `ITaskExecutionContext` class should be thread-safe as well! Task authors can create multi-threaded tasks, and the class should be safe to use.
+
+**TODO**: Figure out how our `IContextFileSystem` will work
