@@ -119,31 +119,28 @@ The following tables list specific .NET APIs and their threading safety classifi
 | `CultureInfo.DefaultThreadCurrentCulture` (setter) | ERROR | Affects new threads | Modify the thread culture instead |
 | `CultureInfo.DefaultThreadCurrentUICulture` (setter) | ERROR | Affects new threads | Modify the thread culture instead |
 
-### Static State
+### Static
 
 | API | Level | Short Reason | Recommendation |
 |-----|-------|--------------|-------|
 | Static fields | WARNING | Shared across threads, can cause race conditions | Avoid |
 
-### Assembly Loading
+### Assembly Loading (System.Reflection.Assembly class, System.Activator class)
 Tasks that load assemblies dynamically in the task host may cause version conflicts. Version conflicts in task assemblies will cause build failures (previously these might have been sporadic). Both dynamically loaded dependencies and static dependencies can cause issues.
 
 | API | Level | Short Reason | Recommendation |
 |-----|-------|--------------|-------|
-| `Assembly.LoadFrom(string assemblyFile)` | WARNING | May cause version conflicts | Be aware of potential conflicts |
+| `Assembly.LoadFrom(string assemblyFile)` | WARNING | May cause version conflicts | Be aware of potential conflicts, use absolute paths |
 | `Assembly.LoadFile(string path)` | WARNING | May cause version conflicts | Be aware of potential conflicts |
-| `Assembly.Load(string assemblyString)` | WARNING | May cause version conflicts | Be aware of potential conflicts |
-| `Assembly.Load(byte[] rawAssembly)` | WARNING | May cause version conflicts | Be aware of potential conflicts |
-| `Assembly.Load(byte[] rawAssembly, byte[] rawSymbolStore)` | WARNING | May cause version conflicts | Be aware of potential conflicts |
+| `Assembly.Load` all overloads | WARNING | May cause version conflicts | Be aware of potential conflicts |
 | `Assembly.LoadWithPartialName(string partialName)` | WARNING | May cause version conflicts | Be aware of potential conflicts |
 | `Activator.CreateInstanceFrom(string assemblyFile, string typeName)` | WARNING | May cause version conflicts | Be aware of potential conflicts |
 | `Activator.CreateInstance(string assemblyName, string typeName)` | WARNING | May cause version conflicts | Be aware of potential conflicts |
-| `AppDomain.Load(string assemblyString)` | WARNING | May cause version conflicts | Be aware of potential conflicts |
-| `AppDomain.Load(byte[] rawAssembly)` | WARNING | May cause version conflicts | Be aware of potential conflicts |
+| `AppDomain.Load` all overloads | WARNING | May cause version conflicts | Be aware of potential conflicts |
 | `AppDomain.CreateInstanceFrom(string assemblyFile, string typeName)` | WARNING | May cause version conflicts | Be aware of potential conflicts |
 | `AppDomain.CreateInstance(string assemblyName, string typeName)` | WARNING | May cause version conflicts | Be aware of potential conflicts |
 
-### P/Invoke and Native Code
+### P/Invoke
 
 **Concerns**:
 - P/Invoke calls may use process-level state like current working directory
@@ -152,4 +149,4 @@ Tasks that load assemblies dynamically in the task host may cause version confli
 
 | API | Level | Short Reason | Recommendation |
 |-----|-------|--------------|-------|
-| `[DllImport]` attribute | WARNING | May use process-level state, not covered by analysers | Review for thread safety, use absolute paths |
+| `[DllImport]` attribute | WARNING | Not covered by analysers | Review for thread safety, use absolute paths |
