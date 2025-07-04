@@ -14,7 +14,7 @@ Categories of threading issues with .NET API usage in thread-safe tasks to be aw
 1. **Environment Variables Modification and Usage**
 1. **Process Culture Modification and Usage**, which can affect data formatting.
 1. **Assembly Loading**
-1. **Static State**
+1. **Static Fields**
 
 **TODO**: Consider other possible causes of issues:
 1. Creating new AppDomain.

@@ -40,56 +40,267 @@ The `ITaskExecutionContext` provides tasks with access to execution environment 
 /// Provides access to task execution context and environment information.
 /// </summary>
 public interface ITaskExecutionContext
-{
-    /// <summary>
-    /// Gets the environment context for this task execution.
-    /// Provides thread-safe access to environment variables.
-    /// </summary>
-    ITaskEnvironmentContext Environment { get; }
+{    
+    string CurrentDirectory { get; set; }
 
-    /// <summary>
-    /// Context-aware File System. All Path/File/Directory calls should be used through it.
-    /// </summary>
-    IContextBasedFileSystem FileSystem { get; }
+    IEnvironment Environment { get; }
+
+    IFileSystem FileSystem { get; }
 }
 ```
 
-## ITaskEnvironmentContext Interface
+### Questions and Notes:
+1. Should we consider using classes?
 
-The `ITaskEnvironmentContext` provides thread-safe access to environment variables:
+## IEnvironment Interface
+
+The `IEnvironment` provides thread-safe access to environment variables:
+
+```csharp
+public interface IEnvironment
+{
+    string? GetEnvironmentVariable(string name);
+    
+    Dictionary<string, string?> GetEnvironmentVariables();
+    
+    void SetEnvironmentVariable(string name, string? value);
+}
+```
+
+## ITaskContextFileSystem Interface
 
 ```csharp
 /// <summary>
-/// Provides thread-safe access to environment variables for task execution.
+/// Context-aware File System. All Path/File/Directory calls should be used through it.
+/// Automatically uses the current working directory from the execution context.
 /// </summary>
-public interface ITaskEnvironmentContext
+public interface IFileSystem
 {
-    /// <summary>
-    /// Gets environment variables for this task execution.
-    /// </summary>
-    IReadOnlyDictionary<string, string> Variables { get; }
+    IPath Path { get; }
     
-    /// <summary>
-    /// Gets an environment variable value, or null if not found.
-    /// </summary>
-    /// <param name="name">The environment variable name</param>
-    /// <returns>The environment variable value, or null if not found</returns>
-    string GetVariable(string name);
+    IFile File { get; }
     
-    /// <summary>
-    /// Sets an environment variable for subsequent tasks in the same project.
-    /// This change will be isolated to the current project's execution context.
-    /// </summary>
-    /// <param name="name">The environment variable name</param>
-    /// <param name="value">The environment variable value</param>
-    void SetVariable(string name, string value);
+    IDirectory Directory { get; }
 }
 ```
 
-### Questions and Design Notes
+### Questions and Notes:
+1. Should we flatten the interface? Avoid IFileSystem and place them in the ITaskExecutionContext, and/or remove IPath, IFile, IDirectory?
+1. Should we consider using classes?
 
-**Question**: Should we use `IReadOnlyDictionary<string, string>` with setter methods or `IDictionary<string, string>` for the `EnvironmentVariables` property? Do we want control over modifications to the dictionary? Should we even expose the `EnvironmentVariables` dictionary? It might not be thread-safe.
+## IPath Interface
 
-**Note**: Our `ITaskExecutionContext` class should be thread-safe as well! Task authors can create multi-threaded tasks, and the class should be safe to use.
+Thread-safe alternative to `System.IO.Path` class:
 
-**TODO**: Figure out how our `IContextFileSystem` will work.
+```csharp
+public interface IPath
+{
+    string GetFullPath(string path);
+}
+```
+
+## IFile Interface
+
+Thread-safe alternative to `System.IO.File` class:
+
+**TODO** Generated with copilot, look that it correctly mirrors all the functions in .NET class that use relative paths.
+
+```csharp
+public interface IFile
+{
+    bool Exists(string path);
+    
+    string ReadAllText(string path);
+    
+    string ReadAllText(string path, Encoding encoding);
+    
+    byte[] ReadAllBytes(string path);
+    
+    string[] ReadAllLines(string path);
+    
+    string[] ReadAllLines(string path, Encoding encoding);
+    
+    IEnumerable<string> ReadLines(string path);
+    
+    IEnumerable<string> ReadLines(string path, Encoding encoding);
+    
+    void WriteAllText(string path, string contents);
+    
+    void WriteAllText(string path, string contents, Encoding encoding);
+    
+    void WriteAllBytes(string path, byte[] bytes);
+    
+    void WriteAllLines(string path, string[] contents);
+    
+    void WriteAllLines(string path, IEnumerable<string> contents);
+    
+    void WriteAllLines(string path, string[] contents, Encoding encoding);
+    
+    void WriteAllLines(string path, IEnumerable<string> contents, Encoding encoding);
+    
+    void AppendAllText(string path, string contents);
+    
+    void AppendAllText(string path, string contents, Encoding encoding);
+    
+    void AppendAllLines(string path, IEnumerable<string> contents);
+    
+    void AppendAllLines(string path, IEnumerable<string> contents, Encoding encoding);
+    
+    void Copy(string sourceFileName, string destFileName);
+
+    void Copy(string sourceFileName, string destFileName, bool overwrite);
+    
+    void Move(string sourceFileName, string destFileName);
+    
+    void Move(string sourceFileName, string destFileName, bool overwrite);
+    
+    void Delete(string path);
+    
+    FileAttributes GetAttributes(string path);
+    
+    void SetAttributes(string path, FileAttributes fileAttributes);
+    
+    DateTime GetCreationTime(string path);
+    
+    DateTime GetCreationTimeUtc(string path);
+    
+    DateTime GetLastAccessTime(string path);
+    
+    DateTime GetLastAccessTimeUtc(string path);
+    
+    DateTime GetLastWriteTime(string path);
+    
+    DateTime GetLastWriteTimeUtc(string path);
+    
+    void SetCreationTime(string path, DateTime creationTime);
+
+    void SetCreationTimeUtc(string path, DateTime creationTimeUtc);
+    
+    void SetLastAccessTime(string path, DateTime lastAccessTime);
+    
+    void SetLastAccessTimeUtc(string path, DateTime lastAccessTimeUtc);
+    
+    void SetLastWriteTime(string path, DateTime lastWriteTime);
+    
+    void SetLastWriteTimeUtc(string path, DateTime lastWriteTimeUtc);
+    
+    FileStream OpenRead(string path);
+    
+    FileStream OpenWrite(string path);
+    
+    FileStream Open(string path, FileMode mode);
+    
+    FileStream Open(string path, FileMode mode, FileAccess access);
+    
+    FileStream Open(string path, FileMode mode, FileAccess access, FileShare share);
+    
+    FileStream Create(string path);
+    
+    FileStream Create(string path, int bufferSize);
+    
+    FileStream Create(string path, int bufferSize, FileOptions options);
+    
+    StreamReader OpenText(string path);
+    
+    StreamWriter CreateText(string path);
+    
+    StreamWriter AppendText(string path);
+    
+    void Replace(string sourceFileName, string destinationFileName, string destinationBackupFileName);
+    
+    void Replace(string sourceFileName, string destinationFileName, string destinationBackupFileName, bool ignoreMetadataErrors);
+}
+```
+
+## IDirectory Interface
+
+Thread-safe alternative to `System.IO.Directory` class:
+
+**TODO** Generated with Copilot, look that it correctly mirrors all the functions in .NET class that use relative paths.
+
+```csharp
+public interface IDirectory
+{
+    bool Exists(string path);
+    
+    DirectoryInfo CreateDirectory(string path);
+    
+    void Delete(string path);
+    
+    void Delete(string path, bool recursive);
+    
+    void Move(string sourceDirName, string destDirName);
+    
+    string[] GetFiles(string path);
+    
+    string[] GetFiles(string path, string searchPattern);
+    
+    string[] GetFiles(string path, string searchPattern, SearchOption searchOption);
+    
+    string[] GetDirectories(string path);
+    
+    string[] GetDirectories(string path, string searchPattern);
+    
+    string[] GetDirectories(string path, string searchPattern, SearchOption searchOption);
+    
+    string[] GetFileSystemEntries(string path);
+    
+    string[] GetFileSystemEntries(string path, string searchPattern);
+    
+    string[] GetFileSystemEntries(string path, string searchPattern, SearchOption searchOption);
+    
+    IEnumerable<string> EnumerateFiles(string path);
+    
+    IEnumerable<string> EnumerateFiles(string path, string searchPattern);
+    
+    IEnumerable<string> EnumerateFiles(string path, string searchPattern, SearchOption searchOption);
+    
+    IEnumerable<string> EnumerateDirectories(string path);
+    
+    IEnumerable<string> EnumerateDirectories(string path, string searchPattern);
+    
+    IEnumerable<string> EnumerateDirectories(string path, string searchPattern, SearchOption searchOption);
+    
+    IEnumerable<string> EnumerateFileSystemEntries(string path);
+    
+    IEnumerable<string> EnumerateFileSystemEntries(string path, string searchPattern);
+    
+    IEnumerable<string> EnumerateFileSystemEntries(string path, string searchPattern, SearchOption searchOption);
+    
+    DateTime GetCreationTime(string path);
+    
+    DateTime GetCreationTimeUtc(string path);
+    
+    DateTime GetLastAccessTime(string path);
+    
+    DateTime GetLastAccessTimeUtc(string path);
+    
+    DateTime GetLastWriteTime(string path);
+    
+    DateTime GetLastWriteTimeUtc(string path);
+    
+    void SetCreationTime(string path, DateTime creationTime);
+    
+    void SetCreationTimeUtc(string path, DateTime creationTimeUtc);
+    
+    void SetLastAccessTime(string path, DateTime lastAccessTime);
+    
+    void SetLastAccessTimeUtc(string path, DateTime lastAccessTimeUtc);
+    
+    void SetLastWriteTime(string path, DateTime lastWriteTime);
+    
+    void SetLastWriteTimeUtc(string path, DateTime lastWriteTimeUtc);
+    
+    DirectoryInfo GetParent(string path);
+    
+    string GetDirectoryRoot(string path);
+    
+    string GetCurrentDirectory();
+    
+    void SetCurrentDirectory(string path);
+}
+```
+
+## Notes
+
+**Note**: Our classes should be thread-safe so that task authors can create multi-threaded tasks, and the class should be safe to use.
