@@ -2,14 +2,13 @@
 
 ## Overview
 
-In the traditional MSBuild execution model, tasks operate under the assumption that they have exclusive control over the entire process during execution. This allows them to freely modify global process state, including environment variables, the current working directory, and other process-level resources. This design works well for MSBuild's historical approach of using separate processes for parallel execution.
+MSBuild's current execution model assumes that tasks have exclusive control over the entire process during execution. This allows tasks to freely modify global process state such as environment variables, the current working directory, and other process-level resources. This design works well for MSBuild's approach of executing builds in separate processes for parallelization.
 
-However, with the introduction of multithreaded MSBuild execution mode, multiple tasks can now run concurrently within the same process. This change requires a new approach to task design to prevent race conditions and ensure thread safety. To enable tasks to opt into this multithreaded execution model, we introduce a new interface that tasks should implement and utilize to declare their thread-safety.
+With the introduction of multithreaded execution within a single MSBuild process, multiple tasks can now run concurrently. This requires a new task design to prevent race conditions and ensure thread safety when multiple tasks access shared process state simultaneously.
 
-Tasks that implement the following `IThreadSafeTask` interface declares itself to be thread-safe. It should avoid using APIs that modify or rely on global process state, as that could cause conflicts when multiple tasks execute simultaneously. For a list of such APIs, refer to [Thread-Safe Tasks API Reference](thread-safe-tasks-api-reference.md).
+To enable this multithreaded execution model, we introduce the `IThreadSafeTask` interface that tasks can implement to declare their thread-safety capabilities. Tasks implementing this interface must avoid using APIs that modify or depend on global process state, as such usage could cause conflicts when multiple tasks execute concurrently, see [Thread-Safe Tasks API Reference](thread-safe-tasks-api-reference.md).
 
-Customers should be using the `ExecutionContext` property of the `IThreadSafeTask` interface to access the safe API that uses or modifies the global process state.
-Example: Task authores should be able to use `ExecutionContext.Path.GetFullPath(relativePath)` instead of `Path.GetFullPath(relativePath)`.
+Task authors should use the `ExecutionContext` property provided by the `IThreadSafeTask` interface to access thread-safe APIs for operations that would otherwise use global process state. For example, use `ExecutionContext.Path.GetFullPath(relativePath)` instead of the standard `Path.GetFullPath(relativePath)`.
 
 ## Option 1: Structured Interfaces
 
@@ -20,8 +19,6 @@ public interface IThreadSafeTask<TExecutionContext> : ITask
     TExecutionContext ExecutionContext { get; set; }
 }
 ```
-
-### ITaskExecutionContext Interface
 
 The `ITaskExecutionContext` provides tasks with access to what was in multi-process mode the global process state, such as environment variables and working directory:
 ```csharp
@@ -56,6 +53,7 @@ Thread-safe alternative to `System.IO.Path` class:
 public interface IPath
 {
     string GetFullPath(string path);
+    ... // Complete list of methods can be find below
 }
 ```
 
@@ -66,7 +64,7 @@ public interface IFile
 {
     bool Exists(string path);
     string ReadAllText(string path);
-    ... // For complete list of methods, see "IFile Methods" section below
+    ... // Complete list of methods can be find below
 }
 ```
 
@@ -77,7 +75,7 @@ public interface IDirectory
 {
     bool Exists(string path);
     DirectoryInfo CreateDirectory(string path);
-    ... // For complete list of methods, see "IDirectory Methods" section below
+    ... // Complete list of methods can be find below
 }
 ```
 
@@ -130,6 +128,7 @@ public class AdvancedTask : IThreadSafeTask<ITaskExecutionContext2>
 }
 ```
 **Note** During the loading of the task assembly, we can check whether the needed version of the `ITaskExecutionContext` is present and gracefully fail if not.
+
 **Note** Consider backporting this check to 17.14 branch as well.
 
 ## Option 2: Abstract Classes
@@ -150,11 +149,6 @@ The `TaskExecutionContext` provides tasks with access to what was in multi-proce
 ```csharp
 public abstract class TaskExecutionContext
 {
-    // Initial version
-    public const int Version1 = 1;
-    public virtual int Version => Version1;
-
-    // Properties for the execution context
     public virtual string CurrentDirectory { get; set; }
     public virtual TaskEnvironment Environment { get; }
     public virtual TaskPath Path { get; }
@@ -173,24 +167,24 @@ public abstract class TaskEnvironment
 }
 ```
 
-Thread-safe alternative to `System.IO.Path` class:
+Thread-safe alternative to `System.IO.Path` class. 
 ```csharp
 public abstract class TaskPath
 {
-    public const int Version1 = 1;
-    public virtual int Version => Version1;
-
     public virtual string GetFullPath(string path) => throw new NotImplementedException();
+    ... // Complete list of methods can be find below
 }
 ```
+
+**Note** the default implementations allow forward compatibility for the customers' that implement the class. 
 
 Thread-safe alternative to `System.IO.File` class:
 ```csharp
 public abstract class TaskFile
-{
+{    
     public virtual bool Exists(string path) => throw new NotImplementedException();
     public virtual string ReadAllText(string path) => throw new NotImplementedException();
-    // For complete list of methods, see "TaskFile Methods" section below
+    ... // Complete list of methods can be find below
 }
 ```
 
@@ -201,7 +195,7 @@ public abstract class TaskDirectory
 {
     public virtual bool Exists(string path) => throw new NotImplementedException();
     public virtual DirectoryInfo CreateDirectory(string path) => throw new NotImplementedException();
-    // For complete list of methods, see "TaskDirectory Methods" section below
+    ... // Complete list of methods can be find below
 }
 ```
 
@@ -210,14 +204,13 @@ public abstract class TaskDirectory
 With abstract classes, versioning is handled through version constants. There is no need to create a new class to add methods.
 
 ```csharp
-public abstract class TaskPath
+public abstract class TaskFile
 {
-    public const int Version1 = 1;
-    public const int Version2 = 2; // adding version
-    public virtual string GetFullPath(string path) => throw new NotImplementedException();
-
-    public virtual int Version => Version2; // pointing to the new version
-    public virtual string GetFullPath2(string path) => throw new NotImplementedException();
+    public virtual bool Exists(string path) => throw new NotImplementedException();
+    public virtual string ReadAllText(string path) => throw new NotImplementedException();
+    
+    // Method added to the class:
+    public virtual string ReadAllText(string path, Encoding encoding) => throw new NotImplementedException();
     // Other methods can be added here
 #endif
 }
@@ -245,127 +238,134 @@ public class VersionAwareTask : IThreadSafeTask
     
     public bool Execute()
     {
-        if (ExecutionContext.Path.Version >= TaskPath.Version2)
-        {
-            ... // Use newer functionality if available
-        }
-        else
-        {
-            ... // Fall back to older functionality
-        }
+        var text = ExecutionContext.File.ReadAllText("file.txt", Encoding.UTF8);
         return true;
     }
 }
 ```
 
-**Note**: During the loading of the task assembly, we can check the version compatibility and gracefully fail if the required version is not available.
+**Question**: How can we check the version compatibility and gracefully fail if the required version is not available? It is not possible in the current set up.
 
 ## Methods Reference
 
 ### Path Methods
 
+- `bool Exists(string path)`
 - `string GetFullPath(string path)`
 
 ### File Methods
 
 **TODO**: Generated with Copilot, review that it correctly mirrors all the functions in .NET class that use relative paths:
 
+- `void AppendAllBytes(string path, byte[] bytes)`
+- `void AppendAllLines(string path, IEnumerable<string> contents)`
+- `void AppendAllLines(string path, IEnumerable<string> contents, Encoding encoding)`
+- `void AppendAllText(string path, string contents)`
+- `void AppendAllText(string path, string contents, Encoding encoding)`
+- `void AppendAllText(string path, ReadOnlySpan<char> contents)`
+- `void AppendAllText(string path, ReadOnlySpan<char> contents, Encoding encoding)`
+- `StreamWriter AppendText(string path)`
+- `void Copy(string sourceFileName, string destFileName)`
+- `void Copy(string sourceFileName, string destFileName, bool overwrite)`
+- `FileStream Create(string path)`
+- `FileStream Create(string path, int bufferSize)`
+- `FileStream Create(string path, int bufferSize, FileOptions options)`
+- `StreamWriter CreateText(string path)`
+- `void Decrypt(string path)`
+- `void Delete(string path)`
+- `void Encrypt(string path)`
 - `bool Exists(string path)`
-- `string ReadAllText(string path)`
-- `string ReadAllText(string path, Encoding encoding)`
+- `FileSecurity GetAccessControl(string path)`
+- `FileSecurity GetAccessControl(string path, AccessControlSections includeSections)`
+- `FileAttributes GetAttributes(string path)`
+- `DateTime GetCreationTime(string path)`
+- `DateTime GetCreationTimeUtc(string path)`
+- `DateTime GetLastAccessTime(string path)`
+- `DateTime GetLastAccessTimeUtc(string path)`
+- `DateTime GetLastWriteTime(string path)`
+- `DateTime GetLastWriteTimeUtc(string path)`
+- `void Move(string sourceFileName, string destFileName)`
+- `void Move(string sourceFileName, string destFileName, bool overwrite)`
+- `FileStream Open(string path, FileMode mode)`
+- `FileStream Open(string path, FileMode mode, FileAccess access)`
+- `FileStream Open(string path, FileMode mode, FileAccess access, FileShare share)`
+- `FileStream OpenRead(string path)`
+- `StreamReader OpenText(string path)`
+- `FileStream OpenWrite(string path)`
 - `byte[] ReadAllBytes(string path)`
 - `string[] ReadAllLines(string path)`
 - `string[] ReadAllLines(string path, Encoding encoding)`
+- `string ReadAllText(string path)`
+- `string ReadAllText(string path, Encoding encoding)`
 - `IEnumerable<string> ReadLines(string path)`
 - `IEnumerable<string> ReadLines(string path, Encoding encoding)`
-- `void WriteAllText(string path, string contents)`
-- `void WriteAllText(string path, string contents, Encoding encoding)`
+- `void Replace(string sourceFileName, string destinationFileName, string destinationBackupFileName)`
+- `void Replace(string sourceFileName, string destinationFileName, string destinationBackupFileName, bool ignoreMetadataErrors)`
+- `void SetAccessControl(string path, FileSecurity fileSecurity)`
+- `void SetAttributes(string path, FileAttributes fileAttributes)`
+- `void SetCreationTime(string path, DateTime creationTime)`
+- `void SetCreationTimeUtc(string path, DateTime creationTimeUtc)`
+- `void SetLastAccessTime(string path, DateTime lastAccessTime)`
+- `void SetLastAccessTimeUtc(string path, DateTime lastAccessTimeUtc)`
+- `void SetLastWriteTime(string path, DateTime lastWriteTime)`
+- `void SetLastWriteTimeUtc(string path, DateTime lastWriteTimeUtc)`
 - `void WriteAllBytes(string path, byte[] bytes)`
 - `void WriteAllLines(string path, string[] contents)`
 - `void WriteAllLines(string path, IEnumerable<string> contents)`
 - `void WriteAllLines(string path, string[] contents, Encoding encoding)`
 - `void WriteAllLines(string path, IEnumerable<string> contents, Encoding encoding)`
-- `void AppendAllText(string path, string contents)`
-- `void AppendAllText(string path, string contents, Encoding encoding)`
-- `void AppendAllLines(string path, IEnumerable<string> contents)`
-- `void AppendAllLines(string path, IEnumerable<string> contents, Encoding encoding)`
-- `void Copy(string sourceFileName, string destFileName)`
-- `void Copy(string sourceFileName, string destFileName, bool overwrite)`
-- `void Move(string sourceFileName, string destFileName)`
-- `void Move(string sourceFileName, string destFileName, bool overwrite)`
-- `void Delete(string path)`
-- `FileAttributes GetAttributes(string path)`
-- `void SetAttributes(string path, FileAttributes fileAttributes)`
-- `DateTime GetCreationTime(string path)`
-- `DateTime GetCreationTimeUtc(string path)`
-- `DateTime GetLastAccessTime(string path)`
-- `DateTime GetLastAccessTimeUtc(string path)`
-- `DateTime GetLastWriteTime(string path)`
-- `DateTime GetLastWriteTimeUtc(string path)`
-- `void SetCreationTime(string path, DateTime creationTime)`
-- `void SetCreationTimeUtc(string path, DateTime creationTimeUtc)`
-- `void SetLastAccessTime(string path, DateTime lastAccessTime)`
-- `void SetLastAccessTimeUtc(string path, DateTime lastAccessTimeUtc)`
-- `void SetLastWriteTime(string path, DateTime lastWriteTime)`
-- `void SetLastWriteTimeUtc(string path, DateTime lastWriteTimeUtc)`
-- `FileStream OpenRead(string path)`
-- `FileStream OpenWrite(string path)`
-- `FileStream Open(string path, FileMode mode)`
-- `FileStream Open(string path, FileMode mode, FileAccess access)`
-- `FileStream Open(string path, FileMode mode, FileAccess access, FileShare share)`
-- `FileStream Create(string path)`
-- `FileStream Create(string path, int bufferSize)`
-- `FileStream Create(string path, int bufferSize, FileOptions options)`
-- `StreamReader OpenText(string path)`
-- `StreamWriter CreateText(string path)`
-- `StreamWriter AppendText(string path)`
-- `void Replace(string sourceFileName, string destinationFileName, string destinationBackupFileName)`
-- `void Replace(string sourceFileName, string destinationFileName, string destinationBackupFileName, bool ignoreMetadataErrors)`
+- `void WriteAllText(string path, string contents)`
+- `void WriteAllText(string path, string contents, Encoding encoding)`
+
+**Note** In net core and framework and in different versions there is different set of the functions. Which exactly we will include
+**Idea** We can use info from apisof.net to identify the most used API and we can drop not much used.
 
 ### Directory Methods
 
 **TODO**: Generated with Copilot, review that it correctly mirrors all the functions in .NET class that use relative paths:
 
-- `bool Exists(string path)`
 - `DirectoryInfo CreateDirectory(string path)`
 - `void Delete(string path)`
 - `void Delete(string path, bool recursive)`
-- `void Move(string sourceDirName, string destDirName)`
-- `string[] GetFiles(string path)`
-- `string[] GetFiles(string path, string searchPattern)`
-- `string[] GetFiles(string path, string searchPattern, SearchOption searchOption)`
-- `string[] GetDirectories(string path)`
-- `string[] GetDirectories(string path, string searchPattern)`
-- `string[] GetDirectories(string path, string searchPattern, SearchOption searchOption)`
-- `string[] GetFileSystemEntries(string path)`
-- `string[] GetFileSystemEntries(string path, string searchPattern)`
-- `string[] GetFileSystemEntries(string path, string searchPattern, SearchOption searchOption)`
-- `IEnumerable<string> EnumerateFiles(string path)`
-- `IEnumerable<string> EnumerateFiles(string path, string searchPattern)`
-- `IEnumerable<string> EnumerateFiles(string path, string searchPattern, SearchOption searchOption)`
 - `IEnumerable<string> EnumerateDirectories(string path)`
 - `IEnumerable<string> EnumerateDirectories(string path, string searchPattern)`
 - `IEnumerable<string> EnumerateDirectories(string path, string searchPattern, SearchOption searchOption)`
+- `IEnumerable<string> EnumerateFiles(string path)`
+- `IEnumerable<string> EnumerateFiles(string path, string searchPattern)`
+- `IEnumerable<string> EnumerateFiles(string path, string searchPattern, SearchOption searchOption)`
 - `IEnumerable<string> EnumerateFileSystemEntries(string path)`
 - `IEnumerable<string> EnumerateFileSystemEntries(string path, string searchPattern)`
 - `IEnumerable<string> EnumerateFileSystemEntries(string path, string searchPattern, SearchOption searchOption)`
+- `bool Exists(string path)`
+- `DirectorySecurity GetAccessControl(string path)`
+- `DirectorySecurity GetAccessControl(string path, AccessControlSections includeSections)`
 - `DateTime GetCreationTime(string path)`
 - `DateTime GetCreationTimeUtc(string path)`
+- `string GetCurrentDirectory()`
+- `string[] GetDirectories(string path)`
+- `string[] GetDirectories(string path, string searchPattern)`
+- `string[] GetDirectories(string path, string searchPattern, SearchOption searchOption)`
+- `string GetDirectoryRoot(string path)`
+- `string[] GetFiles(string path)`
+- `string[] GetFiles(string path, string searchPattern)`
+- `string[] GetFiles(string path, string searchPattern, SearchOption searchOption)`
+- `string[] GetFileSystemEntries(string path)`
+- `string[] GetFileSystemEntries(string path, string searchPattern)`
+- `string[] GetFileSystemEntries(string path, string searchPattern, SearchOption searchOption)`
 - `DateTime GetLastAccessTime(string path)`
 - `DateTime GetLastAccessTimeUtc(string path)`
 - `DateTime GetLastWriteTime(string path)`
 - `DateTime GetLastWriteTimeUtc(string path)`
+- `DirectoryInfo GetParent(string path)`
+- `void Move(string sourceDirName, string destDirName)`
+- `void SetAccessControl(string path, DirectorySecurity directorySecurity)`
 - `void SetCreationTime(string path, DateTime creationTime)`
 - `void SetCreationTimeUtc(string path, DateTime creationTimeUtc)`
+- `void SetCurrentDirectory(string path)`
 - `void SetLastAccessTime(string path, DateTime lastAccessTime)`
 - `void SetLastAccessTimeUtc(string path, DateTime lastAccessTimeUtc)`
 - `void SetLastWriteTime(string path, DateTime lastWriteTime)`
 - `void SetLastWriteTimeUtc(string path, DateTime lastWriteTimeUtc)`
-- `DirectoryInfo GetParent(string path)`
-- `string GetDirectoryRoot(string path)`
-- `string GetCurrentDirectory()`
-- `void SetCurrentDirectory(string path)`
-
 
 ## Notes
 
