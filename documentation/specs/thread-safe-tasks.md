@@ -8,8 +8,6 @@ However, with the introduction of multithreaded MSBuild execution mode, multiple
 
 Tasks that implement the following `IThreadSafeTask` interface should avoid using APIs that modify global process state or rely on process-level state that could cause conflicts when multiple tasks execute simultaneously. For a list of such APIs and their safe alternatives, refer to [Thread-Safe Tasks API Reference](thread-safe-tasks-api-reference.md).
 
-## IThreadSafeTask Interface
-
 ```csharp
 /// <summary>
 /// Interface for tasks that support multithreaded execution in MSBuild.
@@ -31,6 +29,10 @@ public interface IThreadSafeTask : ITask
 
 **TODO**: I want to prevent customers from setting or modifying the ExecutionContext, but I don't want to create it during task construction.
 
+## Alternative Approach: Simple Interfaces
+
+**Note**: The interfaces below represent a simpler approach, but they have the cascading versioning problem you mentioned. They are kept here for reference and comparison with the generic pattern above.
+
 ## ITaskExecutionContext Interface
 
 The `ITaskExecutionContext` provides tasks with access to execution environment information that was previously accessed through global process state:
@@ -50,7 +52,8 @@ public interface ITaskExecutionContext
 ```
 
 ### Questions and Notes:
-1. Should we consider using classes?
+1. ~~Should we flatten the interface? Avoid IFileSystem and place them in the ITaskExecutionContext, and/or remove IPath, IFile, IDirectory?~~ The generic pattern above addresses this by making the structure flexible.
+1. ~~Should we consider using classes?~~ The generic pattern works well with interfaces and provides better testability and flexibility.
 
 ## IEnvironment Interface
 
@@ -85,8 +88,8 @@ public interface IFileSystem
 ```
 
 ### Questions and Notes:
-1. Should we flatten the interface? Avoid IFileSystem and place them in the ITaskExecutionContext, and/or remove IPath, IFile, IDirectory?
-1. Should we consider using classes?
+1. ~~Should we flatten the interface? Avoid IFileSystem and place them in the ITaskExecutionContext, and/or remove IPath, IFile, IDirectory?~~ The generic pattern addresses this concern.
+1. ~~Should we consider using classes?~~ The generic pattern works well with interfaces.
 
 ## IPath Interface
 
@@ -300,6 +303,229 @@ public interface IDirectory
     void SetCurrentDirectory(string path);
 }
 ```
+
+## Generic Versioning Pattern (Recommended Solution)
+
+To avoid the cascading versioning problem when `IFile` needs to be upgraded to `IFile2`, we can use a generic pattern similar to the one used with `BuildSubmissionBase` in MSBuild:
+
+### Base Interfaces (Non-Generic)
+
+```csharp
+/// <summary>
+/// Base interface for tasks that support multithreaded execution in MSBuild.
+/// </summary>
+public interface IThreadSafeTask : ITask
+{
+    /// <summary>
+    /// Execution context for the task, providing thread-safe
+    /// access to environment variables, working directory, and other build context.
+    /// This property will be set by the MSBuild engine before execution is called.
+    /// </summary>
+    ITaskExecutionContextBase ExecutionContext { get; set; }
+}
+
+/// <summary>
+/// Base interface for task execution context.
+/// </summary>
+public interface ITaskExecutionContextBase
+{
+    string CurrentDirectory { get; set; }
+    IEnvironment Environment { get; }
+    IFileSystemBase FileSystem { get; }
+}
+
+/// <summary>
+/// Base interface for file system access.
+/// </summary>
+public interface IFileSystemBase
+{
+    IPathBase Path { get; }
+    IFileBase File { get; }
+    IDirectoryBase Directory { get; }
+}
+
+/// <summary>
+/// Base interface for file operations.
+/// </summary>
+public interface IFileBase
+{
+    bool Exists(string path);
+    string ReadAllText(string path);
+    // ... core methods that rarely change
+}
+
+/// <summary>
+/// Base interface for path operations.
+/// </summary>
+public interface IPathBase
+{
+    string GetFullPath(string path);
+}
+
+/// <summary>
+/// Base interface for directory operations.
+/// </summary>
+public interface IDirectoryBase
+{
+    bool Exists(string path);
+    DirectoryInfo CreateDirectory(string path);
+    // ... core methods that rarely change
+}
+```
+
+### Generic Interfaces (Version-Aware)
+
+```csharp
+/// <summary>
+/// Generic task execution context that allows for versioned components.
+/// </summary>
+public interface ITaskExecutionContext<TPath, TFile, TDirectory> : ITaskExecutionContextBase
+    where TPath : IPathBase
+    where TFile : IFileBase  
+    where TDirectory : IDirectoryBase
+{
+    new IFileSystem<TPath, TFile, TDirectory> FileSystem { get; }
+}
+
+/// <summary>
+/// Generic file system interface that can work with different versions of file/path/directory interfaces.
+/// </summary>
+public interface IFileSystem<TPath, TFile, TDirectory> : IFileSystemBase
+    where TPath : IPathBase
+    where TFile : IFileBase
+    where TDirectory : IDirectoryBase
+{
+    new TPath Path { get; }
+    new TFile File { get; }
+    new TDirectory Directory { get; }
+}
+```
+
+### Versioned Interfaces
+
+```csharp
+/// <summary>
+/// Version 1 of file interface (current).
+/// </summary>
+public interface IFile : IFileBase
+{
+    string ReadAllText(string path, Encoding encoding);
+    byte[] ReadAllBytes(string path);
+    // ... existing methods from current spec
+}
+
+/// <summary>
+/// Version 2 of file interface (future - adds new methods without breaking existing code).
+/// </summary>
+public interface IFile2 : IFile
+{
+    // New methods added in version 2
+    Task<string> ReadAllTextAsync(string path);
+    Task<string> ReadAllTextAsync(string path, Encoding encoding);
+    Task<byte[]> ReadAllBytesAsync(string path);
+    // ... other new async methods
+}
+
+/// <summary>
+/// Version 1 of path interface.
+/// </summary>
+public interface IPath : IPathBase
+{
+    string GetDirectoryName(string path);
+    string GetFileName(string path);
+    // ... existing methods
+}
+
+/// <summary>
+/// Version 1 of directory interface.
+/// </summary>
+public interface IDirectory : IDirectoryBase
+{
+    void Delete(string path);
+    void Delete(string path, bool recursive);
+    // ... existing methods
+}
+```
+
+### Type Aliases for Current Version
+
+```csharp
+/// <summary>
+/// Current version of task execution context.
+/// </summary>
+public interface ITaskExecutionContext : ITaskExecutionContext<IPath, IFile, IDirectory>
+{
+}
+
+/// <summary>
+/// Current version of file system.
+/// </summary>  
+public interface IFileSystem : IFileSystem<IPath, IFile, IDirectory>
+{
+}
+```
+
+### Usage Examples
+
+```csharp
+// Current tasks use the non-generic interfaces (which map to current versions)
+public class MyTask : IThreadSafeTask
+{
+    public ITaskExecutionContextBase ExecutionContext { get; set; }
+    
+    public bool Execute()
+    {
+        // Works with current version
+        var content = ((ITaskExecutionContext)ExecutionContext).FileSystem.File.ReadAllText("file.txt");
+        return true;
+    }
+}
+
+// Advanced tasks that need specific versions can be explicit
+public class AdvancedTask : Task
+{
+    public ITaskExecutionContext<IPath, IFile2, IDirectory> ExecutionContext { get; set; }
+    
+    public override bool Execute()
+    {
+        // Uses version 2 file interface with async methods
+        var content = await ExecutionContext.FileSystem.File.ReadAllTextAsync("file.txt");
+        return true;
+    }
+}
+
+// MSBuild engine implementation can provide the appropriate version
+public class TaskExecutionContextV2 : ITaskExecutionContext<IPath, IFile2, IDirectory>
+{
+    public string CurrentDirectory { get; set; }
+    public IEnvironment Environment { get; }
+    public IFileSystem<IPath, IFile2, IDirectory> FileSystem { get; }
+    
+    // Explicit interface implementations for base interfaces
+    IFileSystemBase ITaskExecutionContextBase.FileSystem => FileSystem;
+}
+```
+
+### Benefits of This Pattern
+
+1. **No Cascading Updates**: When `IFile2` is introduced, existing interfaces (`ITaskExecutionContext`, `IFileSystem`) don't need to be versioned.
+
+2. **Backward Compatibility**: Existing tasks continue to work without modification.
+
+3. **Forward Compatibility**: New tasks can opt into newer interface versions explicitly.
+
+4. **Flexible Mixing**: Tasks can mix and match interface versions (e.g., use `IFile2` with `IPath` v1).
+
+5. **Type Safety**: Compile-time checking ensures compatible interface versions are used together.
+
+### Migration Path
+
+1. **Phase 1**: Introduce base interfaces and current versioned interfaces
+2. **Phase 2**: Update MSBuild engine to provide generic implementations  
+3. **Phase 3**: When new features are needed, add `IFile2`, `IPath2`, etc. without touching higher-level interfaces
+4. **Phase 4**: Tasks can gradually opt into newer versions as needed
+
+This approach eliminates the cascading versioning problem while maintaining full backward compatibility and providing a clear upgrade path for the future.
 
 ## Notes
 
