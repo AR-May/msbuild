@@ -255,117 +255,146 @@ public class VersionAwareTask : IThreadSafeTask
 
 ### File Methods
 
-**TODO**: Generated with Copilot, review that it correctly mirrors all the functions in .NET class that use relative paths:
+**Question** In net core and net framework (and in different versions) there is different set of the functions. Which exactly should we take?
 
-- `void AppendAllBytes(string path, byte[] bytes)`
-- `void AppendAllLines(string path, IEnumerable<string> contents)`
-- `void AppendAllLines(string path, IEnumerable<string> contents, Encoding encoding)`
-- `void AppendAllText(string path, string contents)`
-- `void AppendAllText(string path, string contents, Encoding encoding)`
-- `void AppendAllText(string path, ReadOnlySpan<char> contents)`
-- `void AppendAllText(string path, ReadOnlySpan<char> contents, Encoding encoding)`
-- `StreamWriter AppendText(string path)`
-- `void Copy(string sourceFileName, string destFileName)`
-- `void Copy(string sourceFileName, string destFileName, bool overwrite)`
-- `FileStream Create(string path)`
-- `FileStream Create(string path, int bufferSize)`
-- `FileStream Create(string path, int bufferSize, FileOptions options)`
-- `StreamWriter CreateText(string path)`
-- `void Decrypt(string path)`
-- `void Delete(string path)`
-- `void Encrypt(string path)`
-- `bool Exists(string path)`
-- `FileSecurity GetAccessControl(string path)`
-- `FileSecurity GetAccessControl(string path, AccessControlSections includeSections)`
-- `FileAttributes GetAttributes(string path)`
-- `DateTime GetCreationTime(string path)`
-- `DateTime GetCreationTimeUtc(string path)`
-- `DateTime GetLastAccessTime(string path)`
-- `DateTime GetLastAccessTimeUtc(string path)`
-- `DateTime GetLastWriteTime(string path)`
-- `DateTime GetLastWriteTimeUtc(string path)`
-- `void Move(string sourceFileName, string destFileName)`
-- `void Move(string sourceFileName, string destFileName, bool overwrite)`
-- `FileStream Open(string path, FileMode mode)`
-- `FileStream Open(string path, FileMode mode, FileAccess access)`
-- `FileStream Open(string path, FileMode mode, FileAccess access, FileShare share)`
-- `FileStream OpenRead(string path)`
-- `StreamReader OpenText(string path)`
-- `FileStream OpenWrite(string path)`
-- `byte[] ReadAllBytes(string path)`
-- `string[] ReadAllLines(string path)`
-- `string[] ReadAllLines(string path, Encoding encoding)`
-- `string ReadAllText(string path)`
-- `string ReadAllText(string path, Encoding encoding)`
-- `IEnumerable<string> ReadLines(string path)`
-- `IEnumerable<string> ReadLines(string path, Encoding encoding)`
-- `void Replace(string sourceFileName, string destinationFileName, string destinationBackupFileName)`
-- `void Replace(string sourceFileName, string destinationFileName, string destinationBackupFileName, bool ignoreMetadataErrors)`
-- `void SetAccessControl(string path, FileSecurity fileSecurity)`
-- `void SetAttributes(string path, FileAttributes fileAttributes)`
-- `void SetCreationTime(string path, DateTime creationTime)`
-- `void SetCreationTimeUtc(string path, DateTime creationTimeUtc)`
-- `void SetLastAccessTime(string path, DateTime lastAccessTime)`
-- `void SetLastAccessTimeUtc(string path, DateTime lastAccessTimeUtc)`
-- `void SetLastWriteTime(string path, DateTime lastWriteTime)`
-- `void SetLastWriteTimeUtc(string path, DateTime lastWriteTimeUtc)`
-- `void WriteAllBytes(string path, byte[] bytes)`
-- `void WriteAllLines(string path, string[] contents)`
-- `void WriteAllLines(string path, IEnumerable<string> contents)`
-- `void WriteAllLines(string path, string[] contents, Encoding encoding)`
-- `void WriteAllLines(string path, IEnumerable<string> contents, Encoding encoding)`
-- `void WriteAllText(string path, string contents)`
-- `void WriteAllText(string path, string contents, Encoding encoding)`
-
-**Note** In net core and framework and in different versions there is different set of the functions. Which exactly we will include
 **Idea** We can use info from apisof.net to identify the most used API and we can drop not much used.
+
+The following table lists System.IO.File APIs that may take relative paths as parameters:
+
+| Signature | Available | Include? |
+|-----------|-----------|----------|
+| void AppendAllBytes(string path, byte[] bytes) | net10 | Yes |
+| Task AppendAllBytes(string path, ReadOnlyMemory<byte> bytes) | net10 | No |
+| void AppendAllLines(string path, IEnumerable<string> contents) | netstandard2.0 | Yes |
+| void AppendAllLines(string path, IEnumerable<string> contents, Encoding encoding) | netstandard2.0 | Yes |
+| void AppendAllText(string path, string contents) | netstandard2.0 | Yes |
+| void AppendAllText(string path, string contents, Encoding encoding) | netstandard2.0 | Yes |
+| void AppendAllText(string path, ReadOnlySpan<char> contents) | net10 | No |
+| void AppendAllText(string path, ReadOnlySpan<char> contents, Encoding encoding) | net10 | No |
+| StreamWriter AppendText(string path) | netstandard2.0 | Yes |
+| void Copy(string sourceFileName, string destFileName) | netstandard2.0 | Yes |
+| void Copy(string sourceFileName, string destFileName, bool overwrite) | netstandard2.0 | Yes |
+| FileStream Create(string path) | netstandard2.0 | Yes |
+| FileStream Create(string path, int bufferSize) | netstandard2.0 | No |
+| FileStream Create(string path, int bufferSize, FileOptions options) | netstandard2.0 | No |
+| FileStream Create(string path, int bufferSize, FileOptions options, FileSecurity fileSecurity) | net472 | No |
+| FileSystemInfo CreateSymbolicLink(string path, string pathToTarget) | net10 | No |
+| StreamWriter CreateText(string path) | netstandard2.0 | Yes |
+| void Decrypt(string path) | netstandard2.0 | No |
+| void Delete(string path) | netstandard2.0 | Yes |
+| void Encrypt(string path) | netstandard2.0 | No |
+| bool Exists(string path) | netstandard2.0 | Yes |
+| FileSecurity GetAccessControl(string path) | net472 | No |
+| FileSecurity GetAccessControl(string path, AccessControlSections includeSections) | net472 | No |
+| FileAttributes GetAttributes(string path) | netstandard2.0 | Yes |
+| DateTime GetCreationTime(string path) | netstandard2.0 | Yes |
+| DateTime GetCreationTimeUtc(string path) | netstandard2.0 | Yes |
+| DateTime GetLastAccessTime(string path) | netstandard2.0 | Yes |
+| DateTime GetLastAccessTimeUtc(string path) | netstandard2.0 | Yes |
+| DateTime GetLastWriteTime(string path) | netstandard2.0 | Yes |
+| DateTime GetLastWriteTimeUtc(string path) | netstandard2.0 | Yes |
+| UnixFileMode GetUnixFileMode(string path) | net10 | No |
+| void Move(string sourceFileName, string destFileName) | netstandard2.0 | Yes |
+| void Move(string sourceFileName, string destFileName, bool overwrite) | net10 | Yes |
+| FileStream Open(string path, FileMode mode) | netstandard2.0 | Yes |
+| FileStream Open(string path, FileMode mode, FileAccess access) | netstandard2.0 | Yes |
+| FileStream Open(string path, FileMode mode, FileAccess access, FileShare share) | netstandard2.0 | Yes |
+| FileStream Open(string path, FileStreamOptions options) | net10 | No |
+| SafeFileHandle OpenHandle(string path, FileMode mode, FileAccess access, FileShare share, FileOptions options, long preallocationSize) | net10 | No |
+| FileStream OpenRead(string path) | netstandard2.0 | Yes |
+| StreamReader OpenText(string path) | netstandard2.0 | Yes |
+| FileStream OpenWrite(string path) | netstandard2.0 | Yes |
+| byte[] ReadAllBytes(string path) | netstandard2.0 | Yes |
+| string[] ReadAllLines(string path) | netstandard2.0 | Yes |
+| string[] ReadAllLines(string path, Encoding encoding) | netstandard2.0 | Yes |
+| string ReadAllText(string path) | netstandard2.0 | Yes |
+| string ReadAllText(string path, Encoding encoding) | netstandard2.0 | Yes |
+| IEnumerable<string> ReadLines(string path) | netstandard2.0 | Yes |
+| IEnumerable<string> ReadLines(string path, Encoding encoding) | netstandard2.0 | Yes |
+| void Replace(string sourceFileName, string destinationFileName, string destinationBackupFileName) | netstandard2.0 | Yes |
+| void Replace(string sourceFileName, string destinationFileName, string destinationBackupFileName, bool ignoreMetadataErrors) | netstandard2.0 | Yes |
+| FileSystemInfo ResolveLinkTarget(string linkPath, bool returnFinalTarget) | net10 | No |
+| void SetAccessControl(string path, FileSecurity fileSecurity) | net472 | No |
+| void SetAttributes(string path, FileAttributes fileAttributes) | netstandard2.0 | Yes |
+| void SetCreationTime(string path, DateTime creationTime) | netstandard2.0 | Yes |
+| void SetCreationTimeUtc(string path, DateTime creationTimeUtc) | netstandard2.0 | Yes |
+| void SetLastAccessTime(string path, DateTime lastAccessTime) | netstandard2.0 | Yes |
+| void SetLastAccessTimeUtc(string path, DateTime lastAccessTimeUtc) | netstandard2.0 | Yes |
+| void SetLastWriteTime(string path, DateTime lastWriteTime) | netstandard2.0 | Yes |
+| void SetLastWriteTimeUtc(string path, DateTime lastWriteTimeUtc) | netstandard2.0 | Yes |
+| void SetUnixFileMode(string path, UnixFileMode mode) | net10 | No |
+| void WriteAllBytes(string path, byte[] bytes) | netstandard2.0 | Yes |
+| void WriteAllBytes(string path, ReadOnlySpan<byte> bytes) | net10 | No |
+| void WriteAllLines(string path, IEnumerable<string> contents) | netstandard2.0 | Yes |
+| void WriteAllLines(string path, IEnumerable<string> contents, Encoding encoding) | netstandard2.0 | Yes |
+| void WriteAllLines(string path, string[] contents) | netstandard2.0 | Yes |
+| void WriteAllLines(string path, string[] contents, Encoding encoding) | netstandard2.0 | Yes |
+| void WriteAllText(string path, string contents) | netstandard2.0 | Yes |
+| void WriteAllText(string path, string contents, Encoding encoding) | netstandard2.0 | Yes |
+| void WriteAllText(string path, ReadOnlySpan<char> contents) | net10 | No |
+| void WriteAllText(string path, ReadOnlySpan<char> contents, Encoding encoding) | net10 | No |
+
+**Warning**: Async methods and SafeFileHandle-based methods are excluded from this spec but could be added in future versions.
 
 ### Directory Methods
 
-**TODO**: Generated with Copilot, review that it correctly mirrors all the functions in .NET class that use relative paths:
+The following table lists System.IO.Directory APIs that may take relative paths as parameters:
 
-- `DirectoryInfo CreateDirectory(string path)`
-- `void Delete(string path)`
-- `void Delete(string path, bool recursive)`
-- `IEnumerable<string> EnumerateDirectories(string path)`
-- `IEnumerable<string> EnumerateDirectories(string path, string searchPattern)`
-- `IEnumerable<string> EnumerateDirectories(string path, string searchPattern, SearchOption searchOption)`
-- `IEnumerable<string> EnumerateFiles(string path)`
-- `IEnumerable<string> EnumerateFiles(string path, string searchPattern)`
-- `IEnumerable<string> EnumerateFiles(string path, string searchPattern, SearchOption searchOption)`
-- `IEnumerable<string> EnumerateFileSystemEntries(string path)`
-- `IEnumerable<string> EnumerateFileSystemEntries(string path, string searchPattern)`
-- `IEnumerable<string> EnumerateFileSystemEntries(string path, string searchPattern, SearchOption searchOption)`
-- `bool Exists(string path)`
-- `DirectorySecurity GetAccessControl(string path)`
-- `DirectorySecurity GetAccessControl(string path, AccessControlSections includeSections)`
-- `DateTime GetCreationTime(string path)`
-- `DateTime GetCreationTimeUtc(string path)`
-- `string GetCurrentDirectory()`
-- `string[] GetDirectories(string path)`
-- `string[] GetDirectories(string path, string searchPattern)`
-- `string[] GetDirectories(string path, string searchPattern, SearchOption searchOption)`
-- `string GetDirectoryRoot(string path)`
-- `string[] GetFiles(string path)`
-- `string[] GetFiles(string path, string searchPattern)`
-- `string[] GetFiles(string path, string searchPattern, SearchOption searchOption)`
-- `string[] GetFileSystemEntries(string path)`
-- `string[] GetFileSystemEntries(string path, string searchPattern)`
-- `string[] GetFileSystemEntries(string path, string searchPattern, SearchOption searchOption)`
-- `DateTime GetLastAccessTime(string path)`
-- `DateTime GetLastAccessTimeUtc(string path)`
-- `DateTime GetLastWriteTime(string path)`
-- `DateTime GetLastWriteTimeUtc(string path)`
-- `DirectoryInfo GetParent(string path)`
-- `void Move(string sourceDirName, string destDirName)`
-- `void SetAccessControl(string path, DirectorySecurity directorySecurity)`
-- `void SetCreationTime(string path, DateTime creationTime)`
-- `void SetCreationTimeUtc(string path, DateTime creationTimeUtc)`
-- `void SetCurrentDirectory(string path)`
-- `void SetLastAccessTime(string path, DateTime lastAccessTime)`
-- `void SetLastAccessTimeUtc(string path, DateTime lastAccessTimeUtc)`
-- `void SetLastWriteTime(string path, DateTime lastWriteTime)`
-- `void SetLastWriteTimeUtc(string path, DateTime lastWriteTimeUtc)`
+| Signature | Available | Include? |
+|-----------|-----------|----------|
+| DirectoryInfo CreateDirectory(string path) | netstandard2.0 | Yes |
+| DirectoryInfo CreateDirectory(string path, DirectorySecurity directorySecurity) | net472 | No |
+| DirectoryInfo CreateDirectory(string path, UnixFileMode unixCreateMode) | net10 | No |
+| FileSystemInfo CreateSymbolicLink(string path, string pathToTarget) | net10 | No |
+| DirectoryInfo CreateTempSubdirectory(string prefix) | net10 | No |
+| void Delete(string path) | netstandard2.0 | Yes |
+| void Delete(string path, bool recursive) | netstandard2.0 | Yes |
+| IEnumerable<string> EnumerateDirectories(string path) | netstandard2.0 | Yes |
+| IEnumerable<string> EnumerateDirectories(string path, string searchPattern) | netstandard2.0 | Yes |
+| IEnumerable<string> EnumerateDirectories(string path, string searchPattern, EnumerationOptions enumerationOptions) | net10 | No |
+| IEnumerable<string> EnumerateDirectories(string path, string searchPattern, SearchOption searchOption) | netstandard2.0 | No |
+| IEnumerable<string> EnumerateFiles(string path) | netstandard2.0 | Yes |
+| IEnumerable<string> EnumerateFiles(string path, string searchPattern) | netstandard2.0 | Yes |
+| IEnumerable<string> EnumerateFiles(string path, string searchPattern, EnumerationOptions enumerationOptions) | net10 | No |
+| IEnumerable<string> EnumerateFiles(string path, string searchPattern, SearchOption searchOption) | netstandard2.0 | No |
+| IEnumerable<string> EnumerateFileSystemEntries(string path) | netstandard2.0 | Yes |
+| IEnumerable<string> EnumerateFileSystemEntries(string path, string searchPattern) | netstandard2.0 | Yes |
+| IEnumerable<string> EnumerateFileSystemEntries(string path, string searchPattern, EnumerationOptions enumerationOptions) | net10 | No |
+| IEnumerable<string> EnumerateFileSystemEntries(string path, string searchPattern, SearchOption searchOption) | netstandard2.0 | No |
+| bool Exists(string path) | netstandard2.0 | Yes |
+| DirectorySecurity GetAccessControl(string path) | net472 | No |
+| DirectorySecurity GetAccessControl(string path, AccessControlSections includeSections) | net472 | No |
+| DateTime GetCreationTime(string path) | netstandard2.0 | Yes |
+| DateTime GetCreationTimeUtc(string path) | netstandard2.0 | Yes |
+| string GetCurrentDirectory() | netstandard2.0 | Yes |
+| string[] GetDirectories(string path) | netstandard2.0 | Yes |
+| string[] GetDirectories(string path, string searchPattern) | netstandard2.0 | Yes |
+| string[] GetDirectories(string path, string searchPattern, EnumerationOptions enumerationOptions) | net10 | No |
+| string[] GetDirectories(string path, string searchPattern, SearchOption searchOption) | netstandard2.0 | No |
+| string GetDirectoryRoot(string path) | netstandard2.0 | No |
+| string[] GetFiles(string path) | netstandard2.0 | Yes |
+| string[] GetFiles(string path, string searchPattern) | netstandard2.0 | Yes |
+| string[] GetFiles(string path, string searchPattern, EnumerationOptions enumerationOptions) | net10 | No |
+| string[] GetFiles(string path, string searchPattern, SearchOption searchOption) | netstandard2.0 | No |
+| string[] GetFileSystemEntries(string path) | netstandard2.0 | Yes |
+| string[] GetFileSystemEntries(string path, string searchPattern) | netstandard2.0 | Yes |
+| string[] GetFileSystemEntries(string path, string searchPattern, EnumerationOptions enumerationOptions) | net10 | No |
+| string[] GetFileSystemEntries(string path, string searchPattern, SearchOption searchOption) | netstandard2.0 | No |
+| DateTime GetLastAccessTime(string path) | netstandard2.0 | Yes |
+| DateTime GetLastAccessTimeUtc(string path) | netstandard2.0 | Yes |
+| DateTime GetLastWriteTime(string path) | netstandard2.0 | Yes |
+| DateTime GetLastWriteTimeUtc(string path) | netstandard2.0 | Yes |
+| DirectoryInfo GetParent(string path) | netstandard2.0 | Yes |
+| void Move(string sourceDirName, string destDirName) | netstandard2.0 | Yes |
+| FileSystemInfo ResolveLinkTarget(string linkPath, bool returnFinalTarget) | net10 | No |
+| void SetAccessControl(string path, DirectorySecurity directorySecurity) | net472 | No |
+| void SetCreationTime(string path, DateTime creationTime) | netstandard2.0 | Yes |
+| void SetCreationTimeUtc(string path, DateTime creationTimeUtc) | netstandard2.0 | Yes |
+| void SetCurrentDirectory(string path) | netstandard2.0 | Yes |
+| void SetLastAccessTime(string path, DateTime lastAccessTime) | netstandard2.0 | Yes |
+| void SetLastAccessTimeUtc(string path, DateTime lastAccessTimeUtc) | netstandard2.0 | Yes |
+| void SetLastWriteTime(string path, DateTime lastWriteTime) | netstandard2.0 | Yes |
+| void SetLastWriteTimeUtc(string path, DateTime lastWriteTimeUtc) | netstandard2.0 | Yes |
 
 ## Notes
 
