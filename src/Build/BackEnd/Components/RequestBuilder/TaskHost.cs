@@ -1323,9 +1323,9 @@ namespace Microsoft.Build.BackEnd
         private static readonly FrozenSet<string> s_threadSafeTasks = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             // Core MSBuild tasks that are known to be thread-safe
-            "Message",
-            "Warning",
-            "Error",
+            // "Message",
+            // "Warning",
+            // "Error",
             "ItemGroup",
             "PropertyGroup",
             "CallTarget",
