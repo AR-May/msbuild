@@ -2,6 +2,7 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
+using System.Diagnostics;
 using Microsoft.Build.Framework;
 
 #nullable disable
@@ -47,6 +48,9 @@ namespace Microsoft.Build.Tasks
 
         public override bool Execute()
         {
+            int processId = Process.GetCurrentProcess().Id;
+            Log.LogMessage(MessageImportance.High, "Message task, Process ID: {0}", processId);
+
             MessageImportance messageImportance;
 
             if (string.IsNullOrEmpty(Importance))
