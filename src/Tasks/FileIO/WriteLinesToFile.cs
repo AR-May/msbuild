@@ -16,10 +16,16 @@ namespace Microsoft.Build.Tasks
     /// <summary>
     /// Appends a list of items to a file. One item per line with carriage returns in-between.
     /// </summary>
-    public class WriteLinesToFile : TaskExtension, IIncrementalTask
+    public class WriteLinesToFile : TaskExtension, IConcurrentTask, IIncrementalTask
     {
         // Default encoding taken from System.IO.WriteAllText()
         private static readonly Encoding s_defaultEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
+        
+        /// <summary>
+        /// Execution context used when task is supposed to run concurrently in multiple threads.
+        /// If null hosting process do not run this task concurrently and set it execution context on process level.
+        /// </summary>
+        private TaskExecutionContext _executionContext;
 
         /// <summary>
         /// File to write lines to.
@@ -96,7 +102,8 @@ namespace Microsoft.Build.Tasks
 
                 try
                 {
-                    var directoryPath = Path.GetDirectoryName(FileUtilities.NormalizePath(File.ItemSpec));
+                    string filePath = _executionContext.GetFullPath(File.ItemSpec);
+                    var directoryPath = Path.GetDirectoryName(FileUtilities.NormalizePath(filePath));
                     if (Overwrite)
                     {
                         Directory.CreateDirectory(directoryPath);
@@ -108,9 +115,9 @@ namespace Microsoft.Build.Tasks
                             MSBuildEventSource.Log.WriteLinesToFileUpToDateStart();
                             try
                             {
-                                if (FileUtilities.FileExistsNoThrow(File.ItemSpec))
+                                if (FileUtilities.FileExistsNoThrow(filePath))
                                 {
-                                    string existingContents = System.IO.File.ReadAllText(File.ItemSpec);
+                                    string existingContents = System.IO.File.ReadAllText(filePath);
                                     if (existingContents.Length == buffer.Length)
                                     {
                                         if (existingContents.Equals(contentsAsString))
@@ -134,7 +141,7 @@ namespace Microsoft.Build.Tasks
                             MSBuildEventSource.Log.WriteLinesToFileUpToDateStop(File.ItemSpec, false);
                         }
 
-                        System.IO.File.WriteAllText(File.ItemSpec, contentsAsString, encoding);
+                        System.IO.File.WriteAllText(filePath, contentsAsString, encoding);
                     }
                     else
                     {
@@ -144,7 +151,7 @@ namespace Microsoft.Build.Tasks
                         }
 
                         Directory.CreateDirectory(directoryPath);
-                        System.IO.File.AppendAllText(File.ItemSpec, buffer.ToString(), encoding);
+                        System.IO.File.AppendAllText(filePath, buffer.ToString(), encoding);
                     }
                 }
                 catch (Exception e) when (ExceptionHandling.IsIoRelatedException(e))
@@ -156,6 +163,14 @@ namespace Microsoft.Build.Tasks
             }
 
             return success;
+        }
+
+        /// <summary>
+        /// Configure the task for concurrent execution
+        /// </summary>
+        void IConcurrentTask.ConfigureForConcurrentExecution(TaskExecutionContext executionContext)
+        {
+            _executionContext = executionContext;
         }
     }
 }
