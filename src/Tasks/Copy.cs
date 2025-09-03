@@ -21,7 +21,7 @@ namespace Microsoft.Build.Tasks
     /// <summary>
     /// A task that copies files.
     /// </summary>
-    public class Copy : TaskExtension, IIncrementalTask, ICancelableTask
+    public class Copy : TaskExtension, IIncrementalTask, ICancelableTask, IConcurrentTask
     {
         internal const string AlwaysRetryEnvVar = "MSBUILDALWAYSRETRY";
         internal const string AlwaysOverwriteReadOnlyFilesEnvVar = "MSBUILDALWAYSOVERWRITEREADONLYFILES";
@@ -48,6 +48,8 @@ namespace Microsoft.Build.Tasks
         private AutoResetEvent _signalCopyTasksCompleted;
 
         private static ConcurrentQueue<Action> _copyActionQueue = new ConcurrentQueue<Action>();
+
+        private TaskExecutionContext _executionContext;
 
         private static void InitializeCopyThreads()
         {
@@ -372,9 +374,11 @@ namespace Microsoft.Build.Tasks
             if (!hardLinkCreated && !symbolicLinkCreated)
             {
                 // Do not log a fake command line as well, as it's superfluous, and also potentially expensive
-                Log.LogMessage(MessageImportance.Normal, FileComment, sourceFileState.FileNameFullPath, destinationFileState.FileNameFullPath);
+                string sourceFilePath = _executionContext.GetFullPath(sourceFileState.Name);
+                string destinationFilePath = _executionContext.GetFullPath(destinationFileState.Name);
+                Log.LogMessage(MessageImportance.Normal, FileComment, sourceFilePath, destinationFilePath);
 
-                File.Copy(sourceFileState.Name, destinationFileState.Name, true);
+                File.Copy(sourceFilePath, destinationFilePath, true);
             }
 
             // If the destinationFile file exists, then make sure it's read-write.
@@ -512,7 +516,7 @@ namespace Microsoft.Build.Tasks
 
                 if (!copyComplete)
                 {
-                    if (DoCopyIfNecessary(new FileState(SourceFiles[i].ItemSpec), new FileState(DestinationFiles[i].ItemSpec), copyFile))
+                    if (DoCopyIfNecessary(new FileState(SourceFiles[i].ItemSpec, _executionContext), new FileState(DestinationFiles[i].ItemSpec, _executionContext), copyFile))
                     {
                         filesActuallyCopied[destPath] = SourceFiles[i].ItemSpec;
                         copyComplete = true;
@@ -658,8 +662,8 @@ namespace Microsoft.Build.Tasks
                             if (!copyComplete)
                             {
                                 if (DoCopyIfNecessary(
-                                    new FileState(sourceItem.ItemSpec),
-                                    new FileState(destItem.ItemSpec),
+                                    new FileState(sourceItem.ItemSpec, _executionContext),
+                                    new FileState(destItem.ItemSpec, _executionContext),
                                     copyFile))
                                 {
                                     copyComplete = true;
@@ -1104,5 +1108,7 @@ namespace Microsoft.Build.Tasks
             int parallelism = Traits.Instance.CopyTaskParallelism;
             return parallelism != 1;
         }
+
+        void IConcurrentTask.ConfigureForConcurrentExecution(TaskExecutionContext executionContext) => _executionContext = executionContext;
     }
 }
