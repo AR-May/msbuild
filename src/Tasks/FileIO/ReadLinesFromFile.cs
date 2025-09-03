@@ -15,8 +15,14 @@ namespace Microsoft.Build.Tasks
     /// <summary>
     /// Read a list of items from a file.
     /// </summary>
-    public class ReadLinesFromFile : TaskExtension
+    public class ReadLinesFromFile : TaskExtension, IConcurrentTask
     {
+        /// <summary>
+        /// Execution context used when task is supposed to run concurrently in multiple threads.
+        /// If null hosting process do not run this task concurrently and set it execution context on process level.
+        /// </summary>
+        private TaskExecutionContext _executionContext;
+
         /// <summary>
         /// File to read lines from.
         /// </summary>
@@ -38,11 +44,12 @@ namespace Microsoft.Build.Tasks
             bool success = true;
             if (File != null)
             {
-                if (FileSystems.Default.FileExists(File.ItemSpec))
+                string filePath = _executionContext.GetFullPath(File.ItemSpec);
+                if (FileSystems.Default.FileExists(filePath))
                 {
                     try
                     {
-                        string[] textLines = System.IO.File.ReadAllLines(File.ItemSpec);
+                        string[] textLines = System.IO.File.ReadAllLines(filePath);
 
                         var nonEmptyLines = new List<ITaskItem>();
                         char[] charsToTrim = { '\0', ' ', '\t' };
@@ -73,6 +80,14 @@ namespace Microsoft.Build.Tasks
             }
 
             return success;
+        }
+
+        /// <summary>
+        /// Configure the task for concurrent execution
+        /// </summary>
+        void IConcurrentTask.ConfigureForConcurrentExecution(TaskExecutionContext executionContext)
+        {
+            _executionContext = executionContext;
         }
     }
 }
