@@ -16,8 +16,9 @@ namespace Microsoft.Build.Tasks
     /// <summary>
     /// Remove the specified directories.
     /// </summary>
-    public class RemoveDir : TaskExtension, IIncrementalTask
+    public class RemoveDir : TaskExtension, IIncrementalTask, IConcurrentTask
     {
+        private TaskExecutionContext _executionContext;
         //-----------------------------------------------------------------------------------
         // Property:  directory to remove
         //-----------------------------------------------------------------------------------
@@ -43,6 +44,12 @@ namespace Microsoft.Build.Tasks
 
         public bool FailIfNotIncremental { get; set; }
 
+        // IConcurrentTask implementation - MSBuild will call this to provide the execution context
+        public void ConfigureForConcurrentExecution(TaskExecutionContext executionContext)
+        {
+            _executionContext = executionContext;
+        }
+
         //-----------------------------------------------------------------------------------
         // Execute -- this runs the task
         //-----------------------------------------------------------------------------------
@@ -61,7 +68,8 @@ namespace Microsoft.Build.Tasks
                     continue;
                 }
 
-                if (FileSystems.Default.DirectoryExists(directory.ItemSpec))
+                string absolutePath = _executionContext?.GetFullPath(directory.ItemSpec) ?? directory.ItemSpec;
+                if (FileSystems.Default.DirectoryExists(absolutePath))
                 {
                     if (FailIfNotIncremental)
                     {
@@ -74,18 +82,18 @@ namespace Microsoft.Build.Tasks
 
                     // Try to remove the directory, this will not log unauthorized access errors since
                     // we will attempt to remove read only attributes and try again.
-                    bool currentSuccess = RemoveDirectory(directory, false, out bool unauthorizedAccess);
+                    bool currentSuccess = RemoveDirectory(directory, absolutePath, false, out bool unauthorizedAccess);
 
                     // The first attempt failed, to we will remove readonly attributes and try again..
                     if (!currentSuccess && unauthorizedAccess)
                     {
                         // If the directory delete operation returns an unauthorized access exception
                         // we need to attempt to remove the readonly attributes and try again.
-                        currentSuccess = RemoveReadOnlyAttributeRecursively(new DirectoryInfo(directory.ItemSpec));
+                        currentSuccess = RemoveReadOnlyAttributeRecursively(new DirectoryInfo(absolutePath));
                         if (currentSuccess)
                         {
                             // Retry the remove directory operation, this time we want to log any errors
-                            currentSuccess = RemoveDirectory(directory, true, out unauthorizedAccess);
+                            currentSuccess = RemoveDirectory(directory, absolutePath, true, out unauthorizedAccess);
                         }
                     }
 
@@ -111,7 +119,7 @@ namespace Microsoft.Build.Tasks
         }
 
         // Core implementation of directory removal
-        private bool RemoveDirectory(ITaskItem directory, bool logUnauthorizedError, out bool unauthorizedAccess)
+        private bool RemoveDirectory(ITaskItem directory, string absolutePath, bool logUnauthorizedError, out bool unauthorizedAccess)
         {
             bool success = true;
 
@@ -120,7 +128,7 @@ namespace Microsoft.Build.Tasks
             try
             {
                 // Try to delete the directory
-                Directory.Delete(directory.ItemSpec, true);
+                Directory.Delete(absolutePath, true);
             }
             catch (UnauthorizedAccessException e)
             {
