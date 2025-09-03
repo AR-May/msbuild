@@ -23,7 +23,7 @@ namespace Microsoft.Build.Tasks
     /// for it to complete, and then returns True if the process completed successfully, and False if an error occurred.
     /// </summary>
     // UNDONE: ToolTask has a "UseCommandProcessor" flag that duplicates much of the code in this class. Remove the duplication.
-    public class Exec : ToolTaskExtension
+    public class Exec : ToolTaskExtension, IConcurrentTask
     {
         #region Constructors
 
@@ -51,6 +51,7 @@ namespace Microsoft.Build.Tasks
         private string _workingDirectory;
         private ITaskItem[] _outputs;
         internal bool workingDirectoryIsUNC; // internal for unit testing
+        private TaskExecutionContext _executionContext;
         private string _batchFile;
         private string _customErrorRegex;
         private string _customWarningRegex;
@@ -458,7 +459,7 @@ namespace Microsoft.Build.Tasks
             // directory use that, otherwise it's the current directory
             _workingDirectory = !string.IsNullOrEmpty(WorkingDirectory)
                 ? WorkingDirectory
-                : Directory.GetCurrentDirectory();
+                : _executionContext.StartupDirectory ?? Directory.GetCurrentDirectory();
 
             // check if the working directory we're going to use for the exec command is a UNC path
             workingDirectoryIsUNC = FileUtilitiesRegex.StartsWithUncPattern(_workingDirectory);
@@ -666,5 +667,13 @@ namespace Microsoft.Build.Tasks
         protected override MessageImportance StandardOutputLoggingImportance => MessageImportance.High;
 
         #endregion
+
+        /// <summary>
+        /// Configure the task for concurrent execution
+        /// </summary>
+        void IConcurrentTask.ConfigureForConcurrentExecution(TaskExecutionContext executionContext)
+        {
+            _executionContext = executionContext;
+        }
     }
 }
