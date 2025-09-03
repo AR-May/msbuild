@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Reflection;
+using Microsoft.Build.Framework;
 using Microsoft.Build.Shared;
 
 #nullable disable
@@ -30,8 +31,9 @@ namespace Microsoft.Build.Tasks
         /// <param name="fileExists">Delegate that returns if the file exists.</param>
         /// <param name="getRuntimeVersion">Delegate that returns the clr runtime version for the file.</param>
         /// <param name="targetedRuntimeVesion">The targeted runtime version.</param>
-        public CandidateAssemblyFilesResolver(string[] candidateAssemblyFiles, string searchPathElement, GetAssemblyName getAssemblyName, FileExists fileExists, GetAssemblyRuntimeVersion getRuntimeVersion, Version targetedRuntimeVesion)
-            : base(searchPathElement, getAssemblyName, fileExists, getRuntimeVersion, targetedRuntimeVesion, ProcessorArchitecture.None, false)
+        /// <param name="executionContext">The execution context for this task.</param>
+        public CandidateAssemblyFilesResolver(string[] candidateAssemblyFiles, string searchPathElement, GetAssemblyName getAssemblyName, FileExists fileExists, GetAssemblyRuntimeVersion getRuntimeVersion, Version targetedRuntimeVesion, TaskExecutionContext executionContext)
+            : base(searchPathElement, getAssemblyName, fileExists, getRuntimeVersion, targetedRuntimeVesion, ProcessorArchitecture.None, false, executionContext)
         {
             _candidateAssemblyFiles = candidateAssemblyFiles;
         }

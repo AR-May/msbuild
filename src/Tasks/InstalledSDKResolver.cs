@@ -24,8 +24,15 @@ namespace Microsoft.Build.Tasks
         /// <summary>
         /// Construct.
         /// </summary>
-        public InstalledSDKResolver(Dictionary<string, ITaskItem> resolvedSDKs, string searchPathElement, GetAssemblyName getAssemblyName, FileExists fileExists, GetAssemblyRuntimeVersion getRuntimeVersion, Version targetedRuntimeVesion)
-            : base(searchPathElement, getAssemblyName, fileExists, getRuntimeVersion, targetedRuntimeVesion, System.Reflection.ProcessorArchitecture.None, false)
+        public InstalledSDKResolver(
+            Dictionary<string, ITaskItem> resolvedSDKs,
+            string searchPathElement,
+            GetAssemblyName getAssemblyName,
+            FileExists fileExists,
+            GetAssemblyRuntimeVersion getRuntimeVersion,
+            Version targetedRuntimeVesion,
+            TaskExecutionContext executionContext)
+            : base(searchPathElement, getAssemblyName, fileExists, getRuntimeVersion, targetedRuntimeVesion, System.Reflection.ProcessorArchitecture.None, false, executionContext)
         {
             _resolvedSDKs = resolvedSDKs;
         }

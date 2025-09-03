@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using Microsoft.Build.Framework;
 using Microsoft.Build.Shared;
 
 #nullable disable
@@ -29,8 +30,9 @@ namespace Microsoft.Build.Tasks
         /// <param name="getRuntimeVersion">Delegate to get the runtime version.</param>
         /// <param name="targetedRuntimeVesion">The targeted runtime version.</param>
         /// <param name="getAssemblyPathInGac">Delegate to get assembly path in the GAC.</param>
-        public GacResolver(System.Reflection.ProcessorArchitecture targetProcessorArchitecture, string searchPathElement, GetAssemblyName getAssemblyName, FileExists fileExists, GetAssemblyRuntimeVersion getRuntimeVersion, Version targetedRuntimeVesion, GetAssemblyPathInGac getAssemblyPathInGac)
-            : base(searchPathElement, getAssemblyName, fileExists, getRuntimeVersion, targetedRuntimeVesion, targetProcessorArchitecture, true)
+        /// <param name="executionContext">The execution context for this task.</param>
+        public GacResolver(System.Reflection.ProcessorArchitecture targetProcessorArchitecture, string searchPathElement, GetAssemblyName getAssemblyName, FileExists fileExists, GetAssemblyRuntimeVersion getRuntimeVersion, Version targetedRuntimeVesion, GetAssemblyPathInGac getAssemblyPathInGac, TaskExecutionContext executionContext)
+            : base(searchPathElement, getAssemblyName, fileExists, getRuntimeVersion, targetedRuntimeVesion, targetProcessorArchitecture, true, executionContext)
         {
             _getAssemblyPathInGac = getAssemblyPathInGac;
         }
