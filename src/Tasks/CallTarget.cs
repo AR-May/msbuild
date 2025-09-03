@@ -15,12 +15,15 @@ namespace Microsoft.Build.Tasks
     /// id validation checks to fail.
     /// </remarks>
     [RunInMTA]
-    public class CallTarget : TaskExtension
+    public class CallTarget : TaskExtension, IConcurrentTask
     {
         #region Properties
 
         // outputs of all built targets
         private readonly List<ITaskItem> _targetOutputs = new List<ITaskItem>();
+
+        // Execution context for thread-safe operations
+        private TaskExecutionContext _executionContext;
 
         /// <summary>
         /// The targets to build.
@@ -87,7 +90,17 @@ namespace Microsoft.Build.Tasks
                 Log,
                 _targetOutputs,
                 false,
-                null);            // toolsVersion = null
+                null,           // toolsVersion = null
+                _executionContext);
+        }
+
+        /// <summary>
+        /// Configures this task for concurrent execution.
+        /// </summary>
+        /// <param name="executionContext">The execution context for this task.</param>
+        public void ConfigureForConcurrentExecution(TaskExecutionContext executionContext)
+        {
+            _executionContext = executionContext;
         }
 
         #endregion
