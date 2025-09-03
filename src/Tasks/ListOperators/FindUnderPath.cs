@@ -15,8 +15,11 @@ namespace Microsoft.Build.Tasks
     /// <summary>
     /// Given a list of items, determine which are in the cone of the folder passed in and which aren't.
     /// </summary>
-    public class FindUnderPath : TaskExtension
+    public class FindUnderPath : TaskExtension, IConcurrentTask
     {
+        // Execution context for thread-safe operations
+        private TaskExecutionContext _executionContext;
+
         /// <summary>
         /// Filter based on whether items fall under this path or not.
         /// </summary>
@@ -59,7 +62,7 @@ namespace Microsoft.Build.Tasks
             {
                 conePath =
                     Strings.WeakIntern(
-                        System.IO.Path.GetFullPath(FileUtilities.FixFilePath(Path.ItemSpec)));
+                        _executionContext.GetFullPath(FileUtilities.FixFilePath(Path.ItemSpec)));
                 conePath = FileUtilities.EnsureTrailingSlash(conePath);
             }
             catch (Exception e) when (ExceptionHandling.IsIoRelatedException(e))
@@ -80,7 +83,7 @@ namespace Microsoft.Build.Tasks
                 {
                     fullPath =
                         Strings.WeakIntern(
-                            System.IO.Path.GetFullPath(FileUtilities.FixFilePath(item.ItemSpec)));
+                            _executionContext.GetFullPath(FileUtilities.FixFilePath(item.ItemSpec)));
                 }
                 catch (Exception e) when (ExceptionHandling.IsIoRelatedException(e))
                 {
@@ -111,6 +114,15 @@ namespace Microsoft.Build.Tasks
             InPath = inPathList.ToArray();
             OutOfPath = outOfPathList.ToArray();
             return true;
+        }
+
+        /// <summary>
+        /// Configures this task for concurrent execution.
+        /// </summary>
+        /// <param name="executionContext">The execution context for this task.</param>
+        public void ConfigureForConcurrentExecution(TaskExecutionContext executionContext)
+        {
+            _executionContext = executionContext;
         }
     }
 }
