@@ -10,6 +10,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Diagnostics;
 using Microsoft.Build.Execution;
 using Microsoft.Build.Framework;
 using Microsoft.Build.ProjectCache;
@@ -209,6 +210,10 @@ namespace Microsoft.Build.BackEnd
         /// </summary>
         public Scheduler()
         {
+            // Log the process ID when Scheduler is created
+            int processId = Process.GetCurrentProcess().Id;
+            Console.WriteLine($"Scheduler created. Process ID: {processId}");
+
             // Be careful moving these to Traits, changing the timing of reading environment variables has a breaking potential.
             _debugDumpState = Traits.Instance.DebugScheduler;
             _debugDumpPath = DebugUtils.DebugPath;
