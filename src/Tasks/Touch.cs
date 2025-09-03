@@ -17,8 +17,9 @@ namespace Microsoft.Build.Tasks
     /// <summary>
     /// This class defines the touch task.
     /// </summary>
-    public class Touch : TaskExtension, IIncrementalTask
+    public class Touch : TaskExtension, IIncrementalTask, IConcurrentTask
     {
+        private TaskExecutionContext _executionContext;
         private MessageImportance messageImportance;
 
         /// <summary>
@@ -59,6 +60,12 @@ namespace Microsoft.Build.Tasks
         /// <remarks>When Question is true, skip touching the disk to avoid causing incremental issue.
         /// Unless the file doesn't exists, in which case, error out.</remarks>
         public bool FailIfNotIncremental { get; set; }
+
+        // IConcurrentTask implementation - MSBuild will call this to provide the execution context
+        public void ConfigureForConcurrentExecution(TaskExecutionContext executionContext)
+        {
+            _executionContext = executionContext;
+        }
 
         /// <summary>
         /// Implementation of the execute method.
@@ -167,9 +174,10 @@ namespace Microsoft.Build.Tasks
             string file,
             FileCreate fileCreate)
         {
+            string absoluteFile = _executionContext?.GetFullPath(file) ?? file;
             try
             {
-                using (FileStream fs = fileCreate(file))
+                using (FileStream fs = fileCreate(absoluteFile))
                 {
                 }
             }
@@ -196,7 +204,8 @@ namespace Microsoft.Build.Tasks
             SetLastAccessTime fileSetLastAccessTime,
             SetLastWriteTime fileSetLastWriteTime)
         {
-            if (!fileExists(file))
+            string absoluteFile = _executionContext?.GetFullPath(file) ?? file;
+            if (!fileExists(absoluteFile))
             {
                 // If the file does not exist then we check if we need to create it.
                 if (AlwaysCreate)
@@ -210,7 +219,7 @@ namespace Microsoft.Build.Tasks
                         Log.LogMessageFromResources(messageImportance, "Touch.CreatingFile", file, "AlwaysCreate");
                     }
 
-                    if (!CreateFile(file, fileCreate))
+                    if (!CreateFile(absoluteFile, fileCreate))
                     {
                         return false;
                     }
@@ -234,7 +243,7 @@ namespace Microsoft.Build.Tasks
             // If the file is read only then we must either issue an error, or, if the user so
             // specified, make the file temporarily not read only.
             bool needToRestoreAttributes = false;
-            FileAttributes faOriginal = fileGetAttributes(file);
+            FileAttributes faOriginal = fileGetAttributes(absoluteFile);
             if ((faOriginal & FileAttributes.ReadOnly) == FileAttributes.ReadOnly)
             {
                 if (ForceTouch)
@@ -242,7 +251,7 @@ namespace Microsoft.Build.Tasks
                     try
                     {
                         FileAttributes faNew = (faOriginal & ~FileAttributes.ReadOnly);
-                        fileSetAttributes(file, faNew);
+                        fileSetAttributes(absoluteFile, faNew);
                         needToRestoreAttributes = true;
                     }
                     catch (Exception e) when (ExceptionHandling.IsIoRelatedException(e))
@@ -258,8 +267,8 @@ namespace Microsoft.Build.Tasks
             bool retVal = true;
             try
             {
-                fileSetLastAccessTime(file, dt);
-                fileSetLastWriteTime(file, dt);
+                fileSetLastAccessTime(absoluteFile, dt);
+                fileSetLastWriteTime(absoluteFile, dt);
             }
             catch (Exception e) when (ExceptionHandling.IsIoRelatedException(e))
             {
@@ -275,7 +284,7 @@ namespace Microsoft.Build.Tasks
                     // not much we can do.
                     try
                     {
-                        fileSetAttributes(file, faOriginal);
+                        fileSetAttributes(absoluteFile, faOriginal);
                     }
                     catch (Exception e) when (ExceptionHandling.IsIoRelatedException(e))
                     {
