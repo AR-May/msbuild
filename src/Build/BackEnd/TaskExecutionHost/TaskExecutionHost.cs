@@ -160,6 +160,11 @@ namespace Microsoft.Build.BackEnd
         private readonly PropertyTrackingSetting _propertyTrackingSettings;
 
         /// <summary>
+        /// The task environment to be used by IMultiThreadableTask instances.
+        /// </summary>
+        internal TaskEnvironment TaskEnvironment { get; set; }
+
+        /// <summary>
         /// Constructor
         /// </summary>
         internal TaskExecutionHost(IBuildComponentHost host)
@@ -367,6 +372,12 @@ namespace Microsoft.Build.BackEnd
 
             TaskInstance.BuildEngine = _buildEngine;
             TaskInstance.HostObject = _taskHost;
+            
+            // If the task implements IMultiThreadableTask, set its task environment
+            if (TaskInstance is IMultiThreadableTask multiThreadableTask)
+            {
+                multiThreadableTask.TaskEnvironment = TaskEnvironment;
+            }
 
             return true;
 
@@ -614,6 +625,7 @@ namespace Microsoft.Build.BackEnd
 
             try
             {
+                Debug.Assert(TaskInstance is not IMultiThreadableTask multiThreadableTask || multiThreadableTask.TaskEnvironment != null, "task environment missing for multi-threadable task");
                 taskReturnValue = TaskInstance.Execute();
             }
             finally
@@ -728,7 +740,7 @@ namespace Microsoft.Build.BackEnd
         {
             return InternalSetTaskParameter(parameter, item);
         }
-
+        
         /// <summary>
         /// Called on the local side.
         /// </summary>
@@ -975,7 +987,8 @@ namespace Microsoft.Build.BackEnd
                         AppDomainSetup,
 #endif
                         IsOutOfProc,
-                        ProjectInstance.GetProperty);
+                        ProjectInstance.GetProperty,
+                        TaskEnvironment);
                 }
                 else
                 {

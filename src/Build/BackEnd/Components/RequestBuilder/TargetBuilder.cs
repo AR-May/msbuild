@@ -170,10 +170,22 @@ namespace Microsoft.Build.BackEnd
             ITaskBuilder taskBuilder = _componentHost.GetComponent(BuildComponentType.TaskBuilder) as ITaskBuilder;
             try
             {
+                // Set TaskEnvironment on the actual TaskBuilder instance that will be used
+                if (ChangeWaves.AreFeaturesEnabled(ChangeWaves.Wave18_0) && _requestEntry.TaskEnvironment != null)
+                {
+                    taskBuilder?.SetTaskEnvironment(_requestEntry.TaskEnvironment);
+                }
+
                 await ProcessTargetStack(taskBuilder);
             }
             finally
             {
+                // Clear TaskEnvironment when done
+                if (ChangeWaves.AreFeaturesEnabled(ChangeWaves.Wave18_0))
+                {
+                    taskBuilder?.SetTaskEnvironment(null);
+                }
+
                 // If there are still targets left on the stack, they need to be removed from the 'active targets' list
                 foreach (TargetEntry target in _targetsToBuild)
                 {
@@ -266,6 +278,12 @@ namespace Microsoft.Build.BackEnd
             ITaskBuilder taskBuilder = _componentHost.GetComponent(BuildComponentType.TaskBuilder) as ITaskBuilder;
             try
             {
+                // Set TaskEnvironment for LegacyCallTarget as well
+                if (ChangeWaves.AreFeaturesEnabled(ChangeWaves.Wave18_0) && _requestEntry.TaskEnvironment != null)
+                {
+                    taskBuilder?.SetTaskEnvironment(_requestEntry.TaskEnvironment);
+                }
+
                 // Flag set to true if one of the targets we call fails.
                 bool errorResult = false;
 
@@ -310,6 +328,12 @@ namespace Microsoft.Build.BackEnd
                 while (!Object.ReferenceEquals(_targetsToBuild.Peek(), currentTargetEntry))
                 {
                     _targetsToBuild.Pop();
+                }
+
+                // Clear TaskEnvironment for LegacyCallTarget
+                if (ChangeWaves.AreFeaturesEnabled(ChangeWaves.Wave18_0))
+                {
+                    taskBuilder?.SetTaskEnvironment(null);
                 }
 
                 _legacyCallTargetContinueOnError = originalLegacyCallTargetContinueOnError;

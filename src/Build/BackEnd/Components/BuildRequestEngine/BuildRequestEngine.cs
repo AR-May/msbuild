@@ -16,6 +16,7 @@ using Microsoft.Build.Shared;
 using Microsoft.Build.Shared.Debugging;
 using Microsoft.Build.TelemetryInfra;
 using Microsoft.NET.StringTools;
+using Microsoft.Build.Framework.HostServices;
 using BuildAbortedException = Microsoft.Build.Exceptions.BuildAbortedException;
 
 #nullable disable
@@ -387,7 +388,17 @@ namespace Microsoft.Build.BackEnd
                     }
                     else
                     {
-                        BuildRequestEntry entry = new BuildRequestEntry(request, _configCache[request.ConfigurationId]);
+                        BuildRequestConfiguration config = _configCache[request.ConfigurationId];
+
+                        TaskEnvironment taskEnvironment = null;
+                        if (_componentHost.BuildParameters.MultiThreaded)
+                        {
+                            string projectDirectory = Path.GetDirectoryName(config.ProjectFullPath);
+                            var environmentVariables = new Dictionary<string, string>(_componentHost.BuildParameters.BuildProcessEnvironmentInternal);
+                            taskEnvironment = new MultithreadedTaskEnvironment(projectDirectory, environmentVariables);
+                        }
+
+                        BuildRequestEntry entry = new BuildRequestEntry(request, config, taskEnvironment);
 
                         entry.OnStateChanged += BuildRequestEntry_StateChanged;
 

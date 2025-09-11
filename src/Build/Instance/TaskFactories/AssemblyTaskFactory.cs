@@ -22,6 +22,7 @@ using TargetLoggingContext = Microsoft.Build.BackEnd.Logging.TargetLoggingContex
 using TaskLoggingContext = Microsoft.Build.BackEnd.Logging.TaskLoggingContext;
 using Microsoft.Build.Execution;
 using Microsoft.Build.Internal;
+using Microsoft.Build.Framework.HostServices;
 
 #nullable disable
 
@@ -329,7 +330,7 @@ namespace Microsoft.Build.BackEnd
         }
 
         /// <summary>
-        /// Create an instance of the wrapped ITask for a batch run of the task.
+        /// Create an instance of the wrapped ITask for a batch run of the task. For testing only - it provides stub task environment.
         /// </summary>
         internal ITask CreateTaskInstance(
             ElementLocation taskLocation,
@@ -341,6 +342,34 @@ namespace Microsoft.Build.BackEnd
 #endif
             bool isOutOfProc,
             Func<string, ProjectPropertyInstance> getProperty)
+        {
+            return CreateTaskInstance(
+                taskLocation,
+                taskLoggingContext,
+                buildComponentHost,
+                taskIdentityParameters,
+#if FEATURE_APPDOMAIN
+                appDomainSetup,
+#endif
+                isOutOfProc,
+                getProperty,
+                StubTaskEnvironment.Instance);
+        }
+
+        /// <summary>
+        /// Create an instance of the wrapped ITask for a batch run of the task.
+        /// </summary>
+        internal ITask CreateTaskInstance(
+            ElementLocation taskLocation,
+            TaskLoggingContext taskLoggingContext,
+            IBuildComponentHost buildComponentHost,
+            IDictionary<string, string> taskIdentityParameters,
+#if FEATURE_APPDOMAIN
+            AppDomainSetup appDomainSetup,
+#endif
+            bool isOutOfProc,
+            Func<string, ProjectPropertyInstance> getProperty,
+            TaskEnvironment taskEnvironment)
         {
             bool useTaskFactory = false;
             Dictionary<string, string> mergedParameters = null;
@@ -393,10 +422,12 @@ namespace Microsoft.Build.BackEnd
                     buildComponentHost,
                     mergedParameters,
                     _loadedType,
-                    taskHostFactoryExplicitlyRequested: _isTaskHostFactory
+                    taskHostFactoryExplicitlyRequested: _isTaskHostFactory,
 #if FEATURE_APPDOMAIN
-                    , appDomainSetup
+                    appDomainSetup: appDomainSetup,
 #endif
+
+                    taskEnvironment: taskEnvironment
                     );
 #pragma warning restore SA1111, SA1009 // Closing parenthesis should be on line of last parameter
                 return task;

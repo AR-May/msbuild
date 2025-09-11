@@ -1082,7 +1082,14 @@ namespace Microsoft.Build.BackEnd
         {
             if (_componentHost.BuildParameters.SaveOperatingEnvironment)
             {
-                NativeMethodsShared.SetCurrentDirectory(_requestEntry.ProjectRootDirectory);
+                if (ChangeWaves.AreFeaturesEnabled(ChangeWaves.Wave18_0))
+                {
+                    _requestEntry.TaskEnvironment.ProjectCurrentDirectory = new Framework.PathHelpers.AbsolutePath(_requestEntry.ProjectRootDirectory);
+                }
+                else
+                {
+                    NativeMethodsShared.SetCurrentDirectory(_requestEntry.ProjectRootDirectory);
+                }
             }
         }
 
@@ -1132,7 +1139,14 @@ namespace Microsoft.Build.BackEnd
                     {
                         foreach (ProjectPropertyInstance environmentProperty in environmentProperties)
                         {
-                            Environment.SetEnvironmentVariable(environmentProperty.Name, environmentProperty.EvaluatedValue, EnvironmentVariableTarget.Process);
+                            if (ChangeWaves.AreFeaturesEnabled(ChangeWaves.Wave18_0))
+                            {
+                                _requestEntry.TaskEnvironment.SetEnvironmentVariable(environmentProperty.Name, environmentProperty.EvaluatedValue);
+                            }
+                            else
+                            {
+                                Environment.SetEnvironmentVariable(environmentProperty.Name, environmentProperty.EvaluatedValue, EnvironmentVariableTarget.Process);
+                            }
                         }
                     }
 
@@ -1410,7 +1424,15 @@ namespace Microsoft.Build.BackEnd
 
                 // Restore the saved environment variables.
                 SetEnvironmentVariableBlock(_requestEntry.RequestConfiguration.SavedEnvironmentVariables);
-                NativeMethodsShared.SetCurrentDirectory(_requestEntry.RequestConfiguration.SavedCurrentDirectory);
+                
+                if (ChangeWaves.AreFeaturesEnabled(ChangeWaves.Wave18_0))
+                {
+                    _requestEntry.TaskEnvironment.ProjectCurrentDirectory = new Framework.PathHelpers.AbsolutePath(_requestEntry.RequestConfiguration.SavedCurrentDirectory);
+                }
+                else
+                {
+                    NativeMethodsShared.SetCurrentDirectory(_requestEntry.RequestConfiguration.SavedCurrentDirectory);
+                }
             }
         }
 
@@ -1433,7 +1455,14 @@ namespace Microsoft.Build.BackEnd
             {
                 if (!savedEnvironment.ContainsKey(entry.Key))
                 {
-                    Environment.SetEnvironmentVariable(entry.Key, null);
+                    if (ChangeWaves.AreFeaturesEnabled(ChangeWaves.Wave18_0))
+                    {
+                        _requestEntry.TaskEnvironment.SetEnvironmentVariable(entry.Key, null);
+                    }
+                    else
+                    {
+                        Environment.SetEnvironmentVariable(entry.Key, null);
+                    }
                 }
             }
         }
@@ -1451,7 +1480,14 @@ namespace Microsoft.Build.BackEnd
                 string value;
                 if (!currentEnvironment.TryGetValue(entry.Key, out value) || !String.Equals(entry.Value, value, StringComparison.Ordinal))
                 {
-                    Environment.SetEnvironmentVariable(entry.Key, entry.Value);
+                    if (ChangeWaves.AreFeaturesEnabled(ChangeWaves.Wave18_0))
+                    {
+                        _requestEntry.TaskEnvironment.SetEnvironmentVariable(entry.Key, entry.Value);
+                    }
+                    else
+                    {
+                        Environment.SetEnvironmentVariable(entry.Key, entry.Value);
+                    }
                 }
             }
         }
