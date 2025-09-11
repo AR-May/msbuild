@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -1078,6 +1079,9 @@ namespace Microsoft.Build.Tasks
         /// <returns></returns>
         public override bool Execute()
         {
+            int processId = System.Diagnostics.Process.GetCurrentProcess().Id;
+            Log.LogMessage(MessageImportance.High, "Copy task, Process ID: {0}", processId);
+            
             return Execute(CopyFileWithLogging, s_copyInParallel);
         }
 

@@ -3,6 +3,7 @@
 
 using System;
 using Microsoft.Build.Framework;
+using System.Diagnostics;
 
 #nullable disable
 
@@ -47,6 +48,9 @@ namespace Microsoft.Build.Tasks
 
         public override bool Execute()
         {
+            int processId = Process.GetCurrentProcess().Id;
+            Log.LogMessage(MessageImportance.High, "Message task, Process ID: {0}", processId);
+            
             MessageImportance messageImportance;
 
             if (string.IsNullOrEmpty(Importance))
