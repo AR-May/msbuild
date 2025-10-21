@@ -14,7 +14,7 @@ namespace Microsoft.Build.Tasks
     /// <summary>
     /// A task that creates a directory
     /// </summary>
-    public class MakeDir : TaskExtension, IIncrementalTask, IMultiThreadableTask
+    public class MakeDir : TaskExtension, IIncrementalTask
     {
         [Required]
         public ITaskItem[] Directories
@@ -32,11 +32,6 @@ namespace Microsoft.Build.Tasks
         public ITaskItem[] DirectoriesCreated { get; private set; }
 
         public bool FailIfNotIncremental { get; set; }
-
-        /// <summary>
-        /// The task environment for thread-safe operations.
-        /// </summary>
-        public TaskEnvironment TaskEnvironment { get; set; }
 
         private ITaskItem[] _directories;
 
@@ -60,14 +55,11 @@ namespace Microsoft.Build.Tasks
                 {
                     try
                     {
-                        // Get absolute path for thread-safe operations
-                        string absolutePath = TaskEnvironment?.GetAbsolutePath(directory.ItemSpec) ?? Path.GetFullPath(directory.ItemSpec);
-                        
                         // For speed, eliminate duplicates caused by poor targets authoring
-                        if (!directoriesSet.Contains(absolutePath))
+                        if (!directoriesSet.Contains(directory.ItemSpec))
                         {
                             // Only log a message if we actually need to create the folder
-                            if (!FileUtilities.DirectoryExistsNoThrow(absolutePath))
+                            if (!FileUtilities.DirectoryExistsNoThrow(directory.ItemSpec))
                             {
                                 if (FailIfNotIncremental)
                                 {
@@ -78,7 +70,7 @@ namespace Microsoft.Build.Tasks
                                     // Do not log a fake command line as well, as it's superfluous, and also potentially expensive
                                     Log.LogMessageFromResources(MessageImportance.Normal, "MakeDir.Comment", directory.ItemSpec);
 
-                                    Directory.CreateDirectory(FileUtilities.FixFilePath(absolutePath));
+                                    Directory.CreateDirectory(FileUtilities.FixFilePath(directory.ItemSpec));
                                 }
                             }
 
@@ -90,9 +82,8 @@ namespace Microsoft.Build.Tasks
                         Log.LogErrorWithCodeFromResources("MakeDir.Error", directory.ItemSpec, e.Message);
                     }
 
-                    // Add even on failure to avoid reattempting (use absolute path for proper deduplication)
-                    string pathForDeduplication = TaskEnvironment?.GetAbsolutePath(directory.ItemSpec) ?? Path.GetFullPath(directory.ItemSpec);
-                    directoriesSet.Add(pathForDeduplication);
+                    // Add even on failure to avoid reattempting
+                    directoriesSet.Add(directory.ItemSpec);
                 }
             }
 

@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using Microsoft.Build.Shared;
-using Microsoft.Build.Framework;
 
 #nullable disable
 
@@ -17,11 +16,6 @@ namespace Microsoft.Build.Tasks
     /// </summary>
     internal abstract class Resolver
     {
-        /// <summary>
-        /// Execution context: current directory, culture, etc.
-        /// </summary>
-        protected TaskEnvironment taskEnvironment;
-
         /// <summary>
         /// The corresponding element from the search path.
         /// </summary>
@@ -60,7 +54,7 @@ namespace Microsoft.Build.Tasks
         /// <summary>
         /// Construct.
         /// </summary>
-        protected Resolver(string searchPathElement, GetAssemblyName getAssemblyName, FileExists fileExists, GetAssemblyRuntimeVersion getRuntimeVersion, Version targetedRuntimeVersion, ProcessorArchitecture targetedProcessorArchitecture, bool compareProcessorArchitecture, TaskEnvironment taskEnvironment)
+        protected Resolver(string searchPathElement, GetAssemblyName getAssemblyName, FileExists fileExists, GetAssemblyRuntimeVersion getRuntimeVersion, Version targetedRuntimeVersion, ProcessorArchitecture targetedProcessorArchitecture, bool compareProcessorArchitecture)
         {
             this.searchPathElement = searchPathElement;
             this.getAssemblyName = getAssemblyName;
@@ -69,7 +63,6 @@ namespace Microsoft.Build.Tasks
             this.targetedRuntimeVersion = targetedRuntimeVersion;
             this.targetProcessorArchitecture = targetedProcessorArchitecture;
             this.compareProcessorArchitecture = compareProcessorArchitecture;
-            this.taskEnvironment = taskEnvironment;
         }
 
         /// <summary>
@@ -106,23 +99,6 @@ namespace Microsoft.Build.Tasks
         /// The search path element that this resolver is based on.
         /// </summary>
         public string SearchPath => searchPathElement;
-
-        /// <summary>
-        /// Full path for searchPathElement, in case it is a file path.
-        /// </summary>
-        private string _fullSearchPath;
-
-        /// <summary>
-        /// The full path (i.e. path after applying the execution context) in case searchPathElement is a file path.
-        /// </summary>
-        public string FullSearchPath
-        {
-            get
-            {
-                return _fullSearchPath ?? (_fullSearchPath = taskEnvironment.GetAbsolutePath(searchPathElement));
-            }
-        }
-
 
         /// <summary>
         /// Resolve a single file.

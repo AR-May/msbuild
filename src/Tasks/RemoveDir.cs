@@ -16,17 +16,12 @@ namespace Microsoft.Build.Tasks
     /// <summary>
     /// Remove the specified directories.
     /// </summary>
-    public class RemoveDir : TaskExtension, IIncrementalTask, IMultiThreadableTask
+    public class RemoveDir : TaskExtension, IIncrementalTask
     {
         //-----------------------------------------------------------------------------------
         // Property:  directory to remove
         //-----------------------------------------------------------------------------------
         private ITaskItem[] _directories;
-
-        /// <summary>
-        /// The task environment for thread-safe operations.
-        /// </summary>
-        public TaskEnvironment TaskEnvironment { get; set; }
 
         [Required]
         public ITaskItem[] Directories
@@ -58,8 +53,7 @@ namespace Microsoft.Build.Tasks
 
             foreach (ITaskItem directory in Directories)
             {
-                var directoryPath = TaskEnvironment.GetAbsolutePath(directory.ItemSpec);
-                if (string.IsNullOrEmpty(directoryPath))
+                if (string.IsNullOrEmpty(directory.ItemSpec))
                 {
                     // Skip any empty ItemSpecs, otherwise RemoveDir will wipe the root of the current drive (!).
                     // https://github.com/dotnet/msbuild/issues/7563
@@ -67,7 +61,7 @@ namespace Microsoft.Build.Tasks
                     continue;
                 }
 
-                if (FileSystems.Default.DirectoryExists(directoryPath))
+                if (FileSystems.Default.DirectoryExists(directory.ItemSpec))
                 {
                     if (FailIfNotIncremental)
                     {
@@ -87,7 +81,7 @@ namespace Microsoft.Build.Tasks
                     {
                         // If the directory delete operation returns an unauthorized access exception
                         // we need to attempt to remove the readonly attributes and try again.
-                        currentSuccess = RemoveReadOnlyAttributeRecursively(new DirectoryInfo(directoryPath));
+                        currentSuccess = RemoveReadOnlyAttributeRecursively(new DirectoryInfo(directory.ItemSpec));
                         if (currentSuccess)
                         {
                             // Retry the remove directory operation, this time we want to log any errors
@@ -126,7 +120,7 @@ namespace Microsoft.Build.Tasks
             try
             {
                 // Try to delete the directory
-                Directory.Delete(TaskEnvironment.GetAbsolutePath(directory.ItemSpec), true);
+                Directory.Delete(directory.ItemSpec, true);
             }
             catch (UnauthorizedAccessException e)
             {

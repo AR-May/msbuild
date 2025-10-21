@@ -17,7 +17,7 @@ namespace Microsoft.Build.Tasks
     /// <summary>
     /// Delete files from disk.
     /// </summary>
-    public class Delete : TaskExtension, ICancelableTask, IIncrementalTask, IMultiThreadableTask
+    public class Delete : TaskExtension, ICancelableTask, IIncrementalTask
     {
         #region Properties
 
@@ -62,11 +62,6 @@ namespace Microsoft.Build.Tasks
         /// </summary>
         /// <remarks></remarks>
         public bool FailIfNotIncremental { get; set; }
-
-        /// <summary>
-        /// The task environment for thread-safe operations.
-        /// </summary>
-        public TaskEnvironment TaskEnvironment { get; set; }
 
         /// <summary>
         /// Verify that the inputs are correct.
@@ -124,8 +119,7 @@ namespace Microsoft.Build.Tasks
                 {
                     try
                     {
-                        string filePath = TaskEnvironment?.GetAbsolutePath(file.ItemSpec) ?? Path.GetFullPath(file.ItemSpec);
-                        if (FileSystems.Default.FileExists(filePath))
+                        if (FileSystems.Default.FileExists(file.ItemSpec))
                         {
                             if (FailIfNotIncremental)
                             {
@@ -137,7 +131,7 @@ namespace Microsoft.Build.Tasks
                                 Log.LogMessageFromResources(MessageImportance.Normal, "Delete.DeletingFile", file.ItemSpec);
                             }
 
-                            File.Delete(filePath);
+                            File.Delete(file.ItemSpec);
                         }
                         else
                         {

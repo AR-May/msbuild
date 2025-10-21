@@ -17,7 +17,7 @@ namespace Microsoft.Build.Tasks
     /// <summary>
     /// This class defines the touch task.
     /// </summary>
-    public class Touch : TaskExtension, IIncrementalTask, IMultiThreadableTask
+    public class Touch : TaskExtension, IIncrementalTask
     {
         private MessageImportance messageImportance;
 
@@ -47,11 +47,6 @@ namespace Microsoft.Build.Tasks
         /// </summary>
         [Output]
         public ITaskItem[] TouchedFiles { get; set; }
-
-        /// <summary>
-        /// The task environment for thread-safe operations.
-        /// </summary>
-        public TaskEnvironment TaskEnvironment { get; set; }
 
         /// <summary>
         /// Importance: high, normal, low (default normal)
@@ -201,7 +196,6 @@ namespace Microsoft.Build.Tasks
             SetLastAccessTime fileSetLastAccessTime,
             SetLastWriteTime fileSetLastWriteTime)
         {
-            file = TaskEnvironment.GetAbsolutePath(file);
             if (!fileExists(file))
             {
                 // If the file does not exist then we check if we need to create it.

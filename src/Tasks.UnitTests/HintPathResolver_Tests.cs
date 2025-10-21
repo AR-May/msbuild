@@ -8,7 +8,6 @@ using Microsoft.Build.UnitTests;
 using Shouldly;
 using Xunit;
 using Xunit.Abstractions;
-using Microsoft.Build.Framework;
 
 #nullable disable
 
@@ -72,8 +71,7 @@ namespace Microsoft.Build.Tasks.UnitTests
                 getAssemblyName: (path) => throw new NotImplementedException(), // not called in this code path
                 fileExists: p => FileUtilities.FileExistsNoThrow(p),
                 getRuntimeVersion: (path) => throw new NotImplementedException(), // not called in this code path
-                targetedRuntimeVesion: Version.Parse("4.0.30319"),
-                new TaskEnvironment(StubTaskEnvironmentDriver.Instance));
+                targetedRuntimeVesion: Version.Parse("4.0.30319"));
 
             var result = hintPathResolver.Resolve(new AssemblyNameExtension("FakeSystem.Net.Http"),
                 sdkName: "",

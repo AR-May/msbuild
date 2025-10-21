@@ -17,15 +17,10 @@ namespace Microsoft.Build.Tasks
     /// <summary>
     /// Appends a list of items to a file. One item per line with carriage returns in-between.
     /// </summary>
-    public class WriteLinesToFile : TaskExtension, IIncrementalTask, IMultiThreadableTask
+    public class WriteLinesToFile : TaskExtension, IIncrementalTask
     {
         // Default encoding taken from System.IO.WriteAllText()
         private static readonly Encoding s_defaultEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
-
-        /// <summary>
-        /// The task environment for thread-safe operations.
-        /// </summary>
-        public TaskEnvironment TaskEnvironment { get; set; }
 
         /// <summary>
         /// File to write lines to.
@@ -102,8 +97,7 @@ namespace Microsoft.Build.Tasks
 
                 try
                 {
-                    var spec = TaskEnvironment.GetAbsolutePath(File.ItemSpec);
-                    var directoryPath = Path.GetDirectoryName(FileUtilities.NormalizePath(spec));
+                    var directoryPath = Path.GetDirectoryName(FileUtilities.NormalizePath(File.ItemSpec));
                     if (Overwrite)
                     {
                         Directory.CreateDirectory(directoryPath);
@@ -115,9 +109,9 @@ namespace Microsoft.Build.Tasks
                             MSBuildEventSource.Log.WriteLinesToFileUpToDateStart();
                             try
                             {
-                                if (FileUtilities.FileExistsNoThrow(spec))
+                                if (FileUtilities.FileExistsNoThrow(File.ItemSpec))
                                 {
-                                    string existingContents = FileSystems.Default.ReadFileAllText(spec);
+                                    string existingContents = FileSystems.Default.ReadFileAllText(File.ItemSpec);
                                     if (existingContents.Length == buffer.Length)
                                     {
                                         if (existingContents.Equals(contentsAsString))
@@ -141,7 +135,7 @@ namespace Microsoft.Build.Tasks
                             MSBuildEventSource.Log.WriteLinesToFileUpToDateStop(File.ItemSpec, false);
                         }
 
-                        System.IO.File.WriteAllText(spec, contentsAsString, encoding);
+                        System.IO.File.WriteAllText(File.ItemSpec, contentsAsString, encoding);
                     }
                     else
                     {

@@ -4,7 +4,6 @@
 using System;
 using System.Collections.Generic;
 using Microsoft.Build.Shared;
-using Microsoft.Build.Framework;
 
 #nullable disable
 
@@ -24,8 +23,8 @@ namespace Microsoft.Build.Tasks
         /// <summary>
         /// Construct.
         /// </summary>
-        public FrameworkPathResolver(string[] frameworkPaths, InstalledAssemblies installedAssemblies, string searchPathElement, GetAssemblyName getAssemblyName, FileExists fileExists, GetAssemblyRuntimeVersion getRuntimeVersion, Version targetedRuntimeVesion, TaskEnvironment taskEnvironment)
-            : base(searchPathElement, getAssemblyName, fileExists, getRuntimeVersion, targetedRuntimeVesion, System.Reflection.ProcessorArchitecture.None, false, taskEnvironment)
+        public FrameworkPathResolver(string[] frameworkPaths, InstalledAssemblies installedAssemblies, string searchPathElement, GetAssemblyName getAssemblyName, FileExists fileExists, GetAssemblyRuntimeVersion getRuntimeVersion, Version targetedRuntimeVesion)
+            : base(searchPathElement, getAssemblyName, fileExists, getRuntimeVersion, targetedRuntimeVesion, System.Reflection.ProcessorArchitecture.None, false)
         {
             _frameworkPaths = frameworkPaths;
             _installedAssemblies = installedAssemblies;

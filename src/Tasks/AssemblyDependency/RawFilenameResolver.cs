@@ -5,7 +5,6 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using Microsoft.Build.Shared;
-using Microsoft.Build.Framework;
 
 #nullable disable
 
@@ -19,8 +18,8 @@ namespace Microsoft.Build.Tasks
         /// <summary>
         /// Construct.
         /// </summary>
-        public RawFilenameResolver(string searchPathElement, GetAssemblyName getAssemblyName, FileExists fileExists, GetAssemblyRuntimeVersion getRuntimeVersion, Version targetedRuntimeVesion, TaskEnvironment taskEnvironment)
-            : base(searchPathElement, getAssemblyName, fileExists, getRuntimeVersion, targetedRuntimeVesion, ProcessorArchitecture.None, false, taskEnvironment)
+        public RawFilenameResolver(string searchPathElement, GetAssemblyName getAssemblyName, FileExists fileExists, GetAssemblyRuntimeVersion getRuntimeVersion, Version targetedRuntimeVesion)
+            : base(searchPathElement, getAssemblyName, fileExists, getRuntimeVersion, targetedRuntimeVesion, ProcessorArchitecture.None, false)
         {
         }
 
@@ -42,11 +41,8 @@ namespace Microsoft.Build.Tasks
             foundPath = null;
             userRequestedSpecificFile = false;
 
-            if (rawFileNameCandidate is object)
+            if (rawFileNameCandidate != null)
             {
-
-                rawFileNameCandidate = taskEnvironment.GetAbsolutePath(rawFileNameCandidate);
-
                 // {RawFileName} was passed in.
                 if (isImmutableFrameworkReference || fileExists(rawFileNameCandidate))
                 {

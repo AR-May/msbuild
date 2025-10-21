@@ -15,7 +15,7 @@ namespace Microsoft.Build.Tasks
     /// For compat reasons, it has to follow a particular arbitrary algorithm.
     /// It also adds the TargetPath metadata.
     /// </summary>
-    public class FindAppConfigFile : TaskExtension, IMultiThreadableTask
+    public class FindAppConfigFile : TaskExtension
     {
         // The list to search through
         private ITaskItem[] _primaryList;
@@ -67,11 +67,6 @@ namespace Microsoft.Build.Tasks
         /// </summary>
         [Output]
         public ITaskItem AppConfigFile { get; set; }
-
-        /// <summary>
-        /// The task environment for thread-safe operations.
-        /// </summary>
-        public TaskEnvironment TaskEnvironment { get; set; }
 
         /// <summary>
         /// Find the app config

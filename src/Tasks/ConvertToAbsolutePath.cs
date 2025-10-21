@@ -14,7 +14,7 @@ namespace Microsoft.Build.Tasks
     /// <summary>
     /// Task to call Path.GetFullPath
     /// </summary>
-    public class ConvertToAbsolutePath : TaskExtension, IMultiThreadableTask
+    public class ConvertToAbsolutePath : TaskExtension
     {
         private ITaskItem[] _paths;
 
@@ -38,11 +38,6 @@ namespace Microsoft.Build.Tasks
         /// </summary>
         [Output]
         public ITaskItem[] AbsolutePaths { get; set; }
-
-        /// <summary>
-        /// The task environment for thread-safe operations.
-        /// </summary>
-        public TaskEnvironment TaskEnvironment { get; set; }
 
         /// <summary>
         /// Calls Path.GetFullPath for each of the inputs.  Preserves metadata.
