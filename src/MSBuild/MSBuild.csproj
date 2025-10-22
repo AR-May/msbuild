@@ -306,7 +306,7 @@
              which has been in the official docs for some time. -->
   <UsingTask TaskName="ValidateMSBuildPackageDependencyVersions" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
     <Task>
-      <Code Source="ValidateMSBuildPackageDependencyVersions.cs" Language="cs" />
+      <Code Source="$(MSBuildThisFileDirectory)ValidateMSBuildPackageDependencyVersions.cs" Language="cs" />
     </Task>
   </UsingTask>
 
