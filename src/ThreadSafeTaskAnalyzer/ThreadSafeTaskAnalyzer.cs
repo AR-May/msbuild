@@ -31,7 +31,8 @@ public sealed class ThreadSafeTaskAnalyzer : DiagnosticAnalyzer
         DiagnosticDescriptors.ThreadPoolModification,
         DiagnosticDescriptors.AssemblyLoadingWarning,
         DiagnosticDescriptors.ProcessKill,
-        DiagnosticDescriptors.StaticFieldWarning);
+        DiagnosticDescriptors.StaticFieldWarning,
+        DiagnosticDescriptors.FileDirectoryUsage);
 
     /// <inheritdoc />
     public override void Initialize(AnalysisContext context)
@@ -275,11 +276,11 @@ public sealed class ThreadSafeTaskAnalyzer : DiagnosticAnalyzer
             }
         }
 
-        // Check File and Directory methods (warning level)
+        // Check File and Directory methods (ERROR level - uses current working directory)
         if (containingType is "System.IO.File" or "System.IO.Directory")
         {
             context.ReportDiagnostic(Diagnostic.Create(
-                DiagnosticDescriptors.RelativePathWarning,
+                DiagnosticDescriptors.FileDirectoryUsage,
                 invocation.GetLocation(),
                 $"{methodSymbol.ContainingType?.Name ?? "Unknown"}.{methodName}"));
         }

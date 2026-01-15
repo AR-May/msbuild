@@ -157,4 +157,17 @@ public static class DiagnosticDescriptors
         isEnabledByDefault: true,
         description: "Static fields are shared across threads and may cause race conditions. Use instance fields or thread-safe patterns.",
         helpLinkUri: HelpLinkBase);
+
+    /// <summary>
+    /// MSB0012: Usage of System.IO.File or System.IO.Directory methods.
+    /// </summary>
+    public static readonly DiagnosticDescriptor FileDirectoryUsage = new(
+        id: "MSB0012",
+        title: "Do not use File/Directory methods without absolute paths in thread-safe tasks",
+        messageFormat: "'{0}' uses the current working directory for relative paths. Always use absolute paths in thread-safe tasks",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "System.IO.File and System.IO.Directory methods use the current working directory for relative paths, which is process-global. Always use absolute paths.",
+        helpLinkUri: HelpLinkBase);
 }

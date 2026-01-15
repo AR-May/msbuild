@@ -148,11 +148,83 @@ public class MyTask : Microsoft.Build.Framework.ITask
     }
 
     [Fact]
-    public async Task MultiThreadableTask_FileExists_ReportsWarning()
+    public async Task MultiThreadableTask_FileExists_ReportsError()
     {
         var test = CreateMultiThreadableTaskSource(@"var exists = File.Exists(""file.txt"");");
         await VerifyCS.VerifyAnalyzerAsync(test,
-            new DiagnosticResult(DiagnosticDescriptors.RelativePathWarning.Id, 0, 0));
+            new DiagnosticResult(DiagnosticDescriptors.FileDirectoryUsage.Id, 0, 0));
+    }
+
+    [Fact]
+    public async Task MultiThreadableTask_FileReadAllText_ReportsError()
+    {
+        var test = CreateMultiThreadableTaskSource(@"var content = File.ReadAllText(""file.txt"");");
+        await VerifyCS.VerifyAnalyzerAsync(test,
+            new DiagnosticResult(DiagnosticDescriptors.FileDirectoryUsage.Id, 0, 0));
+    }
+
+    [Fact]
+    public async Task MultiThreadableTask_FileWriteAllText_ReportsError()
+    {
+        var test = CreateMultiThreadableTaskSource(@"File.WriteAllText(""file.txt"", ""content"");");
+        await VerifyCS.VerifyAnalyzerAsync(test,
+            new DiagnosticResult(DiagnosticDescriptors.FileDirectoryUsage.Id, 0, 0));
+    }
+
+    [Fact]
+    public async Task MultiThreadableTask_FileCopy_ReportsError()
+    {
+        var test = CreateMultiThreadableTaskSource(@"File.Copy(""source.txt"", ""dest.txt"");");
+        await VerifyCS.VerifyAnalyzerAsync(test,
+            new DiagnosticResult(DiagnosticDescriptors.FileDirectoryUsage.Id, 0, 0));
+    }
+
+    [Fact]
+    public async Task MultiThreadableTask_FileDelete_ReportsError()
+    {
+        var test = CreateMultiThreadableTaskSource(@"File.Delete(""file.txt"");");
+        await VerifyCS.VerifyAnalyzerAsync(test,
+            new DiagnosticResult(DiagnosticDescriptors.FileDirectoryUsage.Id, 0, 0));
+    }
+
+    [Fact]
+    public async Task MultiThreadableTask_FileMove_ReportsError()
+    {
+        var test = CreateMultiThreadableTaskSource(@"File.Move(""source.txt"", ""dest.txt"");");
+        await VerifyCS.VerifyAnalyzerAsync(test,
+            new DiagnosticResult(DiagnosticDescriptors.FileDirectoryUsage.Id, 0, 0));
+    }
+
+    [Fact]
+    public async Task MultiThreadableTask_DirectoryExists_ReportsError()
+    {
+        var test = CreateMultiThreadableTaskSource(@"var exists = Directory.Exists(""subdir"");");
+        await VerifyCS.VerifyAnalyzerAsync(test,
+            new DiagnosticResult(DiagnosticDescriptors.FileDirectoryUsage.Id, 0, 0));
+    }
+
+    [Fact]
+    public async Task MultiThreadableTask_DirectoryCreateDirectory_ReportsError()
+    {
+        var test = CreateMultiThreadableTaskSource(@"Directory.CreateDirectory(""newdir"");");
+        await VerifyCS.VerifyAnalyzerAsync(test,
+            new DiagnosticResult(DiagnosticDescriptors.FileDirectoryUsage.Id, 0, 0));
+    }
+
+    [Fact]
+    public async Task MultiThreadableTask_DirectoryDelete_ReportsError()
+    {
+        var test = CreateMultiThreadableTaskSource(@"Directory.Delete(""subdir"");");
+        await VerifyCS.VerifyAnalyzerAsync(test,
+            new DiagnosticResult(DiagnosticDescriptors.FileDirectoryUsage.Id, 0, 0));
+    }
+
+    [Fact]
+    public async Task MultiThreadableTask_DirectoryGetFiles_ReportsError()
+    {
+        var test = CreateMultiThreadableTaskSource(@"var files = Directory.GetFiles(""subdir"");");
+        await VerifyCS.VerifyAnalyzerAsync(test,
+            new DiagnosticResult(DiagnosticDescriptors.FileDirectoryUsage.Id, 0, 0));
     }
 
     [Fact]
