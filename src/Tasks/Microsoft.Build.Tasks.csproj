@@ -668,6 +668,8 @@
     <ProjectReference Include="..\Framework\Microsoft.Build.Framework.csproj" />
     <ProjectReference Include="..\Utilities\Microsoft.Build.Utilities.csproj" />
     <ProjectReference Include="..\StringTools\StringTools.csproj" />
+    <!-- Thread-safe task analyzer - reports errors for problematic API usage in multi-threadable tasks -->
+    <ProjectReference Include="..\ThreadSafeTaskAnalyzer\Microsoft.Build.ThreadSafeTaskAnalyzer.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.IO.Redist" Condition="'$(FeatureMSIORedist)' == 'true'" />
