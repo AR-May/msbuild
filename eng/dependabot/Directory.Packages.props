@@ -49,6 +49,13 @@
 
     <PackageVersion Include="Verify.Xunit" Version="19.14.1" />
     <PackageVersion Update="Verify.XUnit" Condition="'$(VerifyXUnitVersion)' != ''" Version="$(VerifyXUnitVersion)" />
+
+    <!-- Roslyn CodeAnalysis packages for ThreadSafeTaskAnalyzer -->
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.8.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.4" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Analyzer.Testing" Version="1.1.2" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.CodeFix.Testing" Version="1.1.2" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(DotNetBuildSourceOnly)' != 'true'">

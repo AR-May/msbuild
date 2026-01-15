@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <IsRoslynComponent>true</IsRoslynComponent>
+    <IsPackable>true</IsPackable>
+    <PackageDescription>Roslyn analyzer for verifying thread-safety requirements in MSBuild tasks implementing IMultiThreadableTask.</PackageDescription>
+
+    <!-- Generate NuGet package with analyzer conventions -->
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <DevelopmentDependency>true</DevelopmentDependency>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    
+    <!-- Do not apply global analyzers to this project to avoid conflicts -->
+    <RunAnalyzers>false</RunAnalyzers>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- Pack the analyzer DLL into the analyzers/dotnet/cs folder for proper NuGet package structure -->
+  <ItemGroup>
+    <None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+  </ItemGroup>
+
+</Project>
