@@ -12,12 +12,11 @@ namespace Microsoft.Build.ThreadSafeTaskAnalyzer;
 
 /// <summary>
 /// Roslyn analyzer that checks for thread-safety violations in MSBuild tasks
-/// implementing <c>IMultiThreadableTask</c> or marked with <c>MSBuildMultiThreadableTaskAttribute</c>.
+/// marked with <c>MSBuildMultiThreadableTaskAttribute</c>.
 /// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class ThreadSafeTaskAnalyzer : DiagnosticAnalyzer
 {
-    private const string IMultiThreadableTaskFullName = "Microsoft.Build.Framework.IMultiThreadableTask";
     private const string MSBuildMultiThreadableTaskAttributeName = "MSBuildMultiThreadableTaskAttribute";
 
     /// <inheritdoc />
@@ -40,103 +39,35 @@ public sealed class ThreadSafeTaskAnalyzer : DiagnosticAnalyzer
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
         context.EnableConcurrentExecution();
 
-        // Register for class declarations to find IMultiThreadableTask implementations
+        // Register for class declarations to find tasks with MSBuildMultiThreadableTaskAttribute
         context.RegisterCompilationStartAction(compilationContext =>
         {
-            // Get the IMultiThreadableTask interface type
-            var multiThreadableTaskInterface = compilationContext.Compilation.GetTypeByMetadataName(IMultiThreadableTaskFullName);
-            var multiThreadableTaskAttribute = GetAttributeSymbol(compilationContext.Compilation);
-
             // Register symbol action to check class declarations
             compilationContext.RegisterSymbolAction(
-                symbolContext => AnalyzeNamedType(symbolContext, multiThreadableTaskInterface, multiThreadableTaskAttribute),
+                symbolContext => AnalyzeNamedType(symbolContext),
                 SymbolKind.NamedType);
         });
     }
 
-    private static INamedTypeSymbol? GetAttributeSymbol(Compilation compilation)
-    {
-        // Look for the attribute by name in any assembly (supports polyfill scenarios)
-        foreach (var reference in compilation.References)
-        {
-            if (compilation.GetAssemblyOrModuleSymbol(reference) is IAssemblySymbol assembly)
-            {
-                var attributeType = GetTypeRecursive(assembly.GlobalNamespace, "Microsoft.Build.Framework", MSBuildMultiThreadableTaskAttributeName);
-                if (attributeType != null)
-                {
-                    return attributeType;
-                }
-            }
-        }
-
-        // Also check the compilation's own assembly
-        return GetTypeRecursive(compilation.Assembly.GlobalNamespace, "Microsoft.Build.Framework", MSBuildMultiThreadableTaskAttributeName);
-    }
-
-    private static INamedTypeSymbol? GetTypeRecursive(INamespaceSymbol ns, string targetNamespace, string typeName)
-    {
-        if (ns.ToDisplayString() == targetNamespace)
-        {
-            foreach (var type in ns.GetTypeMembers())
-            {
-                if (type.Name == typeName)
-                {
-                    return type;
-                }
-            }
-        }
-
-        foreach (var childNs in ns.GetNamespaceMembers())
-        {
-            var result = GetTypeRecursive(childNs, targetNamespace, typeName);
-            if (result != null)
-            {
-                return result;
-            }
-        }
-
-        return null;
-    }
-
-    private static void AnalyzeNamedType(
-        SymbolAnalysisContext context,
-        INamedTypeSymbol? multiThreadableTaskInterface,
-        INamedTypeSymbol? multiThreadableTaskAttribute)
+    private static void AnalyzeNamedType(SymbolAnalysisContext context)
     {
         if (context.Symbol is not INamedTypeSymbol typeSymbol || typeSymbol.TypeKind != TypeKind.Class)
         {
             return;
         }
 
-        // Check if this type implements IMultiThreadableTask or has the attribute
-        bool isMultiThreadableTask = false;
-
-        // Check for interface implementation (either by symbol equality or by name)
-        foreach (var iface in typeSymbol.AllInterfaces)
+        // Check if this type has the MSBuildMultiThreadableTaskAttribute
+        bool hasMultiThreadableAttribute = false;
+        foreach (var attribute in typeSymbol.GetAttributes())
         {
-            if ((multiThreadableTaskInterface != null && SymbolEqualityComparer.Default.Equals(iface, multiThreadableTaskInterface)) ||
-                iface.ToDisplayString() == IMultiThreadableTaskFullName ||
-                iface.Name == "IMultiThreadableTask")
+            if (attribute.AttributeClass?.Name == MSBuildMultiThreadableTaskAttributeName)
             {
-                isMultiThreadableTask = true;
+                hasMultiThreadableAttribute = true;
                 break;
             }
         }
 
-        if (!isMultiThreadableTask)
-        {
-            // Check for the attribute (by name to support polyfill scenarios)
-            foreach (var attribute in typeSymbol.GetAttributes())
-            {
-                if (attribute.AttributeClass?.Name == MSBuildMultiThreadableTaskAttributeName)
-                {
-                    isMultiThreadableTask = true;
-                    break;
-                }
-            }
-        }
-
-        if (!isMultiThreadableTask)
+        if (!hasMultiThreadableAttribute)
         {
             return;
         }
