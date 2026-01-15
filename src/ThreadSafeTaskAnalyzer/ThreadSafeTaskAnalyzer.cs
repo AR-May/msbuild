@@ -284,6 +284,30 @@ public sealed class ThreadSafeTaskAnalyzer : DiagnosticAnalyzer
                 invocation.GetLocation(),
                 $"{methodSymbol.ContainingType?.Name ?? "Unknown"}.{methodName}"));
         }
+
+        // Check FileInfo instance methods that may use relative paths
+        if (containingType == "System.IO.FileInfo")
+        {
+            if (methodName is "CopyTo" or "MoveTo" or "Replace")
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    DiagnosticDescriptors.RelativePathWarning,
+                    invocation.GetLocation(),
+                    $"FileInfo.{methodName}"));
+            }
+        }
+
+        // Check DirectoryInfo instance methods that may use relative paths
+        if (containingType == "System.IO.DirectoryInfo")
+        {
+            if (methodName == "MoveTo")
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    DiagnosticDescriptors.RelativePathWarning,
+                    invocation.GetLocation(),
+                    $"DirectoryInfo.{methodName}"));
+            }
+        }
     }
 
     private static void AnalyzeMemberAccess(SymbolAnalysisContext context, SemanticModel semanticModel, MemberAccessExpressionSyntax memberAccess)
@@ -365,6 +389,15 @@ public sealed class ThreadSafeTaskAnalyzer : DiagnosticAnalyzer
                 DiagnosticDescriptors.RelativePathWarning,
                 objectCreation.GetLocation(),
                 "new StreamReader()"));
+        }
+
+        // Check StreamWriter creation
+        if (typeName == "System.IO.StreamWriter")
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                DiagnosticDescriptors.RelativePathWarning,
+                objectCreation.GetLocation(),
+                "new StreamWriter()"));
         }
     }
 

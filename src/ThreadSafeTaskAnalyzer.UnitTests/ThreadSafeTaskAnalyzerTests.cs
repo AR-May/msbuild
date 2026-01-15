@@ -274,6 +274,44 @@ public class MyTask : Microsoft.Build.Framework.ITask
     }
 
     [Fact]
+    public async Task MultiThreadableTask_FileInfoCopyTo_ReportsWarning()
+    {
+        var test = CreateMultiThreadableTaskSource(@"var fileInfo = new FileInfo(""C:\\file.txt""); fileInfo.CopyTo(""dest.txt"");");
+        // Both constructor and CopyTo are flagged
+        await VerifyCS.VerifyAnalyzerAsync(test,
+            new DiagnosticResult(DiagnosticDescriptors.RelativePathWarning.Id, 0, 0),
+            new DiagnosticResult(DiagnosticDescriptors.RelativePathWarning.Id, 0, 0));
+    }
+
+    [Fact]
+    public async Task MultiThreadableTask_FileInfoMoveTo_ReportsWarning()
+    {
+        var test = CreateMultiThreadableTaskSource(@"var fileInfo = new FileInfo(""C:\\file.txt""); fileInfo.MoveTo(""dest.txt"");");
+        // Both constructor and MoveTo are flagged
+        await VerifyCS.VerifyAnalyzerAsync(test,
+            new DiagnosticResult(DiagnosticDescriptors.RelativePathWarning.Id, 0, 0),
+            new DiagnosticResult(DiagnosticDescriptors.RelativePathWarning.Id, 0, 0));
+    }
+
+    [Fact]
+    public async Task MultiThreadableTask_DirectoryInfoMoveTo_ReportsWarning()
+    {
+        var test = CreateMultiThreadableTaskSource(@"var dirInfo = new DirectoryInfo(""C:\\dir""); dirInfo.MoveTo(""newdir"");");
+        // Both constructor and MoveTo are flagged
+        await VerifyCS.VerifyAnalyzerAsync(test,
+            new DiagnosticResult(DiagnosticDescriptors.RelativePathWarning.Id, 0, 0),
+            new DiagnosticResult(DiagnosticDescriptors.RelativePathWarning.Id, 0, 0));
+    }
+
+    [Fact]
+    public async Task MultiThreadableTask_StreamWriterConstructor_ReportsWarning()
+    {
+        var test = CreateMultiThreadableTaskSource(@"var writer = new StreamWriter(""file.txt"");");
+        await VerifyCS.VerifyAnalyzerAsync(test,
+            new DiagnosticResult(DiagnosticDescriptors.RelativePathWarning.Id, 0, 0));
+    }
+
+    [Fact]
     public async Task MultiThreadableTask_CultureInfoDefaultThreadCurrentCulture_ReportsError()
     {
         var test = CreateMultiThreadableTaskSource(@"CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;");
