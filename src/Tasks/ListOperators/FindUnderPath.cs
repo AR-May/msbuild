@@ -15,8 +15,14 @@ namespace Microsoft.Build.Tasks
     /// <summary>
     /// Given a list of items, determine which are in the cone of the folder passed in and which aren't.
     /// </summary>
-    public class FindUnderPath : TaskExtension
+    [MSBuildMultiThreadableTask]
+    public class FindUnderPath : TaskExtension, IMultiThreadableTask
     {
+        /// <summary>
+        /// Gets or sets the task execution environment for thread-safe path resolution.
+        /// </summary>
+        public TaskEnvironment TaskEnvironment { get; set; }
+
         /// <summary>
         /// Filter based on whether items fall under this path or not.
         /// </summary>
@@ -59,7 +65,7 @@ namespace Microsoft.Build.Tasks
             {
                 conePath =
                     Strings.WeakIntern(
-                        System.IO.Path.GetFullPath(FileUtilities.FixFilePath(Path.ItemSpec)));
+                        TaskEnvironment.GetAbsolutePath(FileUtilities.FixFilePath(Path.ItemSpec)).Value);
                 conePath = FileUtilities.EnsureTrailingSlash(conePath);
             }
             catch (Exception e) when (ExceptionHandling.IsIoRelatedException(e))
@@ -80,7 +86,7 @@ namespace Microsoft.Build.Tasks
                 {
                     fullPath =
                         Strings.WeakIntern(
-                            System.IO.Path.GetFullPath(FileUtilities.FixFilePath(item.ItemSpec)));
+                            TaskEnvironment.GetAbsolutePath(FileUtilities.FixFilePath(item.ItemSpec)).Value);
                 }
                 catch (Exception e) when (ExceptionHandling.IsIoRelatedException(e))
                 {
