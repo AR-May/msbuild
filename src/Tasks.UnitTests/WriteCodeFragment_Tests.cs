@@ -5,6 +5,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using Microsoft.Build.Framework;
 using Microsoft.Build.Shared;
 using Microsoft.Build.Tasks;
 using Microsoft.Build.Utilities;
@@ -26,7 +27,7 @@ namespace Microsoft.Build.UnitTests
         [Fact]
         public void InvalidLanguage()
         {
-            WriteCodeFragment task = new WriteCodeFragment();
+            WriteCodeFragment task = new WriteCodeFragment() { TaskEnvironment = TaskEnvironmentHelper.CreateForTest() };
             MockEngine engine = new MockEngine(true);
             task.BuildEngine = engine;
             task.Language = "xx";
@@ -43,7 +44,7 @@ namespace Microsoft.Build.UnitTests
         [Fact]
         public void NoLanguage()
         {
-            WriteCodeFragment task = new WriteCodeFragment();
+            WriteCodeFragment task = new WriteCodeFragment() { TaskEnvironment = TaskEnvironmentHelper.CreateForTest() };
             MockEngine engine = new MockEngine(true);
             task.BuildEngine = engine;
             task.OutputFile = new TaskItem("foo");
@@ -59,7 +60,7 @@ namespace Microsoft.Build.UnitTests
         [Fact]
         public void NoFileOrDirectory()
         {
-            WriteCodeFragment task = new WriteCodeFragment();
+            WriteCodeFragment task = new WriteCodeFragment() { TaskEnvironment = TaskEnvironmentHelper.CreateForTest() };
             MockEngine engine = new MockEngine(true);
             task.BuildEngine = engine;
             task.Language = "c#";
@@ -75,7 +76,7 @@ namespace Microsoft.Build.UnitTests
         [Fact]
         public void CombineFileDirectory()
         {
-            WriteCodeFragment task = new WriteCodeFragment();
+            WriteCodeFragment task = new WriteCodeFragment() { TaskEnvironment = TaskEnvironmentHelper.CreateForTest() };
             MockEngine engine = new MockEngine(true);
             task.BuildEngine = engine;
             task.Language = "c#";
@@ -144,7 +145,7 @@ namespace Microsoft.Build.UnitTests
         {
             using TestEnvironment env = TestEnvironment.Create();
             var file = env.ExpectFile(Directory.GetCurrentDirectory(), ".tmp");
-            WriteCodeFragment task = new WriteCodeFragment();
+            WriteCodeFragment task = new WriteCodeFragment() { TaskEnvironment = TaskEnvironmentHelper.CreateForTest() };
             MockEngine engine = new MockEngine(true);
             task.BuildEngine = engine;
             task.Language = "c#";
@@ -166,7 +167,7 @@ namespace Microsoft.Build.UnitTests
         [Fact]
         public void DirectoryAndRootedFile()
         {
-            WriteCodeFragment task = new WriteCodeFragment();
+            WriteCodeFragment task = new WriteCodeFragment() { TaskEnvironment = TaskEnvironmentHelper.CreateForTest() };
             MockEngine engine = new MockEngine(true);
             task.BuildEngine = engine;
             task.Language = "c#";
@@ -201,7 +202,7 @@ namespace Microsoft.Build.UnitTests
                 File.Delete(file);
             }
 
-            WriteCodeFragment task = new WriteCodeFragment();
+            WriteCodeFragment task = new WriteCodeFragment() { TaskEnvironment = TaskEnvironmentHelper.CreateForTest() };
             MockEngine engine = new MockEngine(true);
             task.BuildEngine = engine;
             task.Language = "c#";
@@ -228,7 +229,7 @@ namespace Microsoft.Build.UnitTests
                 File.Delete(file);
             }
 
-            WriteCodeFragment task = new WriteCodeFragment();
+            WriteCodeFragment task = new WriteCodeFragment() { TaskEnvironment = TaskEnvironmentHelper.CreateForTest() };
             MockEngine engine = new MockEngine(true);
             task.BuildEngine = engine;
             task.Language = "c#";
@@ -247,7 +248,7 @@ namespace Microsoft.Build.UnitTests
         [WindowsOnlyFact(additionalMessage: "No invalid characters on Unix.")]
         public void InvalidFilePath()
         {
-            WriteCodeFragment task = new WriteCodeFragment();
+            WriteCodeFragment task = new WriteCodeFragment() { TaskEnvironment = TaskEnvironmentHelper.CreateForTest() };
             MockEngine engine = new MockEngine(true);
             task.BuildEngine = engine;
             task.Language = "c#";
@@ -265,7 +266,7 @@ namespace Microsoft.Build.UnitTests
         [WindowsOnlyFact(additionalMessage: "No invalid characters on Unix.")]
         public void InvalidDirectoryPath()
         {
-            WriteCodeFragment task = new WriteCodeFragment();
+            WriteCodeFragment task = new WriteCodeFragment() { TaskEnvironment = TaskEnvironmentHelper.CreateForTest() };
             MockEngine engine = new MockEngine(true);
             task.BuildEngine = engine;
             task.Language = "c#";
@@ -287,7 +288,7 @@ namespace Microsoft.Build.UnitTests
 
             try
             {
-                WriteCodeFragment task = new WriteCodeFragment();
+                WriteCodeFragment task = new WriteCodeFragment() { TaskEnvironment = TaskEnvironmentHelper.CreateForTest() };
                 MockEngine engine = new MockEngine(true);
                 task.BuildEngine = engine;
                 TaskItem attribute = new TaskItem("System.AssemblyTrademarkAttribute");
@@ -316,7 +317,7 @@ namespace Microsoft.Build.UnitTests
         [Fact]
         public void OneAttributeNoParamsVb()
         {
-            WriteCodeFragment task = new WriteCodeFragment();
+            WriteCodeFragment task = new WriteCodeFragment() { TaskEnvironment = TaskEnvironmentHelper.CreateForTest() };
             MockEngine engine = new MockEngine(true);
             task.BuildEngine = engine;
             TaskItem attribute = new TaskItem("System.AssemblyTrademarkAttribute");
@@ -339,7 +340,7 @@ namespace Microsoft.Build.UnitTests
         [Fact]
         public void TwoAttributes()
         {
-            WriteCodeFragment task = new WriteCodeFragment();
+            WriteCodeFragment task = new WriteCodeFragment() { TaskEnvironment = TaskEnvironmentHelper.CreateForTest() };
             MockEngine engine = new MockEngine(true);
             task.BuildEngine = engine;
             TaskItem attribute1 = new TaskItem("AssemblyTrademarkAttribute");
@@ -368,7 +369,7 @@ namespace Microsoft.Build.UnitTests
         [Fact]
         public void ToDirectory()
         {
-            WriteCodeFragment task = new WriteCodeFragment();
+            WriteCodeFragment task = new WriteCodeFragment() { TaskEnvironment = TaskEnvironmentHelper.CreateForTest() };
             MockEngine engine = new MockEngine(true);
             task.BuildEngine = engine;
             TaskItem attribute = new TaskItem("System.AssemblyTrademarkAttribute");
@@ -416,7 +417,7 @@ namespace Microsoft.Build.UnitTests
 
             try
             {
-                WriteCodeFragment task = new WriteCodeFragment();
+                WriteCodeFragment task = new WriteCodeFragment() { TaskEnvironment = TaskEnvironmentHelper.CreateForTest() };
                 MockEngine engine = new MockEngine(true);
                 task.BuildEngine = engine;
                 TaskItem attribute = new TaskItem("AssemblyTrademarkAttribute");
@@ -447,7 +448,7 @@ namespace Microsoft.Build.UnitTests
         [Fact]
         public void OneAttributeTwoParamsSameName()
         {
-            WriteCodeFragment task = new WriteCodeFragment();
+            WriteCodeFragment task = new WriteCodeFragment() { TaskEnvironment = TaskEnvironmentHelper.CreateForTest() };
             MockEngine engine = new MockEngine(true);
             task.BuildEngine = engine;
             TaskItem attribute = new TaskItem("AssemblyTrademarkAttribute");
@@ -470,7 +471,7 @@ namespace Microsoft.Build.UnitTests
         [Fact]
         public void OneAttributePositionalParamInvalidSuffix()
         {
-            WriteCodeFragment task = new WriteCodeFragment();
+            WriteCodeFragment task = new WriteCodeFragment() { TaskEnvironment = TaskEnvironmentHelper.CreateForTest() };
             MockEngine engine = new MockEngine(true);
             task.BuildEngine = engine;
             TaskItem attribute = new TaskItem("AssemblyTrademarkAttribute");
@@ -493,7 +494,7 @@ namespace Microsoft.Build.UnitTests
         [Fact]
         public void OneAttributeTwoPositionalParams()
         {
-            WriteCodeFragment task = new WriteCodeFragment();
+            WriteCodeFragment task = new WriteCodeFragment() { TaskEnvironment = TaskEnvironmentHelper.CreateForTest() };
             MockEngine engine = new MockEngine(true);
             task.BuildEngine = engine;
             TaskItem attribute = new TaskItem("AssemblyTrademarkAttribute");
@@ -517,7 +518,7 @@ namespace Microsoft.Build.UnitTests
         [Fact]
         public void OneAttributeTwoPositionalParamsWithSameValue()
         {
-            WriteCodeFragment task = new WriteCodeFragment();
+            WriteCodeFragment task = new WriteCodeFragment() { TaskEnvironment = TaskEnvironmentHelper.CreateForTest() };
             MockEngine engine = new MockEngine(true);
             task.BuildEngine = engine;
             TaskItem attribute = new TaskItem("AssemblyMetadataAttribute");
@@ -549,7 +550,7 @@ namespace Microsoft.Build.UnitTests
             var lines = new[] { "line 1", "line 2", "line 3" };
             var multilineString = String.Join(Environment.NewLine, lines);
 
-            WriteCodeFragment task = new WriteCodeFragment();
+            WriteCodeFragment task = new WriteCodeFragment() { TaskEnvironment = TaskEnvironmentHelper.CreateForTest() };
             MockEngine engine = new MockEngine(true);
             task.BuildEngine = engine;
             TaskItem attribute = new TaskItem("System.Reflection.AssemblyDescriptionAttribute");
@@ -585,7 +586,7 @@ namespace Microsoft.Build.UnitTests
             var lines = new[] { "line 1", "line 2", "line 3" };
             var multilineString = String.Join(Environment.NewLine, lines);
 
-            WriteCodeFragment task = new WriteCodeFragment();
+            WriteCodeFragment task = new WriteCodeFragment() { TaskEnvironment = TaskEnvironmentHelper.CreateForTest() };
             MockEngine engine = new MockEngine(true);
             task.BuildEngine = engine;
             TaskItem attribute = new TaskItem("System.Reflection.AssemblyDescriptionAttribute");
@@ -618,7 +619,7 @@ namespace Microsoft.Build.UnitTests
         [Fact]
         public void OneAttributeSkippedPositionalParams()
         {
-            WriteCodeFragment task = new WriteCodeFragment();
+            WriteCodeFragment task = new WriteCodeFragment() { TaskEnvironment = TaskEnvironmentHelper.CreateForTest() };
             MockEngine engine = new MockEngine(true);
             task.BuildEngine = engine;
             TaskItem attribute = new TaskItem("AssemblyTrademarkAttribute");
@@ -641,7 +642,7 @@ namespace Microsoft.Build.UnitTests
         [Fact]
         public void InvalidNumber()
         {
-            WriteCodeFragment task = new WriteCodeFragment();
+            WriteCodeFragment task = new WriteCodeFragment() { TaskEnvironment = TaskEnvironmentHelper.CreateForTest() };
             MockEngine engine = new MockEngine(true);
             task.BuildEngine = engine;
             TaskItem attribute = new TaskItem("AssemblyTrademarkAttribute");
@@ -664,7 +665,7 @@ namespace Microsoft.Build.UnitTests
         [Fact]
         public void NoNumber()
         {
-            WriteCodeFragment task = new WriteCodeFragment();
+            WriteCodeFragment task = new WriteCodeFragment() { TaskEnvironment = TaskEnvironmentHelper.CreateForTest() };
             MockEngine engine = new MockEngine(true);
             task.BuildEngine = engine;
             TaskItem attribute = new TaskItem("AssemblyTrademarkAttribute");
@@ -687,7 +688,7 @@ namespace Microsoft.Build.UnitTests
         [Fact]
         public void OneAttributePositionalAndNamedParams()
         {
-            WriteCodeFragment task = new WriteCodeFragment();
+            WriteCodeFragment task = new WriteCodeFragment() { TaskEnvironment = TaskEnvironmentHelper.CreateForTest() };
             MockEngine engine = new MockEngine(true);
             task.BuildEngine = engine;
             TaskItem attribute = new TaskItem("AssemblyTrademarkAttribute");
@@ -720,7 +721,7 @@ namespace Microsoft.Build.UnitTests
         [Fact]
         public void OneAttributePositionalAndNamedParamsVisualBasic()
         {
-            WriteCodeFragment task = new WriteCodeFragment();
+            WriteCodeFragment task = new WriteCodeFragment() { TaskEnvironment = TaskEnvironmentHelper.CreateForTest() };
             MockEngine engine = new MockEngine(true);
             task.BuildEngine = engine;
             TaskItem attribute = new TaskItem("AssemblyTrademarkAttribute");
@@ -1061,7 +1062,7 @@ namespace Microsoft.Build.UnitTests
         [Fact]
         public void MessageDisplayPositionalParameterNameWhenAttributeNotFound()
         {
-            WriteCodeFragment task = new WriteCodeFragment();
+            WriteCodeFragment task = new WriteCodeFragment() { TaskEnvironment = TaskEnvironmentHelper.CreateForTest() };
             MockEngine engine = new MockEngine(true);
             task.BuildEngine = engine;
             TaskItem attribute = new TaskItem("System.TheAttributeCannotFound");
@@ -1101,6 +1102,7 @@ namespace Microsoft.Build.UnitTests
         {
             return new WriteCodeFragment()
             {
+                TaskEnvironment = TaskEnvironmentHelper.CreateForTest(),
                 Language = language,
                 OutputDirectory = outputDirectory,
                 OutputFile = outputFile,

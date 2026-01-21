@@ -30,8 +30,12 @@ namespace Microsoft.Build.Tasks
     /// <comment>
     /// Currently only supports writing .NET attributes.
     /// </comment>
-    public class WriteCodeFragment : TaskExtension
+    [MSBuildMultiThreadableTask]
+    public class WriteCodeFragment : TaskExtension, IMultiThreadableTask
     {
+        /// <inheritdoc />
+        public TaskEnvironment TaskEnvironment { get; set; }
+
         private const string TypeNameSuffix = "_TypeName";
         private const string IsLiteralSuffix = "_IsLiteral";
         private static readonly string[] NamespaceImports = ["System", "System.Reflection"];
@@ -111,11 +115,20 @@ namespace Microsoft.Build.Tasks
                     OutputFile = new TaskItem(Path.Combine(OutputDirectory.ItemSpec, OutputFile.ItemSpec));
                 }
 
-                OutputFile ??= new TaskItem(FileUtilities.GetTemporaryFile(OutputDirectory.ItemSpec, null, extension));
+                if (OutputFile == null)
+                {
+                    // Use absolute path for file I/O so files are created in the correct location,
+                    // but keep the relative path in OutputFile for the task output.
+                    AbsolutePath absoluteOutputDirectory = TaskEnvironment.GetAbsolutePath(OutputDirectory.ItemSpec);
+                    string tempFilePath = FileUtilities.GetTemporaryFile(absoluteOutputDirectory, null, extension);
+                    string tempFileName = Path.GetFileName(tempFilePath);
+                    OutputFile = new TaskItem(Path.Combine(OutputDirectory.ItemSpec, tempFileName));
+                }
 
-                FileUtilities.EnsureDirectoryExists(Path.GetDirectoryName(OutputFile.ItemSpec));
+                AbsolutePath absolutePath = TaskEnvironment.GetAbsolutePath(OutputFile.ItemSpec);
+                FileUtilities.EnsureDirectoryExists(Path.GetDirectoryName(absolutePath));
 
-                File.WriteAllText(OutputFile.ItemSpec, code); // Overwrites file if it already exists (and can be overwritten)
+                File.WriteAllText(absolutePath, code); // Overwrites file if it already exists (and can be overwritten)
             }
             catch (Exception ex) when (ExceptionHandling.IsIoRelatedException(ex))
             {
