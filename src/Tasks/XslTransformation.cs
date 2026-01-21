@@ -23,9 +23,13 @@ namespace Microsoft.Build.Tasks
     /// A task that transforms a XML input with an XSLT or Compiled XSLT
     /// and outputs to screen or specified file.
     /// </summary>
-    public class XslTransformation : TaskExtension
+    [MSBuildMultiThreadableTask]
+    public class XslTransformation : TaskExtension, IMultiThreadableTask
     {
         #region Members
+
+        /// <inheritdoc />
+        public TaskEnvironment TaskEnvironment { get; set; }
 
         /// <summary>
         /// The output files.

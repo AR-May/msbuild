@@ -30,8 +30,12 @@ namespace Microsoft.Build.Tasks
     /// <comment>
     /// Currently only supports writing .NET attributes.
     /// </comment>
-    public class WriteCodeFragment : TaskExtension
+    [MSBuildMultiThreadableTask]
+    public class WriteCodeFragment : TaskExtension, IMultiThreadableTask
     {
+        /// <inheritdoc />
+        public TaskEnvironment TaskEnvironment { get; set; }
+
         private const string TypeNameSuffix = "_TypeName";
         private const string IsLiteralSuffix = "_IsLiteral";
         private static readonly string[] NamespaceImports = ["System", "System.Reflection"];
@@ -115,7 +119,8 @@ namespace Microsoft.Build.Tasks
 
                 FileUtilities.EnsureDirectoryExists(Path.GetDirectoryName(OutputFile.ItemSpec));
 
-                File.WriteAllText(OutputFile.ItemSpec, code); // Overwrites file if it already exists (and can be overwritten)
+                AbsolutePath absolutePath = TaskEnvironment.GetAbsolutePath(OutputFile.ItemSpec);
+                File.WriteAllText(absolutePath, code); // Overwrites file if it already exists (and can be overwritten)
             }
             catch (Exception ex) when (ExceptionHandling.IsIoRelatedException(ex))
             {

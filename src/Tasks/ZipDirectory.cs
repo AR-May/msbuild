@@ -10,8 +10,12 @@ using Microsoft.Build.Utilities;
 
 namespace Microsoft.Build.Tasks
 {
-    public sealed class ZipDirectory : TaskExtension, IIncrementalTask
+    [MSBuildMultiThreadableTask]
+    public sealed class ZipDirectory : TaskExtension, IIncrementalTask, IMultiThreadableTask
     {
+        /// <inheritdoc />
+        public TaskEnvironment TaskEnvironment { get; set; } = null!;
+
         public const string CompressionLevelOptimal = "Optimal";
         public const string CompressionLevelFastest = "Fastest";
         public const string CompressionLevelNoCompression = "NoCompression";
@@ -59,7 +63,8 @@ namespace Microsoft.Build.Tasks
 
         public override bool Execute()
         {
-            DirectoryInfo sourceDirectory = new DirectoryInfo(SourceDirectory.ItemSpec);
+            AbsolutePath sourcePath = TaskEnvironment.GetAbsolutePath(SourceDirectory.ItemSpec);
+            DirectoryInfo sourceDirectory = new DirectoryInfo(sourcePath);
 
             if (!sourceDirectory.Exists)
             {
@@ -67,7 +72,8 @@ namespace Microsoft.Build.Tasks
                 return false;
             }
 
-            FileInfo destinationFile = new FileInfo(DestinationFile.ItemSpec);
+            AbsolutePath destPath = TaskEnvironment.GetAbsolutePath(DestinationFile.ItemSpec);
+            FileInfo destinationFile = new FileInfo(destPath);
 
             BuildEngine3.Yield();
 
@@ -84,7 +90,7 @@ namespace Microsoft.Build.Tasks
 
                     try
                     {
-                        File.Delete(destinationFile.FullName);
+                        File.Delete(destPath);
                     }
                     catch (Exception e)
                     {
