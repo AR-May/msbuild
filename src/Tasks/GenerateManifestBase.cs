@@ -15,7 +15,8 @@ namespace Microsoft.Build.Tasks
     /// <summary>
     /// Base class for all manifest generation tasks.
     /// </summary>
-    public abstract class GenerateManifestBase : Task
+    [MSBuildMultiThreadableTask]
+    public abstract class GenerateManifestBase : Task, IMultiThreadableTask
     {
         private enum AssemblyType
         {
@@ -79,6 +80,11 @@ namespace Microsoft.Build.Tasks
         }
 
         public string TargetFrameworkMoniker { get; set; }
+
+        /// <summary>
+        /// Gets or sets the task execution environment for thread-safe path resolution.
+        /// </summary>
+        public TaskEnvironment TaskEnvironment { get; set; }
 
         protected internal AssemblyReference AddAssemblyNameFromItem(ITaskItem item, AssemblyReferenceType referenceType)
         {
@@ -510,7 +516,7 @@ namespace Microsoft.Build.Tasks
         {
             int t1 = Environment.TickCount;
 
-            string[] searchPaths = { Directory.GetCurrentDirectory() };
+            string[] searchPaths = { TaskEnvironment.ProjectDirectory.Value };
             _manifest.ResolveFiles(searchPaths);
             _manifest.UpdateFileInfo(TargetFrameworkVersion);
             if (_manifest.OutputMessages.ErrorCount > 0)

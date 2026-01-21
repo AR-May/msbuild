@@ -4,7 +4,6 @@
 #if NETFRAMEWORK
 using System;
 using System.Collections.Generic;
-using System.IO;
 using Microsoft.Build.Tasks.Deployment.Bootstrapper;
 #endif
 
@@ -19,7 +18,8 @@ namespace Microsoft.Build.Tasks
     /// <summary>
     /// Generates a bootstrapper for ClickOnce deployment projects.
     /// </summary>
-    public sealed class GenerateBootstrapper : TaskExtension, IGenerateBootstrapperTaskContract
+    [MSBuildMultiThreadableTask]
+    public sealed class GenerateBootstrapper : TaskExtension, IGenerateBootstrapperTaskContract, IMultiThreadableTask
     {
         public string ApplicationName { get; set; }
 
@@ -41,7 +41,7 @@ namespace Microsoft.Build.Tasks
 
         public string FallbackCulture { get; set; } = Util.DefaultCultureInfo.Name;
 
-        public string OutputPath { get; set; } = Directory.GetCurrentDirectory();
+        public string OutputPath { get; set; }
 
         public string Path { get; set; }
 
@@ -50,6 +50,11 @@ namespace Microsoft.Build.Tasks
         public string VisualStudioVersion { get; set; }
 
         public bool Validate { get; set; } = true;
+
+        /// <summary>
+        /// Gets or sets the task execution environment for thread-safe path resolution.
+        /// </summary>
+        public TaskEnvironment TaskEnvironment { get; set; }
 
         [Output]
         public string BootstrapperKeyFile { get; set; }
@@ -67,6 +72,9 @@ namespace Microsoft.Build.Tasks
             {
                 Path = Util.GetDefaultPath(VisualStudioVersion);
             }
+
+            // Use project directory as default output path if not specified
+            string effectiveOutputPath = OutputPath ?? TaskEnvironment.ProjectDirectory.Value;
 
             var bootstrapperBuilder = new BootstrapperBuilder
             {
@@ -87,7 +95,7 @@ namespace Microsoft.Build.Tasks
                 CopyComponents = CopyComponents,
                 Culture = Culture,
                 FallbackCulture = FallbackCulture,
-                OutputPath = OutputPath,
+                OutputPath = effectiveOutputPath,
                 SupportUrl = SupportUrl
             };
 
