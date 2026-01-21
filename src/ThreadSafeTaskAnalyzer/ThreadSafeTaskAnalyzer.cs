@@ -112,6 +112,74 @@ public sealed class ThreadSafeTaskAnalyzer : DiagnosticAnalyzer
         }
     }
 
+    /// <summary>
+    /// Methods and constructors where additional string parameters are legitimate (not paths).
+    /// Key is method/type name, value is the number of path parameters at the start.
+    /// </summary>
+    private static readonly System.Collections.Generic.Dictionary<string, int> s_methodsWithPathParamCount = new()
+    {
+        // File methods: first param is path, rest may be content/encoding
+        ["WriteAllText"] = 1,
+        ["WriteAllLines"] = 1,
+        ["AppendAllText"] = 1,
+        ["AppendAllLines"] = 1,
+        ["ReadAllText"] = 1,
+        ["ReadAllLines"] = 1,
+        ["ReadAllBytes"] = 1,
+        ["WriteAllBytes"] = 1,
+        // Copy/Move have 2 path params
+        ["Copy"] = 2,
+        ["Move"] = 2,
+        ["Replace"] = 3,
+        // CreateSymbolicLink has 2 path params
+        ["CreateSymbolicLink"] = 2,
+        // Constructors: first param is path
+        ["FileInfo"] = 1,
+        ["DirectoryInfo"] = 1,
+        ["FileStream"] = 1,
+        ["StreamReader"] = 1,
+        ["StreamWriter"] = 1,
+    };
+
+    /// <summary>
+    /// Checks if all path arguments for a file I/O method are AbsolutePath.
+    /// Uses the method name to determine how many leading parameters are paths.
+    /// For methods not in the exception list, ALL string arguments must be AbsolutePath.
+    /// </summary>
+    private static bool AllPathArgumentsAreAbsolutePath(SemanticModel semanticModel, string methodName, ArgumentListSyntax? argumentList, System.Threading.CancellationToken cancellationToken)
+    {
+        if (argumentList == null || argumentList.Arguments.Count == 0)
+        {
+            return false;
+        }
+
+        // Determine how many leading arguments are paths
+        // If method is in exception list, only check that many; otherwise check ALL arguments
+        bool hasKnownPathCount = s_methodsWithPathParamCount.TryGetValue(methodName, out int pathParamCount);
+        int argsToCheck = hasKnownPathCount
+            ? System.Math.Min(pathParamCount, argumentList.Arguments.Count)
+            : argumentList.Arguments.Count;
+
+        for (int i = 0; i < argsToCheck; i++)
+        {
+            var argument = argumentList.Arguments[i];
+            var typeInfo = semanticModel.GetTypeInfo(argument.Expression, cancellationToken);
+            var typeName = typeInfo.Type?.ToDisplayString();
+
+            // Only flag string arguments that are not AbsolutePath
+            // Non-string arguments (e.g., bool, FileMode) are fine
+            if (typeName == "string" || typeName == "System.String")
+            {
+                return false;
+            }
+
+            // AbsolutePath is acceptable for path arguments
+            // Other non-string types are also acceptable (e.g., enums, booleans)
+        }
+
+        return true;
+    }
+
     private static void AnalyzeMember(SymbolAnalysisContext context, SemanticModel semanticModel, MemberDeclarationSyntax member)
     {
         SyntaxNode? body = member switch
@@ -277,12 +345,16 @@ public sealed class ThreadSafeTaskAnalyzer : DiagnosticAnalyzer
         }
 
         // Check File and Directory methods (ERROR level - uses current working directory)
+        // Safe if all path arguments are AbsolutePath
         if (containingType is "System.IO.File" or "System.IO.Directory")
         {
-            context.ReportDiagnostic(Diagnostic.Create(
-                DiagnosticDescriptors.FileDirectoryUsage,
-                invocation.GetLocation(),
-                $"{methodSymbol.ContainingType?.Name ?? "Unknown"}.{methodName}"));
+            if (!AllPathArgumentsAreAbsolutePath(semanticModel, methodName, invocation.ArgumentList, context.CancellationToken))
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    DiagnosticDescriptors.FileDirectoryUsage,
+                    invocation.GetLocation(),
+                    $"{methodSymbol.ContainingType?.Name ?? "Unknown"}.{methodName}"));
+            }
         }
 
         // Check FileInfo instance methods that may use relative paths
@@ -354,6 +426,7 @@ public sealed class ThreadSafeTaskAnalyzer : DiagnosticAnalyzer
         }
 
         var typeName = constructorSymbol.ContainingType?.ToDisplayString();
+        var shortTypeName = constructorSymbol.ContainingType?.Name ?? "";
 
         // Check ProcessStartInfo creation
         if (typeName == "System.Diagnostics.ProcessStartInfo")
@@ -364,40 +437,16 @@ public sealed class ThreadSafeTaskAnalyzer : DiagnosticAnalyzer
                 "new ProcessStartInfo()"));
         }
 
-        // Check FileInfo/DirectoryInfo creation
-        if (typeName is "System.IO.FileInfo" or "System.IO.DirectoryInfo")
+        // Check path-related type constructors (FileInfo, DirectoryInfo, FileStream, StreamReader, StreamWriter)
+        if (typeName is "System.IO.FileInfo" or "System.IO.DirectoryInfo" or "System.IO.FileStream" or "System.IO.StreamReader" or "System.IO.StreamWriter")
         {
-            context.ReportDiagnostic(Diagnostic.Create(
-                DiagnosticDescriptors.RelativePathWarning,
-                objectCreation.GetLocation(),
-                $"new {constructorSymbol.ContainingType?.Name ?? "Unknown"}()"));
-        }
-
-        // Check FileStream creation
-        if (typeName == "System.IO.FileStream")
-        {
-            context.ReportDiagnostic(Diagnostic.Create(
-                DiagnosticDescriptors.RelativePathWarning,
-                objectCreation.GetLocation(),
-                "new FileStream()"));
-        }
-
-        // Check StreamReader creation
-        if (typeName == "System.IO.StreamReader")
-        {
-            context.ReportDiagnostic(Diagnostic.Create(
-                DiagnosticDescriptors.RelativePathWarning,
-                objectCreation.GetLocation(),
-                "new StreamReader()"));
-        }
-
-        // Check StreamWriter creation
-        if (typeName == "System.IO.StreamWriter")
-        {
-            context.ReportDiagnostic(Diagnostic.Create(
-                DiagnosticDescriptors.RelativePathWarning,
-                objectCreation.GetLocation(),
-                "new StreamWriter()"));
+            if (!AllPathArgumentsAreAbsolutePath(semanticModel, shortTypeName, objectCreation.ArgumentList, context.CancellationToken))
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    DiagnosticDescriptors.RelativePathWarning,
+                    objectCreation.GetLocation(),
+                    $"new {shortTypeName}()"));
+            }
         }
     }
 
