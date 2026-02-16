@@ -8,6 +8,7 @@ using System.Threading;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Shared;
 using Microsoft.Build.Tasks;
+using Microsoft.Build.UnitTests.Shared;
 using Microsoft.Build.Utilities;
 using Shouldly;
 using Xunit;
@@ -236,6 +237,7 @@ namespace Microsoft.Build.UnitTests.GetSDKReferenceFiles_Tests
                 BuildEngine = engine,
                 ResolvedSDKReferences = new ITaskItem[] { item },
                 CacheFileFolderPath = _cacheDirectory,
+                TaskEnvironment = TaskEnvironmentHelper.CreateForTest()
             };
 
             t.Execute(_getAssemblyName, _getAssemblyRuntimeVersion, p => FileUtilities.FileExistsNoThrow(p), synchronous: true).ShouldBeTrue();
@@ -274,9 +276,9 @@ namespace Microsoft.Build.UnitTests.GetSDKReferenceFiles_Tests
             using (TestEnvironment env = TestEnvironment.Create())
             {
                 TransientTestFolder folder = env.CreateFolder();
-                GetSDKReferenceFiles.SDKFilesCache cache = new(null, folder.Path, null, null, null);
+                GetSDKReferenceFiles.SDKFilesCache cache = new(null, folder.Path, null, null, null, TaskEnvironmentHelper.CreateForTest());
                 cache.SaveAssemblyListToCacheFile(contextWriter);
-                GetSDKReferenceFiles.SDKFilesCache cache2 = new(null, folder.Path, null, null, null);
+                GetSDKReferenceFiles.SDKFilesCache cache2 = new(null, folder.Path, null, null, null, TaskEnvironmentHelper.CreateForTest());
                 readInfo = cache2.LoadAssemblyListFromCacheFile("d", "n");
             }
             readInfo.DirectoryToFileList.Count.ShouldBe(2);
@@ -348,6 +350,7 @@ namespace Microsoft.Build.UnitTests.GetSDKReferenceFiles_Tests
             var t = new GetSDKReferenceFiles();
             t.BuildEngine = engine;
             t.CacheFileFolderPath = _cacheDirectory;
+            t.TaskEnvironment = TaskEnvironmentHelper.CreateForTest();
             bool success = t.Execute(_getAssemblyName, _getAssemblyRuntimeVersion, p => FileUtilities.FileExistsNoThrow(p), synchronous: true);
 
             Assert.True(success);
@@ -366,6 +369,7 @@ namespace Microsoft.Build.UnitTests.GetSDKReferenceFiles_Tests
             var t = new GetSDKReferenceFiles();
             t.BuildEngine = engine;
             t.CacheFileFolderPath = _cacheDirectory;
+            t.TaskEnvironment = TaskEnvironmentHelper.CreateForTest();
 
             ITaskItem item = new TaskItem(_sdkDirectory);
             item.SetMetadata("ExpandReferenceAssemblies", "false");

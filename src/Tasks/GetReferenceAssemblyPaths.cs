@@ -18,6 +18,7 @@ namespace Microsoft.Build.Tasks
     /// <summary>
     /// Returns the reference assembly paths to the various frameworks
     /// </summary>
+    [MSBuildMultiThreadableTask]
     public class GetReferenceAssemblyPaths : TaskExtension
     {
         #region Data
@@ -31,7 +32,9 @@ namespace Microsoft.Build.Tasks
         /// <summary>
         /// Cache in a static whether or not we have found the 35sp1sentinel assembly.
         /// </summary>
+#pragma warning disable MSB0011 // This static field is safe because it's only used for caching GAC assembly lookup results
         private static bool? s_net35SP1SentinelAssemblyFound;
+#pragma warning restore MSB0011
 #endif
 
         /// <summary>

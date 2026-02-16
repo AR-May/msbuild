@@ -24,8 +24,9 @@ namespace Microsoft.Build.Tasks
     /// <summary>
     /// Resolves an SDKReference to a full path on disk
     /// </summary>
+    [MSBuildMultiThreadableTask]
 #pragma warning disable RS0022 // Constructor make noninheritable base class inheritable: Longstanding API design that we shouldn't change now
-    public class GetSDKReferenceFiles : TaskExtension
+    public class GetSDKReferenceFiles : TaskExtension, IMultiThreadableTask
 #pragma warning restore RS0022 // Constructor make noninheritable base class inheritable
     {
         /// <summary>
@@ -84,6 +85,11 @@ namespace Microsoft.Build.Tasks
         private string _cacheFilePath = FileUtilities.TempFileDirectory;
 
         #region Properties
+
+        /// <summary>
+        /// Environment for task execution
+        /// </summary>
+        public TaskEnvironment TaskEnvironment { get; set; }
 
         /// <summary>
         /// Path where the cache files should be stored
@@ -655,7 +661,8 @@ namespace Microsoft.Build.Tasks
         /// </summary>
         private void PopulateReferencesForSDK(IEnumerable<ITaskItem> sdks)
         {
-            var sdkFilesCache = new SDKFilesCache(_exceptions, _cacheFilePath, _getAssemblyName, _getRuntimeVersion, _fileExists);
+            AbsolutePath absoluteCacheFilePath = TaskEnvironment.GetAbsolutePath(_cacheFilePath);
+            var sdkFilesCache = new SDKFilesCache(_exceptions, absoluteCacheFilePath, _getAssemblyName, _getRuntimeVersion, _fileExists, TaskEnvironment);
 
             // Go through each sdk which has been resolved in this project
             foreach (ITaskItem sdk in sdks)
@@ -908,15 +915,21 @@ namespace Microsoft.Build.Tasks
             private readonly string _cacheFileDirectory;
 
             /// <summary>
+            /// Task environment for file operations
+            /// </summary>
+            private readonly TaskEnvironment _taskEnvironment;
+
+            /// <summary>
             /// Constructor
             /// </summary>
-            internal SDKFilesCache(ConcurrentQueue<string> exceptionQueue, string cacheFileDirectory, GetAssemblyName getAssemblyName, GetAssemblyRuntimeVersion getRuntimeVersion, FileExists fileExists)
+            internal SDKFilesCache(ConcurrentQueue<string> exceptionQueue, string cacheFileDirectory, GetAssemblyName getAssemblyName, GetAssemblyRuntimeVersion getRuntimeVersion, FileExists fileExists, TaskEnvironment taskEnvironment)
             {
                 _exceptionMessages = exceptionQueue;
                 _cacheFileDirectory = cacheFileDirectory;
                 _getAssemblyName = getAssemblyName;
                 _getRuntimeVersion = getRuntimeVersion;
                 _fileExists = fileExists;
+                _taskEnvironment = taskEnvironment;
             }
 
             /// <summary>
@@ -1047,7 +1060,8 @@ namespace Microsoft.Build.Tasks
                 referenceDirectories,
                 path =>
                 {
-                    List<string> files = Directory.GetFiles(path, "*", SearchOption.TopDirectoryOnly).ToList();
+                    AbsolutePath absolutePath = _taskEnvironment.GetAbsolutePath(path);
+                    List<string> files = Directory.GetFiles(absolutePath, "*", SearchOption.TopDirectoryOnly).ToList();
                     referencesByDirectory.TryAdd(path, files);
 
                     Parallel.ForEach(files, filePath => { references.TryAdd(filePath, GetSDKReferenceInfo(filePath)); });
@@ -1057,14 +1071,15 @@ namespace Microsoft.Build.Tasks
             /// <summary>
             /// Populate an existing assembly dictionary for the given framework moniker
             /// </summary>
-            private static void PopulateRedistDictionaryFromPaths(ConcurrentDictionary<string, List<string>> redistFilesByDirectory, IEnumerable<string> redistDirectories)
+            private void PopulateRedistDictionaryFromPaths(ConcurrentDictionary<string, List<string>> redistFilesByDirectory, IEnumerable<string> redistDirectories)
             {
                 // Add each folder to the dictionary along with a list of all of files inside of it
                 Parallel.ForEach(
                 redistDirectories,
                 path =>
                 {
-                    List<string> files = Directory.GetFiles(path, "*", SearchOption.TopDirectoryOnly).ToList();
+                    AbsolutePath absolutePath = _taskEnvironment.GetAbsolutePath(path);
+                    List<string> files = Directory.GetFiles(absolutePath, "*", SearchOption.TopDirectoryOnly).ToList();
                     redistFilesByDirectory.TryAdd(path, files);
                 });
             }

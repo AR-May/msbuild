@@ -17,6 +17,7 @@ namespace Microsoft.Build.Tasks
     ///  Gathers the list of installed SDKS in the registry and on disk and outputs them into the project
     ///  so they can be used during SDK reference resolution and RAR for single files.
     /// </summary>
+    [MSBuildMultiThreadableTask]
 #pragma warning disable RS0022 // Constructor make noninheritable base class inheritable: Longstanding API design that we shouldn't change now
     public class GetInstalledSDKLocations : TaskExtension
 #pragma warning restore RS0022 // Constructor make noninheritable base class inheritable
@@ -115,6 +116,7 @@ namespace Microsoft.Build.Tasks
         /// </summary>
         [Output]
         public ITaskItem[] InstalledSDKs { get; set; }
+        
         #endregion
 
         #region ITask Members
