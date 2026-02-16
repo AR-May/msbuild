@@ -1,6 +1,7 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 
@@ -57,14 +58,27 @@ namespace Microsoft.Build.Framework
         /// </summary>
         /// <param name="name">The name of the environment variable.</param>
         /// <param name="value">The value to set, or null to remove the environment variable.</param>
-        public void SetEnvironmentVariable(string name, string? value) => _driver.SetEnvironmentVariable(name, value);
+        /// <exception cref="ArgumentException">Thrown when attempting to modify protected environment variables.</exception>
+        public void SetEnvironmentVariable(string name, string? value)
+        {
+            ProtectedEnvironmentVariables.ValidateEnvironmentVariableIsNotProtected(name);
+            _driver.SetEnvironmentVariable(name, value);
+        }
 
         /// <summary>
         /// Updates the environment to match the provided dictionary.
         /// This mirrors the behavior of CommunicationsUtilities.SetEnvironment but operates on this TaskEnvironment.
         /// </summary>
         /// <param name="newEnvironment">The new environment variables to set.</param>
-        internal void SetEnvironment(IDictionary<string, string> newEnvironment) => _driver.SetEnvironment(newEnvironment);
+        /// <exception cref="ArgumentException">Thrown when attempting to modify protected environment variables.</exception>
+        internal void SetEnvironment(IDictionary<string, string> newEnvironment)
+        {
+            foreach (string name in newEnvironment.Keys)
+            {
+                ProtectedEnvironmentVariables.ValidateEnvironmentVariableIsNotProtected(name);
+            }
+            _driver.SetEnvironment(newEnvironment);
+        }
 
         /// <summary>
         /// Creates a new ProcessStartInfo configured for the current task execution environment.
