@@ -3,7 +3,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.IO;
 using Microsoft.Build.BackEnd;
 using Microsoft.Build.Framework;
 using ParameterType = Microsoft.Build.Tasks.AssemblyDependency.RarTaskParameters.ParameterType;
@@ -25,14 +24,15 @@ namespace Microsoft.Build.Tasks.AssemblyDependency
         internal RarNodeExecuteRequest(ResolveAssemblyReference rar)
         {
             // The RAR node may have a different working directory than the target, so convert potential relative paths to absolute.
+            // Use TaskEnvironment for thread-safe resolution relative to the project directory.
             if (rar.AppConfigFile != null)
             {
-                rar.AppConfigFile = Path.GetFullPath(rar.AppConfigFile);
+                rar.AppConfigFile = rar.TaskEnvironment.GetAbsolutePath(rar.AppConfigFile).GetCanonicalForm();
             }
 
             if (rar.StateFile != null)
             {
-                rar.StateFile = Path.GetFullPath(rar.StateFile);
+                rar.StateFile = rar.TaskEnvironment.GetAbsolutePath(rar.StateFile).GetCanonicalForm();
             }
 
             _taskInputs = RarTaskParameters.Get(ParameterType.Input, rar);

@@ -120,6 +120,7 @@ namespace Microsoft.Build.Tasks
         /// <param name="targetedRuntimeVersion"></param>
         /// <param name="getAssemblyPathInGac"></param>
         /// <param name="log"></param>
+        /// <param name="taskEnvironment">TaskEnvironment for thread-safe environment variable access.</param>
         /// <returns></returns>
 #else
         /// <summary>
@@ -137,6 +138,7 @@ namespace Microsoft.Build.Tasks
         /// <param name="targetedRuntimeVersion"></param>
         /// <param name="getAssemblyPathInGac"></param>
         /// <param name="log"></param>
+        /// <param name="taskEnvironment">TaskEnvironment for thread-safe environment variable access.</param>
         /// <returns></returns>
 #endif
         public static Resolver[] CompileSearchPaths(
@@ -156,7 +158,8 @@ namespace Microsoft.Build.Tasks
             GetAssemblyRuntimeVersion getRuntimeVersion,
             Version targetedRuntimeVersion,
             GetAssemblyPathInGac getAssemblyPathInGac,
-            TaskLoggingHelper log)
+            TaskLoggingHelper log,
+            TaskEnvironment taskEnvironment)
         {
             var resolvers = new Resolver[searchPaths.Length];
 
@@ -196,12 +199,12 @@ namespace Microsoft.Build.Tasks
                 // Check for AssemblyFoldersEx sentinel.
                 else if (0 == String.Compare(basePath, 0, AssemblyResolutionConstants.assemblyFoldersExSentinel, 0, AssemblyResolutionConstants.assemblyFoldersExSentinel.Length, StringComparison.OrdinalIgnoreCase))
                 {
-                    resolvers[p] = new AssemblyFoldersExResolver(searchPaths[p], getAssemblyName, fileExists, getRegistrySubKeyNames, getRegistrySubKeyDefaultValue, getRuntimeVersion, openBaseKey, targetedRuntimeVersion, targetProcessorArchitecture, true, buildEngine);
+                    resolvers[p] = new AssemblyFoldersExResolver(searchPaths[p], getAssemblyName, fileExists, getRegistrySubKeyNames, getRegistrySubKeyDefaultValue, getRuntimeVersion, openBaseKey, targetedRuntimeVersion, targetProcessorArchitecture, true, buildEngine, taskEnvironment);
                 }
 #endif
                 else if (0 == String.Compare(basePath, 0, AssemblyResolutionConstants.assemblyFoldersFromConfigSentinel, 0, AssemblyResolutionConstants.assemblyFoldersFromConfigSentinel.Length, StringComparison.OrdinalIgnoreCase))
                 {
-                    resolvers[p] = new AssemblyFoldersFromConfigResolver(searchPaths[p], getAssemblyName, fileExists, getRuntimeVersion, targetedRuntimeVersion, targetProcessorArchitecture, true, buildEngine, log);
+                    resolvers[p] = new AssemblyFoldersFromConfigResolver(searchPaths[p], getAssemblyName, fileExists, getRuntimeVersion, targetedRuntimeVersion, targetProcessorArchitecture, true, buildEngine, log, taskEnvironment);
                 }
                 else
                 {
