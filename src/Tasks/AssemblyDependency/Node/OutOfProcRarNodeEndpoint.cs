@@ -5,6 +5,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Build.BackEnd;
+using Microsoft.Build.Framework;
 using Microsoft.Build.Internal;
 using Microsoft.Build.Shared;
 
@@ -96,6 +97,7 @@ namespace Microsoft.Build.Tasks.AssemblyDependency
 
                             RarNodeExecuteRequest request = (RarNodeExecuteRequest)packet;
                             ResolveAssemblyReference rarTask = new();
+                            rarTask.TaskEnvironment = new TaskEnvironment(MultiProcessTaskEnvironmentDriver.Instance);
                             request.SetTaskInputs(rarTask, _buildEngine);
 
                             bool success = rarTask.Execute();

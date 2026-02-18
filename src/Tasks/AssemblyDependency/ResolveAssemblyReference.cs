@@ -33,7 +33,8 @@ namespace Microsoft.Build.Tasks
     /// Given a list of assemblyFiles, determine the closure of all assemblyFiles that
     /// depend on those assemblyFiles including second and nth-order dependencies too.
     /// </summary>
-    public class ResolveAssemblyReference : TaskExtension, IIncrementalTask
+    [MSBuildMultiThreadableTask]
+    public class ResolveAssemblyReference : TaskExtension, IIncrementalTask, IMultiThreadableTask
     {
         /// <summary>
         /// key assembly used to trigger inclusion of facade references.
@@ -920,6 +921,9 @@ namespace Microsoft.Build.Tasks
         }
 
         public bool FailIfNotIncremental { get; set; }
+
+        /// <inheritdoc />
+        public TaskEnvironment TaskEnvironment { get; set; }
 
         /// <summary>
         /// Allow the task to run on the out-of-proc node if enabled for this build.
@@ -2237,7 +2241,7 @@ namespace Microsoft.Build.Tasks
                         return false;
                     }
 
-                    _logVerboseSearchResults = Environment.GetEnvironmentVariable("MSBUILDLOGVERBOSERARSEARCHRESULTS") != null;
+                    _logVerboseSearchResults = TaskEnvironment.GetEnvironmentVariable("MSBUILDLOGVERBOSERARSEARCHRESULTS") != null;
 
                     // Loop through all the target framework directories that were passed in,
                     // and ensure that they all have a trailing slash.  This is necessary
@@ -2468,7 +2472,8 @@ namespace Microsoft.Build.Tasks
                         _ignoreTargetFrameworkAttributeVersionMismatch,
                         _unresolveFrameworkAssembliesFromHigherFrameworks,
                         assemblyMetadataCache,
-                        _nonCultureResourceDirectories);
+                        _nonCultureResourceDirectories,
+                        TaskEnvironment);
 
                     dependencyTable.FindDependenciesOfExternallyResolvedReferences = FindDependenciesOfExternallyResolvedReferences;
 
@@ -2942,7 +2947,7 @@ namespace Microsoft.Build.Tasks
                 return;
             }
 
-            string dumpFrameworkSubsetList = Environment.GetEnvironmentVariable("MSBUILDDUMPFRAMEWORKSUBSETLIST");
+            string dumpFrameworkSubsetList = TaskEnvironment.GetEnvironmentVariable("MSBUILDDUMPFRAMEWORKSUBSETLIST");
             if (dumpFrameworkSubsetList == null)
             {
                 return;
@@ -3249,7 +3254,7 @@ namespace Microsoft.Build.Tasks
         private string GetAssemblyPathInGac(AssemblyNameExtension assemblyName, SystemProcessorArchitecture targetProcessorArchitecture, GetAssemblyRuntimeVersion getRuntimeVersion, Version targetedRuntimeVersion, FileExists fileExists, bool fullFusionName, bool specificVersion)
         {
 #if FEATURE_GAC
-            return GlobalAssemblyCache.GetLocation(BuildEngine as IBuildEngine4, assemblyName, targetProcessorArchitecture, getRuntimeVersion, targetedRuntimeVersion, fullFusionName, fileExists, null, null, specificVersion /* this value does not matter if we are passing a full fusion name*/);
+            return GlobalAssemblyCache.GetLocation(BuildEngine as IBuildEngine4, assemblyName, targetProcessorArchitecture, getRuntimeVersion, targetedRuntimeVersion, fullFusionName, fileExists, null, null, specificVersion /* this value does not matter if we are passing a full fusion name*/, TaskEnvironment);
 #else
             return string.Empty;
 #endif
@@ -3288,6 +3293,19 @@ namespace Microsoft.Build.Tasks
                     // TODO: Disable out-of-proc for the remainder of the build if any connection fails.
                     CommunicationsUtilities.Trace("RAR out-of-proc connection failed, failing back to in-proc. Exception: {0}", ex);
                 }
+            }
+
+            // In a multithreaded node, relative paths must be resolved relative to the project directory
+            // rather than the process working directory. Resolve potential relative paths to absolute before
+            // entering the internal Execute, matching the pattern from RarNodeExecuteRequest.
+            if (AppConfigFile is not null)
+            {
+                AppConfigFile = TaskEnvironment.GetAbsolutePath(AppConfigFile);
+            }
+
+            if (StateFile is not null)
+            {
+                StateFile = TaskEnvironment.GetAbsolutePath(StateFile);
             }
 
             return Execute(

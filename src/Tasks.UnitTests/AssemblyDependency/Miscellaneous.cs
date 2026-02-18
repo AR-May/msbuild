@@ -7013,6 +7013,7 @@ namespace Microsoft.Build.UnitTests.ResolveAssemblyReference_Tests
         {
             mockEngine = new MockEngine(output);
             rar = new ResolveAssemblyReference();
+            rar.TaskEnvironment = TaskEnvironmentHelper.CreateForTest();
             rar.BuildEngine = mockEngine;
         }
 
@@ -7050,6 +7051,7 @@ namespace Microsoft.Build.UnitTests.ResolveAssemblyReference_Tests
         {
             mockEngine = new MockEngine(_output);
             rar = new ResolveAssemblyReference();
+            rar.TaskEnvironment = TaskEnvironmentHelper.CreateForTest();
             rar.BuildEngine = mockEngine;
 
             referenceTable = MakeEmptyReferenceTable(rar.Log);

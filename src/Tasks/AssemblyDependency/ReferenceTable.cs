@@ -112,6 +112,11 @@ namespace Microsoft.Build.Tasks
         private readonly ReadMachineTypeFromPEHeader _readMachineTypeFromPEHeader;
 
         /// <summary>
+        /// TaskEnvironment for thread-safe access to environment variables and path resolution.
+        /// </summary>
+        private readonly TaskEnvironment _taskEnvironment;
+
+        /// <summary>
         /// Is the file a winMD file
         /// </summary>
         private readonly IsWinMDFile _isWinMDFile;
@@ -225,6 +230,7 @@ namespace Microsoft.Build.Tasks
         /// <param name="warnOrErrorOnTargetArchitectureMismatch"></param>
         /// <param name="ignoreFrameworkAttributeVersionMismatch"></param>
         /// <param name="nonCultureResourceDirectories"></param>
+        /// <param name="taskEnvironment">TaskEnvironment for thread-safe environment variable access and path resolution.</param>
 #else
         /// <summary>
         /// Construct.
@@ -265,6 +271,7 @@ namespace Microsoft.Build.Tasks
         /// <param name="warnOrErrorOnTargetArchitectureMismatch"></param>
         /// <param name="ignoreFrameworkAttributeVersionMismatch"></param>
         /// <param name="nonCultureResourceDirectories"></param>
+        /// <param name="taskEnvironment">TaskEnvironment for thread-safe environment variable access and path resolution.</param>
 #endif
         internal ReferenceTable(
             IBuildEngine buildEngine,
@@ -307,7 +314,8 @@ namespace Microsoft.Build.Tasks
             bool ignoreFrameworkAttributeVersionMismatch,
             bool unresolveFrameworkAssembliesFromHigherFrameworks,
             ConcurrentDictionary<string, AssemblyMetadata> assemblyMetadataCache,
-            string[] nonCultureResourceDirectories)
+            string[] nonCultureResourceDirectories,
+            TaskEnvironment taskEnvironment)
         {
             _log = log;
             _findDependencies = findDependencies;
@@ -339,6 +347,7 @@ namespace Microsoft.Build.Tasks
             _assemblyMetadataCache = assemblyMetadataCache;
             _nonCultureResourceDirectories = nonCultureResourceDirectories;
             _enableCustomCulture = enableCustomCulture;
+            _taskEnvironment = taskEnvironment;
 
             // Set condition for when to check assembly version against the target framework version
             _checkAssemblyVersionAgainstTargetFrameworkVersion = unresolveFrameworkAssembliesFromHigherFrameworks || ((_projectTargetFramework ?? ReferenceTable.s_targetFrameworkVersion_40) <= ReferenceTable.s_targetFrameworkVersion_40);
@@ -378,7 +387,8 @@ namespace Microsoft.Build.Tasks
                     getRuntimeVersion,
                     targetedRuntimeVersion,
                     getAssemblyPathInGac,
-                    log);
+                    log,
+                    taskEnvironment);
         }
 
         /// <summary>
@@ -468,7 +478,7 @@ namespace Microsoft.Build.Tasks
 
             if (!Path.IsPathRooted(assemblyFileName))
             {
-                reference.FullPath = Path.GetFullPath(assemblyFileName);
+                reference.FullPath = _taskEnvironment.GetAbsolutePath(assemblyFileName);
             }
             else
             {
