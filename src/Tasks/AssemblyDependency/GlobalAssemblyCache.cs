@@ -268,7 +268,7 @@ namespace Microsoft.Build.Tasks
         /// <param name="getPathFromFusionName">Delegate to get path to a file based on the fusion name.</param>
         /// <param name="getGacEnumerator">Delegate to get the enumerator which will enumerate over the GAC.</param>
         /// <param name="specificVersion">Whether to check for a specific version.</param>
-        /// <param name="getEnvironmentVariable">Optional TaskEnvironment for thread-safe environment variable access.</param>
+        /// <param name="taskEnvironment">Optional TaskEnvironment for thread-safe environment variable access.</param>
         /// <returns>The path to the assembly. Empty if none exists.</returns>
         internal static string GetLocation(
             IBuildEngine4 buildEngine,
