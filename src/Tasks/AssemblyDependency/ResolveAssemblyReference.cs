@@ -3300,12 +3300,12 @@ namespace Microsoft.Build.Tasks
             // entering the internal Execute, matching the pattern from RarNodeExecuteRequest.
             if (AppConfigFile is not null)
             {
-                AppConfigFile = TaskEnvironment.GetAbsolutePath(AppConfigFile);
+                AppConfigFile = TaskEnvironment.GetAbsolutePath(AppConfigFile).GetCanonicalForm();
             }
 
             if (StateFile is not null)
             {
-                StateFile = TaskEnvironment.GetAbsolutePath(StateFile);
+                StateFile = TaskEnvironment.GetAbsolutePath(StateFile).GetCanonicalForm();
             }
 
             return Execute(
