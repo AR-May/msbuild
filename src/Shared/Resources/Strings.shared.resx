@@ -212,6 +212,10 @@
     <value>When attempting to generate a reference assembly path from the path "{0}" and the framework moniker "{1}" there was an error. {2}</value>
     <comment>No Error code because this resource will be used in an exception. The error code is discarded if it is included</comment>
   </data>
+  <data name="FrameworkLocationHelper.ComplusInstallRootMustBeFullyQualified" xml:space="preserve">
+    <value>The COMPLUS_INSTALLROOT environment variable must be a fully qualified path.</value>
+    <comment>No Error code because this resource will be used in an exception. The error code is discarded if it is included</comment>
+  </data>
   <data name="DirectoryNotFound" xml:space="preserve">
     <value>Could not find directory path: {0}</value>
     <comment>Directory must exist</comment>

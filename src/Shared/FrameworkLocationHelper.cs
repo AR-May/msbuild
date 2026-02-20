@@ -823,6 +823,19 @@ namespace Microsoft.Build.Shared
 
             if (!String.IsNullOrEmpty(complusInstallRoot) && !String.IsNullOrEmpty(complusVersion))
             {
+#if NETFRAMEWORK
+                // Path.IsPathFullyQualified is provided by Microsoft.IO package in .NET Framework
+                if (ChangeWaves.AreFeaturesEnabled(ChangeWaves.Wave18_5) && !Microsoft.IO.Path.IsPathFullyQualified(complusInstallRoot))
+                {
+                    ErrorUtilities.ThrowInvalidOperation("FrameworkLocationHelper.ComplusInstallRootMustBeFullyQualified");
+                }
+#elif NET
+                if (ChangeWaves.AreFeaturesEnabled(ChangeWaves.Wave18_5) && !Path.IsPathFullyQualified(complusInstallRoot))
+                {
+                    ErrorUtilities.ThrowInvalidOperation("FrameworkLocationHelper.ComplusInstallRootMustBeFullyQualified");
+                }
+#endif
+
                 return Path.Combine(complusInstallRoot, complusVersion);
             }
 

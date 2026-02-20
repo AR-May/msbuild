@@ -42,6 +42,11 @@
         <target state="translated">{0} ({1},{2})</target>
         <note>A file location to be embedded in a string.</note>
       </trans-unit>
+      <trans-unit id="FrameworkLocationHelper.ComplusInstallRootMustBeFullyQualified">
+        <source>The COMPLUS_INSTALLROOT environment variable must be a fully qualified path.</source>
+        <target state="new">The COMPLUS_INSTALLROOT environment variable must be a fully qualified path.</target>
+        <note>No Error code because this resource will be used in an exception. The error code is discarded if it is included</note>
+      </trans-unit>
       <trans-unit id="LoggingBeforeTaskInitialization">
         <source>MSB6005: Task attempted to log before it was initialized. Message was: {0}</source>
         <target state="translated">MSB6005: Zadanie podjęło próbę zarejestrowania przed zainicjowaniem. Pojawił się komunikat: {0}</target>
