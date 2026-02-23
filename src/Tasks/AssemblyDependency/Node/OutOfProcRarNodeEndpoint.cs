@@ -97,16 +97,22 @@ namespace Microsoft.Build.Tasks.AssemblyDependency
 
                             RarNodeExecuteRequest request = (RarNodeExecuteRequest)packet;
                             ResolveAssemblyReference rarTask = new();
-                            rarTask.TaskEnvironment = new TaskEnvironment(MultiProcessTaskEnvironmentDriver.Instance);
-                            request.SetTaskInputs(rarTask, _buildEngine);
+                            
+                            // TODO: This needs to be updated when configuration support is added to pass client-specific state
+                            // For now, using the environment variables from the RAR node process.
+                            using (var environmentDriver = new MultiThreadedTaskEnvironmentDriver(request.ProjectDirectory))
+                            {
+                                rarTask.TaskEnvironment = new TaskEnvironment(environmentDriver);
+                                request.SetTaskInputs(rarTask, _buildEngine);
 
-                            bool success = rarTask.Execute();
+                                bool success = rarTask.Execute();
 
-                            // Send any remaining log events before returning the final result packet.
-                            await _buildEngine.FlushEventsAsync(cancellationToken).ConfigureAwait(false);
-                            await _pipeServer.WritePacketAsync(new RarNodeExecuteResponse(rarTask, success), cancellationToken).ConfigureAwait(false);
+                                // Send any remaining log events before returning the final result packet.
+                                await _buildEngine.FlushEventsAsync(cancellationToken).ConfigureAwait(false);
+                                await _pipeServer.WritePacketAsync(new RarNodeExecuteResponse(rarTask, success), cancellationToken).ConfigureAwait(false);
 
-                            CommunicationsUtilities.Trace("({0}) Completed RAR request.", _endpointId);
+                                CommunicationsUtilities.Trace("({0}) Completed RAR request.", _endpointId);
+                            }
                             break;
                         case NodePacketType.NodeShutdown:
                             // Although the client has already disconnected, it is still necessary to Disconnect() so the
