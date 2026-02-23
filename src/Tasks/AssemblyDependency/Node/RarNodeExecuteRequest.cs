@@ -18,6 +18,7 @@ namespace Microsoft.Build.Tasks.AssemblyDependency
         private int _lineNumberOfTaskNode;
         private int _columnNumberOfTaskNode;
         private string? _projectFileOfTaskNode;
+        private string _projectDirectory = null!;
         private MessageImportance _minimumMessageImportance;
         private bool _isTaskInputLoggingEnabled;
 
@@ -37,6 +38,9 @@ namespace Microsoft.Build.Tasks.AssemblyDependency
 
             _taskInputs = RarTaskParameters.Get(ParameterType.Input, rar);
 
+            // Capture the project directory from TaskEnvironment
+            _projectDirectory = rar.TaskEnvironment.ProjectDirectory.Value;
+
             // Ensure log messages are identical to those that would be produced on the client.
             _lineNumberOfTaskNode = rar.BuildEngine.LineNumberOfTaskNode;
             _columnNumberOfTaskNode = rar.BuildEngine.ColumnNumberOfTaskNode;
@@ -49,6 +53,8 @@ namespace Microsoft.Build.Tasks.AssemblyDependency
 
         internal RarNodeExecuteRequest(ITranslator translator) => Translate(translator);
 
+        public string ProjectDirectory => _projectDirectory;
+
         public NodePacketType Type => NodePacketType.RarNodeExecuteRequest;
 
         public void Translate(ITranslator translator)
@@ -60,6 +66,7 @@ namespace Microsoft.Build.Tasks.AssemblyDependency
             translator.Translate(ref _lineNumberOfTaskNode);
             translator.Translate(ref _columnNumberOfTaskNode);
             translator.Translate(ref _projectFileOfTaskNode);
+            translator.Translate(ref _projectDirectory);
             translator.TranslateEnum(ref _minimumMessageImportance, (int)_minimumMessageImportance);
             translator.Translate(ref _isTaskInputLoggingEnabled);
         }
