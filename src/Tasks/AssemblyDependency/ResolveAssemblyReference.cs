@@ -223,12 +223,6 @@ namespace Microsoft.Build.Tasks
         private bool _logVerboseSearchResults = false;
         private WarnOrErrorOnTargetArchitectureMismatchBehavior _warnOrErrorOnTargetArchitectureMismatch = WarnOrErrorOnTargetArchitectureMismatchBehavior.Warning;
         private bool _unresolveFrameworkAssembliesFromHigherFrameworks = false;
-        
-        /// <summary>
-        /// Debug logging for file/directory operations
-        /// </summary>
-        private static readonly object _logLock = new object();
-        private const string DEBUG_LOG_PATH = @"C:\Users\alinama\work\msbuild\issues\rar-enlightening\rar-file-operations.log";
 
         /// <summary>
         /// If set to true, it forces to unresolve framework assemblies with versions higher or equal the version of the target framework, regardless of the target framework
@@ -2102,75 +2096,50 @@ namespace Microsoft.Build.Tasks
         }
         #endregion
 
-        #region Debug Logging
+        #region Path Validation Wrappers
         
         /// <summary>
-        /// Log file/directory operations for debugging multithreading issues
+        /// Create a wrapper for FileExists delegate that throws on relative paths
         /// </summary>
-        private void LogFileOperation(string operation, string path, object result = null)
+        private FileExists CreateValidatingFileExists(FileExists originalFileExists)
         {
-            try
+            return path =>
             {
-                lock (_logLock)
+                if (!string.IsNullOrEmpty(path) && !Path.IsPathRooted(path))
                 {
-                    string logDir = Path.GetDirectoryName(DEBUG_LOG_PATH);
-                    if (!Directory.Exists(logDir))
-                    {
-                        Directory.CreateDirectory(logDir);
-                    }
-                    
-                    string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-                    string threadId = System.Threading.Thread.CurrentThread.ManagedThreadId.ToString();
-                    string processId = System.Diagnostics.Process.GetCurrentProcess().Id.ToString();
-                    string currentDir = Directory.GetCurrentDirectory();
-                    
-                    string logLine = $"[{timestamp}] PID:{processId} TID:{threadId} CWD:{currentDir} {operation}({path}) -> {result}";
-                    
-                    File.AppendAllText(DEBUG_LOG_PATH, logLine + Environment.NewLine);
+                    throw new ArgumentException($"Relative path encountered in FileExists: {path}. Only absolute paths are allowed.", nameof(path));
                 }
-            }
-            catch
-            {
-                // Ignore logging errors to avoid disrupting the build
-            }
-        }
-        
-        /// <summary>
-        /// Create a logging wrapper for FileExists delegate
-        /// </summary>
-        private FileExists CreateLoggingFileExists(FileExists originalFileExists)
-        {
-            return path =>
-            {
-                bool result = originalFileExists(path);
-                LogFileOperation("FileExists", path, result);
-                return result;
+                return originalFileExists(path);
             };
         }
         
         /// <summary>
-        /// Create a logging wrapper for DirectoryExists delegate
+        /// Create a wrapper for DirectoryExists delegate that throws on relative paths
         /// </summary>
-        private DirectoryExists CreateLoggingDirectoryExists(DirectoryExists originalDirectoryExists)
+        private DirectoryExists CreateValidatingDirectoryExists(DirectoryExists originalDirectoryExists)
         {
             return path =>
             {
-                bool result = originalDirectoryExists(path);
-                LogFileOperation("DirectoryExists", path, result);
-                return result;
+                if (!string.IsNullOrEmpty(path) && !Path.IsPathRooted(path))
+                {
+                    throw new ArgumentException($"Relative path encountered in DirectoryExists: {path}. Only absolute paths are allowed.", nameof(path));
+                }
+                return originalDirectoryExists(path);
             };
         }
         
         /// <summary>
-        /// Create a logging wrapper for GetDirectories delegate
+        /// Create a wrapper for GetDirectories delegate that throws on relative paths
         /// </summary>
-        private GetDirectories CreateLoggingGetDirectories(GetDirectories originalGetDirectories)
+        private GetDirectories CreateValidatingGetDirectories(GetDirectories originalGetDirectories)
         {
             return (path, searchPattern) =>
             {
-                string[] result = originalGetDirectories(path, searchPattern);
-                LogFileOperation("GetDirectories", $"{path} (pattern: {searchPattern})", $"[{result.Length} items]");
-                return result;
+                if (!string.IsNullOrEmpty(path) && !Path.IsPathRooted(path))
+                {
+                    throw new ArgumentException($"Relative path encountered in GetDirectories: {path}. Only absolute paths are allowed.", nameof(path));
+                }
+                return originalGetDirectories(path, searchPattern);
             };
         }
         
@@ -2443,7 +2412,7 @@ namespace Microsoft.Build.Tasks
                     // Cache delegates.
                     getAssemblyMetadata = _cache.CacheDelegate(getAssemblyMetadata);
                     FileExists cachedFileExists = _cache.CacheDelegate();
-                    fileExists = CreateLoggingFileExists(cachedFileExists);
+                    fileExists = CreateValidatingFileExists(cachedFileExists);
                     directoryExists = _cache.CacheDelegate(directoryExists);
                     getDirectories = _cache.CacheDelegate(getDirectories);
 
@@ -3372,9 +3341,9 @@ namespace Microsoft.Build.Tasks
             }
 
             return Execute(
-                CreateLoggingFileExists(p => FileUtilities.FileExistsNoThrow(p)),
-                CreateLoggingDirectoryExists(p => FileUtilities.DirectoryExistsNoThrow(p)),
-                CreateLoggingGetDirectories((p, searchPattern) => FileSystems.Default.EnumerateDirectories(p, searchPattern)
+                CreateValidatingFileExists(p => FileUtilities.FileExistsNoThrow(p)),
+                CreateValidatingDirectoryExists(p => FileUtilities.DirectoryExistsNoThrow(p)),
+                CreateValidatingGetDirectories((p, searchPattern) => FileSystems.Default.EnumerateDirectories(p, searchPattern)
                                         .OrderBy(path => path, StringComparer.Ordinal) // sort to ensure deterministic order
                                         .ToArray()),
                 p => AssemblyNameExtension.GetAssemblyNameEx(p),
