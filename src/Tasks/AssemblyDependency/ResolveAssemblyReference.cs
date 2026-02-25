@@ -180,13 +180,14 @@ namespace Microsoft.Build.Tasks
         private bool _ignoreDefaultInstalledAssemblyTables = false;
         private bool _ignoreDefaultInstalledAssemblySubsetTables = false;
         private bool _enableCustomCulture = false;
-        private string[] _candidateAssemblyFiles = [];
+        private AbsolutePath[] _candidateAssemblyFiles = [];
         private string[] _targetFrameworkDirectories = [];
         private string[] _nonCultureResourceDirectories = [];
         private string[] _searchPaths = [];
         private string[] _allowedAssemblyExtensions = [".winmd", ".dll", ".exe"];
         private string[] _relatedFileExtensions = [".pdb", ".xml", ".pri"];
-        private string _appConfigFile = null;
+        private AbsolutePath _appConfigFile = default;
+        private bool _appConfigValueIsEmptyString = false;
         private bool _supportsBindingRedirectGeneration;
         private bool _autoUnify = false;
         private bool _ignoreVersionForFrameworkReferences = false;
@@ -213,7 +214,7 @@ namespace Microsoft.Build.Tasks
         private string _targetedRuntimeVersionRawValue = String.Empty;
         private Version _projectTargetFramework;
 
-        private string _stateFile = null;
+        private AbsolutePath _stateFile = default;
         private string _targetProcessorArchitecture = null;
 
         private string _profileName = String.Empty;
@@ -393,15 +394,15 @@ namespace Microsoft.Build.Tasks
 
         /// <summary>
         /// A list of assembly files that can be part of the search and resolution process.
-        /// These must be absolute filenames, or project-relative filenames.
+        /// These must be absolute file paths, or project-relative file paths.
         ///
         /// Assembly files in this list will be considered when SearchPaths contains
         /// {CandidateAssemblyFiles} as one of the paths to consider.
         /// </summary>
         public string[] CandidateAssemblyFiles
         {
-            get { return _candidateAssemblyFiles; }
-            set { _candidateAssemblyFiles = value; }
+            get { return _candidateAssemblyFiles.Select(path => path.OriginalValue).ToArray(); }
+            set { _candidateAssemblyFiles = value?.Select(path => string.IsNullOrEmpty(path) ? default : TaskEnvironment.GetAbsolutePath(path)).ToArray(); }
         }
 
         /// <summary>
@@ -677,8 +678,18 @@ namespace Microsoft.Build.Tasks
         /// <value></value>
         public string AppConfigFile
         {
-            get { return _appConfigFile; }
-            set { _appConfigFile = value; }
+            get => _appConfigFile.OriginalValue;
+            set 
+            { 
+                if (!string.IsNullOrEmpty(value))
+                {
+                    _appConfigFile = TaskEnvironment.GetAbsolutePath(value);
+                }
+                else if (value == string.Empty && !ChangeWaves.AreFeaturesEnabled(ChangeWaves.Wave18_5))
+                {
+                    _appConfigValueIsEmptyString = true;
+                }
+            }
         }
 
         /// <summary>
@@ -765,8 +776,14 @@ namespace Microsoft.Build.Tasks
         /// <value></value>
         public string StateFile
         {
-            get { return _stateFile; }
-            set { _stateFile = value; }
+            get => _stateFile.OriginalValue;
+            set 
+            { 
+                if (!string.IsNullOrEmpty(value))
+                {
+                    _stateFile = TaskEnvironment.GetAbsolutePath(value);
+                }
+            }
         }
 
         /// <summary>
@@ -1537,11 +1554,11 @@ namespace Microsoft.Build.Tasks
             }
 
             Log.LogMessage(importance, property, "CandidateAssemblyFiles");
-            foreach (string file in CandidateAssemblyFiles)
+            foreach (AbsolutePath file in _candidateAssemblyFiles)
             {
                 try
                 {
-                    if (FileUtilities.HasExtension(file, _allowedAssemblyExtensions))
+                    if (FileUtilities.HasExtension(file.OriginalValue, _allowedAssemblyExtensions))
                     {
                         Log.LogMessage(importance, indent + file);
                     }
@@ -1587,7 +1604,7 @@ namespace Microsoft.Build.Tasks
             }
 
             Log.LogMessage(importance, property, "AppConfigFile");
-            Log.LogMessage(importance, $"{indent}{AppConfigFile}");
+            Log.LogMessage(importance, $"{indent}{_appConfigFile.OriginalValue}");
 
             Log.LogMessage(importance, property, "AutoUnify");
             Log.LogMessage(importance, $"{indent}{AutoUnify}");
@@ -1711,7 +1728,7 @@ namespace Microsoft.Build.Tasks
                         }
                         else
                         {
-                            Log.LogMessage(importance, Strings.UnificationByAppConfig, unificationVersion.version, _appConfigFile, unificationVersion.referenceFullPath);
+                            Log.LogMessage(importance, Strings.UnificationByAppConfig, unificationVersion.version, _appConfigFile.OriginalValue, unificationVersion.referenceFullPath);
                         }
                         break;
 
@@ -2106,7 +2123,7 @@ namespace Microsoft.Build.Tasks
         /// </summary>
         internal void ReadStateFile(FileExists fileExists)
         {
-            _cache = SystemState.DeserializeCache<SystemState>(_stateFile, Log);
+            _cache = SystemState.DeserializeCache<SystemState>(_stateFile.Value, Log);
 
             // Construct the cache only if we can't find any caches.
             if (_cache == null && AssemblyInformationCachePaths != null && AssemblyInformationCachePaths.Length > 0)
@@ -2129,11 +2146,11 @@ namespace Microsoft.Build.Tasks
             {
                 _cache.SerializePrecomputedCache(AssemblyInformationCacheOutputPath, Log);
             }
-            else if (!string.IsNullOrEmpty(_stateFile) && (_cache.IsDirty || _cache.instanceLocalOutgoingFileStateCache.Count < _cache.instanceLocalFileStateCache.Count))
+            else if (_stateFile.Value is not null && (_cache.IsDirty || _cache.instanceLocalOutgoingFileStateCache.Count < _cache.instanceLocalFileStateCache.Count))
             {
                 // Either the cache is dirty (we added or updated an item) or the number of items actually used is less than what
                 // we got by reading the state file prior to execution. Serialize the cache into the state file.
-                _cache.SerializeCache(_stateFile, Log);
+                _cache.SerializeCache(_stateFile.Value, Log);
             }
         }
         #endregion
@@ -2144,10 +2161,10 @@ namespace Microsoft.Build.Tasks
         /// </summary>
         private List<DependentAssembly> GetAssemblyRemappingsFromAppConfig()
         {
-            if (_appConfigFile != null)
+            if (_appConfigFile.Value is not null)
             {
                 AppConfig appConfig = new AppConfig();
-                appConfig.Load(_appConfigFile);
+                appConfig.Load(_appConfigFile.Value);
 
                 return appConfig.Runtime.DependentAssemblies;
             }
@@ -2415,10 +2432,22 @@ namespace Microsoft.Build.Tasks
                         try
                         {
                             appConfigRemappedAssemblies = GetAssemblyRemappingsFromAppConfig();
+
+                            if (!ChangeWaves.AreFeaturesEnabled(ChangeWaves.Wave18_5) && _appConfigValueIsEmptyString)
+                            {
+                                // Preserve backward compatibility for empty AppConfigFile handling.
+                                // Prior to Wave18_5, empty strings would cause TaskEnvironment.GetAbsolutePath() to throw an exception,
+                                // which would be caught and logged as an error, stopping RAR execution.
+                                // With the new behavior, empty strings are silently ignored (treated like null).
+                                // When Wave 18.5 is disabled, we preserve the old failure behavior.
+                                // When cleaning up this change wave, also clean up the _appConfigValueIsEmptyString field.
+                                Log.LogErrorWithCodeFromResources("ResolveAssemblyReference.InvalidAppConfig", string.Empty, "AppConfig file path cannot be empty.");
+                                return false;
+                            }
                         }
                         catch (AppConfigException e)
                         {
-                            Log.LogErrorWithCodeFromResources(null, e.FileName, e.Line, e.Column, 0, 0, "ResolveAssemblyReference.InvalidAppConfig", AppConfigFile, e.Message);
+                            Log.LogErrorWithCodeFromResources(null, e.FileName, e.Line, e.Column, 0, 0, "ResolveAssemblyReference.InvalidAppConfig", _appConfigFile.OriginalValue, e.Message);
                             return false;
                         }
                     }
@@ -2441,7 +2470,7 @@ namespace Microsoft.Build.Tasks
                         _searchPaths,
                         _allowedAssemblyExtensions,
                         _relatedFileExtensions,
-                        _candidateAssemblyFiles,
+                        _candidateAssemblyFiles.Select(path => path.Value).ToArray(),
                         _resolvedSDKReferences,
                         _targetFrameworkDirectories,
                         installedAssemblies,
@@ -2639,9 +2668,9 @@ namespace Microsoft.Build.Tasks
                     WriteStateFile();
 
                     // Save the new state out and put into the file exists if it is actually on disk.
-                    if (_stateFile != null && fileExists(_stateFile))
+                    if (_stateFile.Value is not null && fileExists(_stateFile.Value))
                     {
-                        _filesWritten.Add(new TaskItem(_stateFile));
+                        _filesWritten.Add(new TaskItem(_stateFile.OriginalValue));
                     }
 
                     // Log the results.
@@ -3279,9 +3308,9 @@ namespace Microsoft.Build.Tasks
                     // FilesWritten already defines a public setter which no-ops. Changing its visiblity is a breaking
                     // change, so we can't set it outside of RAR when we check for properties with OutputAttribute.
                     // It only has two possible states, so we can just compute it here.
-                    if (_stateFile != null && FileUtilities.FileExistsNoThrow(_stateFile))
+                    if (_stateFile.Value is not null && FileUtilities.FileExistsNoThrow(_stateFile.Value))
                     {
-                        _filesWritten.Add(new TaskItem(_stateFile));
+                        _filesWritten.Add(new TaskItem(_stateFile.OriginalValue));
                     }
 
                     return success;
@@ -3296,17 +3325,8 @@ namespace Microsoft.Build.Tasks
             }
 
             // In a multithreaded node, relative paths must be resolved relative to the project directory
-            // rather than the process working directory. Resolve potential relative paths to absolute before
-            // entering the internal Execute, matching the pattern from RarNodeExecuteRequest.
-            if (AppConfigFile is not null)
-            {
-                AppConfigFile = TaskEnvironment.GetAbsolutePath(AppConfigFile).GetCanonicalForm();
-            }
-
-            if (StateFile is not null)
-            {
-                StateFile = TaskEnvironment.GetAbsolutePath(StateFile).GetCanonicalForm();
-            }
+            // rather than the process working directory. AbsolutePath objects are created in property setters
+            // when TaskEnvironment is available, so no additional processing needed here.
 
             return Execute(
                 p => FileUtilities.FileExistsNoThrow(p),
