@@ -180,7 +180,7 @@ namespace Microsoft.Build.Tasks
         private bool _ignoreDefaultInstalledAssemblyTables = false;
         private bool _ignoreDefaultInstalledAssemblySubsetTables = false;
         private bool _enableCustomCulture = false;
-        private string[] _candidateAssemblyFiles = [];
+        private AbsolutePath[] _candidateAssemblyFiles = [];
         private string[] _targetFrameworkDirectories = [];
         private string[] _nonCultureResourceDirectories = [];
         private string[] _searchPaths = [];
@@ -395,15 +395,15 @@ namespace Microsoft.Build.Tasks
 
         /// <summary>
         /// A list of assembly files that can be part of the search and resolution process.
-        /// These must be absolute filenames, or project-relative filenames.
+        /// These must be absolute file paths, or project-relative file paths.
         ///
         /// Assembly files in this list will be considered when SearchPaths contains
         /// {CandidateAssemblyFiles} as one of the paths to consider.
         /// </summary>
         public string[] CandidateAssemblyFiles
         {
-            get { return _candidateAssemblyFiles; }
-            set { _candidateAssemblyFiles = value; }
+            get { return _candidateAssemblyFiles.Select(path => path.OriginalValue).ToArray(); }
+            set { _candidateAssemblyFiles = value?.Select(path => string.IsNullOrEmpty(path) ? default : TaskEnvironment.GetAbsolutePath(path)).ToArray(); }
         }
 
         /// <summary>
@@ -1551,11 +1551,11 @@ namespace Microsoft.Build.Tasks
             }
 
             Log.LogMessage(importance, property, "CandidateAssemblyFiles");
-            foreach (string file in CandidateAssemblyFiles)
+            foreach (AbsolutePath file in _candidateAssemblyFiles)
             {
                 try
                 {
-                    if (FileUtilities.HasExtension(file, _allowedAssemblyExtensions))
+                    if (FileUtilities.HasExtension(file.OriginalValue, _allowedAssemblyExtensions))
                     {
                         Log.LogMessage(importance, indent + file);
                     }
@@ -2455,7 +2455,7 @@ namespace Microsoft.Build.Tasks
                         _searchPaths,
                         _allowedAssemblyExtensions,
                         _relatedFileExtensions,
-                        _candidateAssemblyFiles,
+                        _candidateAssemblyFiles.Select(path => path.Value).ToArray(),
                         _resolvedSDKReferences,
                         _targetFrameworkDirectories,
                         installedAssemblies,
