@@ -2354,7 +2354,14 @@ namespace Microsoft.Build.CommandLine
 
         private static bool IsMultiThreadedEnabled(CommandLineSwitches commandLineSwitches)
         {
-            return commandLineSwitches.IsParameterizedSwitchSet(CommandLineSwitches.ParameterizedSwitch.MultiThreaded);
+            // Check command line switches first (takes precedence over environment variable)
+            if (commandLineSwitches.IsParameterizedSwitchSet(CommandLineSwitches.ParameterizedSwitch.MultiThreaded))
+            {
+                return true;
+            }
+
+            // Check environment variable as fallback
+            return Traits.Instance.UseMultiThreadedMode;
         }
 
         private static bool ProcessTerminalLoggerConfiguration(CommandLineSwitches commandLineSwitches, out string aggregatedParameters)
