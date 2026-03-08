@@ -986,7 +986,7 @@ namespace Microsoft.Build.Tasks
         /// <param name="taskEnvironment">TaskEnvironment for path conversion</param>
         internal AssemblyTableInfo(string path, string frameworkDirectory, TaskEnvironment taskEnvironment)
         {
-            Path = taskEnvironment.GetAbsolutePath(FileUtilities.NormalizeForPathComparison(path));
+            Path = taskEnvironment.GetAbsolutePath(FileUtilities.NormalizeForPathComparison(path)).GetCanonicalForm();
             FrameworkDirectory = FileUtilities.NormalizeForPathComparison(frameworkDirectory);
         }
 

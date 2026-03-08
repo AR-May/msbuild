@@ -38,7 +38,7 @@ namespace Microsoft.Build.Tasks
             // Cache absolute paths to avoid repeated TaskEnvironment.GetAbsolutePath calls
             foreach (var kvp in resolvedSDKs)
             {
-                _resolvedSDKPaths[kvp.Key] = taskEnvironment.GetAbsolutePath(kvp.Value.ItemSpec);
+                _resolvedSDKPaths[kvp.Key] = taskEnvironment.GetAbsolutePath(kvp.Value.ItemSpec).GetCanonicalForm();
             }
         }
 

@@ -572,7 +572,7 @@ namespace Microsoft.Build.Tasks
                 string stateFilePath;
                 if (ChangeWaves.AreFeaturesEnabled(ChangeWaves.Wave18_6))
                 {
-                    stateFilePath = taskEnvironment.GetAbsolutePath(stateFile.ItemSpec).Value;
+                    stateFilePath = taskEnvironment.GetAbsolutePath(stateFile.ItemSpec).GetCanonicalForm().Value;
                 }
                 else
                 {

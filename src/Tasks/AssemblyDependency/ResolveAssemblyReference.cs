@@ -300,7 +300,8 @@ namespace Microsoft.Build.Tasks
 
             set
             {
-                _latestTargetFrameworkDirectories = value?.Select(path => string.IsNullOrEmpty(path) ? default : TaskEnvironment.GetAbsolutePath(path)).ToArray();
+                _latestTargetFrameworkDirectories = value?.Select(
+                    path => string.IsNullOrEmpty(path) ? default : TaskEnvironment.GetAbsolutePath(path).GetCanonicalForm()).ToArray();
             }
         }
 
@@ -402,8 +403,15 @@ namespace Microsoft.Build.Tasks
         /// </summary>
         public string[] CandidateAssemblyFiles
         {
-            get { return _candidateAssemblyFiles.Select(path => path.OriginalValue).ToArray(); }
-            set { _candidateAssemblyFiles = value?.Select(path => string.IsNullOrEmpty(path) ? default : TaskEnvironment.GetAbsolutePath(path)).ToArray(); }
+            get
+            {
+                return _candidateAssemblyFiles.Select(path => path.OriginalValue).ToArray();
+            }
+            set
+            {
+                _candidateAssemblyFiles = value?.Select(
+                    path => string.IsNullOrEmpty(path) ? default : TaskEnvironment.GetAbsolutePath(path).GetCanonicalForm()).ToArray();
+            }
         }
 
         /// <summary>
@@ -424,8 +432,15 @@ namespace Microsoft.Build.Tasks
         /// </summary>
         public string[] TargetFrameworkDirectories
         {
-            get { return _targetFrameworkDirectories?.Select(path => path.OriginalValue).ToArray(); }
-            set { _targetFrameworkDirectories = value?.Select(path => string.IsNullOrEmpty(path) ? default : TaskEnvironment.GetAbsolutePath(path)).ToArray(); }
+            get
+            {
+                return _targetFrameworkDirectories?.Select(path => path.OriginalValue).ToArray();
+            }
+            set
+            {
+                _targetFrameworkDirectories = value?.Select(
+                    path => string.IsNullOrEmpty(path) ? default : TaskEnvironment.GetAbsolutePath(path).GetCanonicalForm()).ToArray();
+            }
         }
 
         /// <summary>
@@ -792,7 +807,7 @@ namespace Microsoft.Build.Tasks
             { 
                 if (!string.IsNullOrEmpty(value))
                 {
-                    _stateFile = TaskEnvironment.GetAbsolutePath(value);
+                    _stateFile = TaskEnvironment.GetAbsolutePath(value).GetCanonicalForm();
                 }
             }
         }
@@ -944,7 +959,8 @@ namespace Microsoft.Build.Tasks
             set
             {
                 ErrorUtilities.VerifyThrowArgumentNull(value, "FullFrameworkFolders");
-                _fullFrameworkFolders = value?.Select(path => string.IsNullOrEmpty(path) ? default : TaskEnvironment.GetAbsolutePath(path)).ToArray();
+                _fullFrameworkFolders = value?.Select(
+                    path => string.IsNullOrEmpty(path) ? default : TaskEnvironment.GetAbsolutePath(path).GetCanonicalForm()).ToArray();
             }
         }
 
@@ -2481,7 +2497,7 @@ namespace Microsoft.Build.Tasks
                         _searchPaths,
                         _allowedAssemblyExtensions,
                         _relatedFileExtensions,
-                        _candidateAssemblyFiles.Select(path => path.Value).ToArray(),
+                        _candidateAssemblyFiles?.Select(path => path.Value).ToArray(),
                         _resolvedSDKReferences,
                         _targetFrameworkDirectories?.Select(path => path.Value).ToArray(),
                         installedAssemblies,
