@@ -487,15 +487,15 @@ namespace Microsoft.Build.Tasks
 
             try
             {
-                if (_fileExists(assemblyFileName))
+                if (_fileExists(reference.FullPath))
                 {
-                    assemblyName = _getAssemblyName(assemblyFileName);
+                    assemblyName = _getAssemblyName(reference.FullPath);
                     if (assemblyName != null)
                     {
                         reference.ResolvedSearchPath = assemblyFileName;
                     }
                 }
-                else if (_directoryExists(assemblyFileName))
+                else if (_directoryExists(reference.FullPath))
                 {
                     assemblyName = new AssemblyNameExtension("*directory*");
 
