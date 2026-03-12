@@ -45,11 +45,11 @@ namespace Microsoft.Build.Tasks
             if (rawFileNameCandidate != null)
             {
                 // {RawFileName} was passed in.
-                string FullRawFileName = taskEnvironment.GetAbsolutePath(rawFileNameCandidate).GetCanonicalForm().Value;
-                if (isImmutableFrameworkReference || fileExists(FullRawFileName))
+                string fullRawFileName = taskEnvironment.GetAbsolutePath(rawFileNameCandidate).GetCanonicalForm().Value;
+                if (isImmutableFrameworkReference || fileExists(fullRawFileName))
                 {
                     userRequestedSpecificFile = true;
-                    foundPath = FullRawFileName;
+                    foundPath = fullRawFileName;
                     return true;
                 }
 
@@ -57,7 +57,7 @@ namespace Microsoft.Build.Tasks
                 {
                     var considered = new ResolutionSearchLocation
                     {
-                        FileNameAttempted = FullRawFileName,
+                        FileNameAttempted = fullRawFileName,
                         SearchPath = searchPathElement,
                         Reason = NoMatchReason.NotAFileNameOnDisk
                     };
