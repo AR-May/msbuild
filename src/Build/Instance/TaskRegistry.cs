@@ -1034,7 +1034,9 @@ namespace Microsoft.Build.Execution
             private static readonly Func<Type, object, bool> s_taskFactoryTypeFilter = IsTaskFactoryClass;
 
             /// <summary>
-            /// Lock object to ensure that only one thread can access the task factory type loader at a time.
+            /// Lock object protecting mutable instance state: <see cref="_taskFactoryWrapperInstance"/>
+            /// and <see cref="_taskNamesCreatableByFactory"/>. In /mt mode, shared toolset records
+            /// can be accessed concurrently from multiple in-proc node threads.
             /// </summary>
             private readonly LockType _lockObject = new();
 
@@ -1072,9 +1074,7 @@ namespace Microsoft.Build.Execution
             /// <summary>
             /// Cache of task names which can be created by the factory.
             /// When ever a taskName is checked against the factory we cache the result so we do not have to
-            /// make possibly expensive calls over and over again. We intentionally do not use a ConcurrentDictionary here
-            /// for performance reasons, since a concurrent dictionary is much larger than a regular dictionary. The usage
-            /// scope is limited, so we can just lock on a regular dictionary.
+            /// make possibly expensive calls over and over again. Protected by <see cref="_lockObject"/>.
             /// </summary>
             private Dictionary<RegisteredTaskIdentity, object> _taskNamesCreatableByFactory;
 
@@ -1410,6 +1410,13 @@ namespace Microsoft.Build.Execution
                 // see if we have already created the factory before, only create it once
                 if (_taskFactoryWrapperInstance == null)
                 {
+                    lock (_lockObject)
+                    {
+                        if (_taskFactoryWrapperInstance != null)
+                        {
+                            return true;
+                        }
+
                     AssemblyLoadInfo taskFactoryLoadInfo = TaskFactoryAssemblyLoadInfo;
                     ErrorUtilities.VerifyThrow(taskFactoryLoadInfo != null, "TaskFactoryLoadInfo should never be null");
                     ITaskFactory factory = null;
@@ -1608,7 +1615,8 @@ namespace Microsoft.Build.Execution
                         }
                     }
 
-                    _taskFactoryWrapperInstance = new TaskFactoryWrapper(factory, loadedType, RegisteredName, TaskFactoryParameters, Statistics);
+                        _taskFactoryWrapperInstance = new TaskFactoryWrapper(factory, loadedType, RegisteredName, TaskFactoryParameters, ComputeIfCustom(), IsFromNugetCache, TaskFactoryAttributeName);
+                    }
                 }
 
                 return true;
