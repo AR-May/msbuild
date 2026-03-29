@@ -47,10 +47,11 @@ namespace Microsoft.Build.Tasks.AssemblyFoldersFromConfig
             else
             {
                 _filesInDirectories = new(assemblyFoldersFromConfig.AsParallel()
-                    .Where(assemblyFolder => FileUtilities.DirectoryExistsNoThrow(assemblyFolder.DirectoryPath))
+                    .Select(assemblyFolder => taskEnvironment.GetAbsolutePath(assemblyFolder.DirectoryPath).GetCanonicalForm())
+                    .Where(absolutePath => FileUtilities.DirectoryExistsNoThrow(absolutePath))
                     .SelectMany(
-                        assemblyFolder =>
-                            Directory.GetFiles(assemblyFolder.DirectoryPath, "*.*", SearchOption.TopDirectoryOnly)),
+                        absolutePath =>
+                            Directory.GetFiles(absolutePath, "*.*", SearchOption.TopDirectoryOnly)),
                     StringComparer.OrdinalIgnoreCase);
             }
         }

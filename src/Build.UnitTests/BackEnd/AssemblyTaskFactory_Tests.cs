@@ -2,9 +2,13 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
+using System.Threading;
 using Microsoft.Build.BackEnd;
+using Microsoft.Build.BackEnd.Logging;
 using Microsoft.Build.Construction;
 using Microsoft.Build.Engine.UnitTests;
 using Microsoft.Build.Execution;
@@ -798,6 +802,172 @@ namespace Microsoft.Build.UnitTests.BackEnd
 
             _loadedType = _taskFactory.InitializeFactory(_loadInfo, "TaskToTestFactories", new Dictionary<string, TaskPropertyInfo>(), string.Empty, factoryParameters, explicitlyLaunchTaskHost, new TestLoggingContext(null!, new BuildEventContext(1, 2, 3, 4)), ElementLocation.Create("NONE"), String.Empty);
             Assert.True(_loadedType.Assembly.Equals(_loadInfo)); // "Expected the AssemblyLoadInfo to be equal"
+        }
+
+        /// <summary>
+        /// Deterministically verifies that the _taskLoggingContext race condition is fixed.
+        ///
+        /// The old code stored the taskLoggingContext parameter in a shared instance field
+        /// (_taskLoggingContext) and later read it via ErrorLoggingDelegate and telemetry calls.
+        /// When CreateTaskInstance was called twice (even sequentially), the second call
+        /// overwrote the first call's context, so if the first call's error delegate fired
+        /// later, it would log to the wrong context.
+        ///
+        /// The fix removed both the shared field and the ErrorLoggingDelegate method,
+        /// replacing them with a lambda that captures the method parameter directly.
+        ///
+        /// This test calls CreateTaskInstance with two different contexts and then uses
+        /// reflection to verify that neither the shared field nor the delegate method exist.
+        /// With the old code, the field would hold the SECOND context (nodeId 200), proving
+        /// that the first call's context (nodeId 100) was overwritten — a deterministic
+        /// demonstration of the race condition.
+        /// </summary>
+        [Fact]
+        public void CreateTaskInstance_DoesNotStoreLoggingContextInSharedField()
+        {
+            var ctxA = new TaskLoggingContext(
+                new MockLoggingService(), new BuildEventContext(100, 1, 1, 1));
+            var ctxB = new TaskLoggingContext(
+                new MockLoggingService(), new BuildEventContext(200, 1, 1, 1));
+
+            ITask taskA = _taskFactory.CreateTaskInstance(
+                ElementLocation.Create("MSBUILD"),
+                ctxA,
+                new MockHost(),
+                TaskHostParameters.Empty,
+                projectFile: "projA.proj",
+                hostServices: null,
+#if FEATURE_APPDOMAIN
+                new AppDomainSetup(),
+#endif
+                false,
+                scheduledNodeId: 1,
+                (string propName) => ProjectPropertyInstance.Create("test", "test"),
+                CreateStubTaskEnvironment());
+
+            ITask taskB = _taskFactory.CreateTaskInstance(
+                ElementLocation.Create("MSBUILD"),
+                ctxB,
+                new MockHost(),
+                TaskHostParameters.Empty,
+                projectFile: "projB.proj",
+                hostServices: null,
+#if FEATURE_APPDOMAIN
+                new AppDomainSetup(),
+#endif
+                false,
+                scheduledNodeId: 1,
+                (string propName) => ProjectPropertyInstance.Create("test", "test"),
+                CreateStubTaskEnvironment());
+
+            try
+            {
+                // Verify the shared field does not exist. With the old code, the field
+                // would hold ctxB (nodeId=200) after both calls, proving that ctxA's
+                // error delegate would use the wrong context.
+                FieldInfo field = typeof(AssemblyTaskFactory).GetField(
+                    "_taskLoggingContext", BindingFlags.NonPublic | BindingFlags.Instance);
+
+                if (field != null)
+                {
+                    // Prove the overwrite: the field now holds ctxB, not ctxA.
+                    var stored = (TaskLoggingContext)field.GetValue(_taskFactory);
+                    stored.BuildEventContext.NodeId.ShouldBe(
+                        100,
+                        "The stored _taskLoggingContext was overwritten by the second call "
+                        + $"(holds nodeId={stored.BuildEventContext.NodeId} instead of 100). "
+                        + "This is the race condition — remove this shared field.");
+                }
+
+                // Verify ErrorLoggingDelegate (which read the shared field) is also gone.
+                typeof(AssemblyTaskFactory)
+                    .GetMethod("ErrorLoggingDelegate", BindingFlags.NonPublic | BindingFlags.Instance)
+                    .ShouldBeNull(
+                        "ErrorLoggingDelegate should not exist — it reads from the "
+                        + "racy shared _taskLoggingContext field.");
+            }
+            finally
+            {
+                _taskFactory.CleanupTask(taskA);
+                _taskFactory.CleanupTask(taskB);
+            }
+        }
+
+        /// <summary>
+        /// Stress-tests concurrent CreateTaskInstance and CleanupTask calls.
+        /// Exercises the ConcurrentDictionary fix for _tasksAndAppDomains (replacing
+        /// Dictionary + TryGetValue/Remove with ConcurrentDictionary + TryRemove) and
+        /// verifies no shared-state corruption under heavy thread contention.
+        /// </summary>
+        [Fact]
+        public void ConcurrentCreateAndCleanup_DoesNotCorruptState()
+        {
+            const int threadCount = 16;
+            const int iterationsPerThread = 25;
+            using var barrier = new Barrier(threadCount);
+            var createdTasks = new ConcurrentBag<ITask>();
+            var exceptions = new ConcurrentBag<Exception>();
+
+            var threads = new Thread[threadCount];
+            for (int i = 0; i < threadCount; i++)
+            {
+                int threadIndex = i;
+                threads[i] = new Thread(() =>
+                {
+                    try
+                    {
+                        barrier.SignalAndWait();
+
+                        for (int iter = 0; iter < iterationsPerThread; iter++)
+                        {
+                            var loggingContext = new TaskLoggingContext(
+                                new MockLoggingService(),
+                                new BuildEventContext(
+                                    nodeId: threadIndex,
+                                    targetId: iter,
+                                    projectContextId: 1,
+                                    taskId: threadIndex * 1000 + iter));
+
+                            ITask task = _taskFactory.CreateTaskInstance(
+                                ElementLocation.Create("MSBUILD"),
+                                loggingContext,
+                                new MockHost(),
+                                TaskHostParameters.Empty,
+                                projectFile: $"proj{threadIndex}_{iter}.proj",
+                                hostServices: null,
+#if FEATURE_APPDOMAIN
+                                new AppDomainSetup(),
+#endif
+                                false,
+                                scheduledNodeId: 1,
+                                (string propName) => ProjectPropertyInstance.Create("test", "test"),
+                                CreateStubTaskEnvironment());
+
+                            task.ShouldNotBeNull();
+                            createdTasks.Add(task);
+                            _taskFactory.CleanupTask(task);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        exceptions.Add(ex);
+                    }
+                });
+            }
+
+            foreach (Thread t in threads)
+            {
+                t.Start();
+            }
+
+            foreach (Thread t in threads)
+            {
+                t.Join();
+            }
+
+            exceptions.ShouldBeEmpty(
+                "Concurrent create/cleanup should not throw exceptions");
+            createdTasks.Count.ShouldBe(threadCount * iterationsPerThread);
         }
 
 #endregion
