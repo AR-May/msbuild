@@ -1099,51 +1099,6 @@ namespace Microsoft.Build.Execution
             private string _definingFileFullPath;
 
             /// <summary>
-            /// Execution statistics for the tasks.
-            /// Not translatable - the statistics are anyway expected to be reset after each project request.
-            /// </summary>
-            internal Stats Statistics { get; private init; } = new Stats();
-
-            internal class Stats()
-            {
-                public short ExecutedCount { get; private set; } = 0;
-                public long TotalMemoryConsumption { get; private set; } = 0;
-                private readonly Stopwatch _executedSw = new Stopwatch();
-                private long _memoryConsumptionOnStart;
-
-                public TimeSpan ExecutedTime => _executedSw.Elapsed;
-
-                public void ExecutionStarted()
-                {
-                    _memoryConsumptionOnStart = GetMemoryAllocated();
-                    _executedSw.Start();
-                    ExecutedCount++;
-                }
-
-                public void ExecutionStopped()
-                {
-                    _executedSw.Stop();
-                    TotalMemoryConsumption += GetMemoryAllocated() - _memoryConsumptionOnStart;
-                }
-
-                private static long GetMemoryAllocated()
-                {
-#if NET
-                    return GC.GetTotalAllocatedBytes(false);
-#else
-                    return GC.GetTotalMemory(false);
-#endif
-                }
-
-                public void Reset()
-                {
-                    ExecutedCount = 0;
-                    _executedSw.Reset();
-                    TotalMemoryConsumption = 0;
-                }
-            }
-
-            /// <summary>
             /// Constructor
             /// </summary>
             internal RegisteredTaskRecord(
@@ -1417,203 +1372,203 @@ namespace Microsoft.Build.Execution
                             return true;
                         }
 
-                    AssemblyLoadInfo taskFactoryLoadInfo = TaskFactoryAssemblyLoadInfo;
-                    ErrorUtilities.VerifyThrow(taskFactoryLoadInfo != null, "TaskFactoryLoadInfo should never be null");
-                    ITaskFactory factory = null;
-                    LoadedType loadedType = null;
+                        AssemblyLoadInfo taskFactoryLoadInfo = TaskFactoryAssemblyLoadInfo;
+                        ErrorUtilities.VerifyThrow(taskFactoryLoadInfo != null, "TaskFactoryLoadInfo should never be null");
+                        ITaskFactory factory = null;
+                        LoadedType loadedType = null;
 
-                    bool isAssemblyTaskFactory = String.Equals(TaskFactoryAttributeName, AssemblyTaskFactory, StringComparison.OrdinalIgnoreCase);
-                    bool isTaskHostFactory = String.Equals(TaskFactoryAttributeName, TaskHostFactory, StringComparison.OrdinalIgnoreCase);
+                        bool isAssemblyTaskFactory = String.Equals(TaskFactoryAttributeName, AssemblyTaskFactory, StringComparison.OrdinalIgnoreCase);
+                        bool isTaskHostFactory = String.Equals(TaskFactoryAttributeName, TaskHostFactory, StringComparison.OrdinalIgnoreCase);
 
-                    if (isTaskHostFactory)
-                    {
-                        _taskFactoryParameters = _taskFactoryParameters.WithTaskHostFactoryExplicitlyRequested(true);
-                    }
-
-                    if (isAssemblyTaskFactory || isTaskHostFactory)
-                    {
-                        // If ForceAllTasksOutOfProc is true, we will force all tasks to run in the MSBuild task host
-                        // "EXCEPT a small well-known set of tasks that are known to depend on IBuildEngine callbacks
-                        // as forcing those out of proc would be just setting them up for known failure"
-                        bool launchTaskHost =
-                            isTaskHostFactory ||
-                            (
-                                Traits.Instance.ForceAllTasksOutOfProcToTaskHost &&
-                                !TypeLoader.IsPartialTypeNameMatch(RegisteredName, "MSBuild") &&
-                                !TypeLoader.IsPartialTypeNameMatch(RegisteredName, "CallTarget"));
-
-                        // Create an instance of the internal assembly task factory, it has the error handling built into its methods.
-                        AssemblyTaskFactory taskFactory = new AssemblyTaskFactory();
-                        loadedType = taskFactory.InitializeFactory(taskFactoryLoadInfo, RegisteredName, ParameterGroupAndTaskBody.UsingTaskParameters, ParameterGroupAndTaskBody.InlineTaskXmlBody, TaskFactoryParameters, launchTaskHost, targetLoggingContext, elementLocation, taskProjectFile);
-                        factory = taskFactory;
-                    }
-                    else
-                    {
-                        // We are not one of the default factories.
-                        TaskEngineAssemblyResolver resolver = null;
-
-                        try
+                        if (isTaskHostFactory)
                         {
-                            // Add a resolver to allow us to resolve types from the assembly when loading into the current appdomain.
-                            resolver = new TaskEngineAssemblyResolver();
-                            resolver.Initialize(taskFactoryLoadInfo.AssemblyFile);
-                            resolver.InstallHandler();
+                            _taskFactoryParameters = _taskFactoryParameters.WithTaskHostFactoryExplicitlyRequested(true);
+                        }
+
+                        if (isAssemblyTaskFactory || isTaskHostFactory)
+                        {
+                            // If ForceAllTasksOutOfProc is true, we will force all tasks to run in the MSBuild task host
+                            // "EXCEPT a small well-known set of tasks that are known to depend on IBuildEngine callbacks
+                            // as forcing those out of proc would be just setting them up for known failure"
+                            bool launchTaskHost =
+                                isTaskHostFactory ||
+                                (
+                                    Traits.Instance.ForceAllTasksOutOfProcToTaskHost &&
+                                    !TypeLoader.IsPartialTypeNameMatch(RegisteredName, "MSBuild") &&
+                                    !TypeLoader.IsPartialTypeNameMatch(RegisteredName, "CallTarget"));
+
+                            // Create an instance of the internal assembly task factory, it has the error handling built into its methods.
+                            AssemblyTaskFactory taskFactory = new AssemblyTaskFactory();
+                            loadedType = taskFactory.InitializeFactory(taskFactoryLoadInfo, RegisteredName, ParameterGroupAndTaskBody.UsingTaskParameters, ParameterGroupAndTaskBody.InlineTaskXmlBody, TaskFactoryParameters, launchTaskHost, targetLoggingContext, elementLocation, taskProjectFile);
+                            factory = taskFactory;
+                        }
+                        else
+                        {
+                            // We are not one of the default factories.
+                            TaskEngineAssemblyResolver resolver = null;
 
                             try
                             {
-                                lock (s_taskFactoryTypeLoaderLock)
+                                // Add a resolver to allow us to resolve types from the assembly when loading into the current appdomain.
+                                resolver = new TaskEngineAssemblyResolver();
+                                resolver.Initialize(taskFactoryLoadInfo.AssemblyFile);
+                                resolver.InstallHandler();
+
+                                try
                                 {
-                                    if (s_taskFactoryTypeLoader == null)
+                                    lock (s_taskFactoryTypeLoaderLock)
                                     {
-                                        s_taskFactoryTypeLoader = new TypeLoader(s_taskFactoryTypeFilter);
+                                        if (s_taskFactoryTypeLoader == null)
+                                        {
+                                            s_taskFactoryTypeLoader = new TypeLoader(s_taskFactoryTypeFilter);
+                                        }
                                     }
-                                }
 
-                                // Make sure we only look for task factory classes when loading based on the name
-                                loadedType = s_taskFactoryTypeLoader.Load(TaskFactoryAttributeName, taskFactoryLoadInfo, targetLoggingContext.LogWarning);
+                                    // Make sure we only look for task factory classes when loading based on the name
+                                    loadedType = s_taskFactoryTypeLoader.Load(TaskFactoryAttributeName, taskFactoryLoadInfo, targetLoggingContext.LogWarning);
 
-                                if (loadedType == null)
-                                {
-                                    // We could not find the type (this is what null means from the Load method) but there is no reason given so we can only log the fact that
-                                    // we could not find the name given in the task factory attribute in the class specified in the assembly File or assemblyName fields.
-                                    ProjectErrorUtilities.ThrowInvalidProject(elementLocation, "CouldNotFindFactory", TaskFactoryAttributeName, taskFactoryLoadInfo.AssemblyLocation);
-                                }
-
-                                targetLoggingContext.LogComment(MessageImportance.Low, "InitializingTaskFactory", TaskFactoryAttributeName, taskFactoryLoadInfo.AssemblyLocation);
-                            }
-                            catch (TargetInvocationException e)
-                            {
-                                // Exception thrown by the called code itself
-                                // Log the stack, so the task vendor can fix their code
-                                ProjectErrorUtilities.ThrowInvalidProject(elementLocation, "TaskFactoryLoadFailure", TaskFactoryAttributeName, taskFactoryLoadInfo.AssemblyLocation, Environment.NewLine + e.InnerException.ToString());
-                            }
-                            catch (ReflectionTypeLoadException e)
-                            {
-                                // ReflectionTypeLoadException.LoaderExceptions may contain nulls
-                                foreach (Exception exception in e.LoaderExceptions)
-                                {
-                                    if (exception != null)
+                                    if (loadedType == null)
                                     {
-                                        targetLoggingContext.LogError(new BuildEventFileInfo(taskProjectFile), "TaskFactoryLoadFailure", TaskFactoryAttributeName, taskFactoryLoadInfo.AssemblyLocation, exception.Message);
+                                        // We could not find the type (this is what null means from the Load method) but there is no reason given so we can only log the fact that
+                                        // we could not find the name given in the task factory attribute in the class specified in the assembly File or assemblyName fields.
+                                        ProjectErrorUtilities.ThrowInvalidProject(elementLocation, "CouldNotFindFactory", TaskFactoryAttributeName, taskFactoryLoadInfo.AssemblyLocation);
                                     }
+
+                                    targetLoggingContext.LogComment(MessageImportance.Low, "InitializingTaskFactory", TaskFactoryAttributeName, taskFactoryLoadInfo.AssemblyLocation);
+                                }
+                                catch (TargetInvocationException e)
+                                {
+                                    // Exception thrown by the called code itself
+                                    // Log the stack, so the task vendor can fix their code
+                                    ProjectErrorUtilities.ThrowInvalidProject(elementLocation, "TaskFactoryLoadFailure", TaskFactoryAttributeName, taskFactoryLoadInfo.AssemblyLocation, Environment.NewLine + e.InnerException.ToString());
+                                }
+                                catch (ReflectionTypeLoadException e)
+                                {
+                                    // ReflectionTypeLoadException.LoaderExceptions may contain nulls
+                                    foreach (Exception exception in e.LoaderExceptions)
+                                    {
+                                        if (exception != null)
+                                        {
+                                            targetLoggingContext.LogError(new BuildEventFileInfo(taskProjectFile), "TaskFactoryLoadFailure", TaskFactoryAttributeName, taskFactoryLoadInfo.AssemblyLocation, exception.Message);
+                                        }
+                                    }
+
+                                    ProjectErrorUtilities.ThrowInvalidProject(elementLocation, "TaskFactoryLoadFailure", TaskFactoryAttributeName, taskFactoryLoadInfo.AssemblyLocation, e.Message);
+                                }
+                                catch (Exception e) when (!ExceptionHandling.NotExpectedReflectionException(e))
+                                {
+                                    ProjectErrorUtilities.ThrowInvalidProject(elementLocation, "TaskFactoryLoadFailure", TaskFactoryAttributeName, taskFactoryLoadInfo.AssemblyLocation, e.Message);
                                 }
 
-                                ProjectErrorUtilities.ThrowInvalidProject(elementLocation, "TaskFactoryLoadFailure", TaskFactoryAttributeName, taskFactoryLoadInfo.AssemblyLocation, e.Message);
-                            }
-                            catch (Exception e) when (!ExceptionHandling.NotExpectedReflectionException(e))
-                            {
-                                ProjectErrorUtilities.ThrowInvalidProject(elementLocation, "TaskFactoryLoadFailure", TaskFactoryAttributeName, taskFactoryLoadInfo.AssemblyLocation, e.Message);
-                            }
-
-                            try
-                            {
-                                // We have loaded the type, lets now try and construct it
-                                // Any exceptions from the constructor of the task factory will be caught lower down and turned into an InvalidProjectFileExceptions
+                                try
+                                {
+                                    // We have loaded the type, lets now try and construct it
+                                    // Any exceptions from the constructor of the task factory will be caught lower down and turned into an InvalidProjectFileExceptions
 #if FEATURE_APPDOMAIN
                                 factory = (ITaskFactory)AppDomain.CurrentDomain.CreateInstanceAndUnwrap(loadedType.Type.GetTypeInfo().Assembly.FullName, loadedType.Type.FullName);
 #else
-                                factory = (ITaskFactory)Activator.CreateInstance(loadedType.Type);
+                                    factory = (ITaskFactory)Activator.CreateInstance(loadedType.Type);
 #endif
-                                TaskFactoryEngineContext taskFactoryLoggingHost = new TaskFactoryEngineContext(true /*I dont have the data at this point, the safest thing to do is make sure events are serializable*/, elementLocation, targetLoggingContext, isMultiThreadedBuild, Traits.Instance.ForceTaskFactoryOutOfProc);
+                                    TaskFactoryEngineContext taskFactoryLoggingHost = new TaskFactoryEngineContext(true /*I dont have the data at this point, the safest thing to do is make sure events are serializable*/, elementLocation, targetLoggingContext, isMultiThreadedBuild, Traits.Instance.ForceTaskFactoryOutOfProc);
 
-                                bool initialized = false;
-                                try
-                                {
-                                    // for backward compatibility with public interface
-                                    if (factory is ITaskFactory2 factory2)
+                                    bool initialized = false;
+                                    try
                                     {
-                                        var taskFactoryParams = new Dictionary<string, string>(3)
+                                        // for backward compatibility with public interface
+                                        if (factory is ITaskFactory2 factory2)
+                                        {
+                                            var taskFactoryParams = new Dictionary<string, string>(3)
                                         {
                                             { nameof(TaskHostParameters.Runtime), TaskFactoryParameters.Runtime },
                                             { nameof(TaskHostParameters.Architecture), TaskFactoryParameters.Architecture },
                                             { nameof(TaskHostParameters.TaskHostFactoryExplicitlyRequested), TaskFactoryParameters.TaskHostFactoryExplicitlyRequested.ToString() },
                                         };
 
-                                        initialized = factory2.Initialize(RegisteredName, taskFactoryParams, ParameterGroupAndTaskBody.UsingTaskParameters, ParameterGroupAndTaskBody.InlineTaskXmlBody, taskFactoryLoggingHost);
-                                    }
-                                    else if (factory is ITaskFactory3 factory3)
-                                    {
-                                        initialized = factory3.Initialize(RegisteredName, TaskFactoryParameters, ParameterGroupAndTaskBody.UsingTaskParameters, ParameterGroupAndTaskBody.InlineTaskXmlBody, taskFactoryLoggingHost);
-                                    }
-                                    else
-                                    {
-                                        initialized = factory.Initialize(RegisteredName, ParameterGroupAndTaskBody.UsingTaskParameters, ParameterGroupAndTaskBody.InlineTaskXmlBody, taskFactoryLoggingHost);
-
-                                        // TaskFactoryParameters will always be null unless specifically created to have runtime and architecture parameters.
-                                        // In case TaskHostFactory is explicitly requested, we will now have a parameter for that.
-                                        bool containsArchOrRuntimeParam = TaskFactoryParameters.Runtime != null
-                                                                          || TaskFactoryParameters.Architecture != null;
-
-                                        if (initialized && containsArchOrRuntimeParam)
+                                            initialized = factory2.Initialize(RegisteredName, taskFactoryParams, ParameterGroupAndTaskBody.UsingTaskParameters, ParameterGroupAndTaskBody.InlineTaskXmlBody, taskFactoryLoggingHost);
+                                        }
+                                        else if (factory is ITaskFactory3 factory3)
                                         {
-                                            targetLoggingContext.LogWarning(
-                                                null,
-                                                    new BuildEventFileInfo(elementLocation),
-                                                    "TaskFactoryWillIgnoreTaskFactoryParameters",
-                                                    factory.FactoryName,
-                                                    XMakeAttributes.runtime,
-                                                    XMakeAttributes.architecture,
-                                                RegisteredName);
+                                            initialized = factory3.Initialize(RegisteredName, TaskFactoryParameters, ParameterGroupAndTaskBody.UsingTaskParameters, ParameterGroupAndTaskBody.InlineTaskXmlBody, taskFactoryLoggingHost);
+                                        }
+                                        else
+                                        {
+                                            initialized = factory.Initialize(RegisteredName, ParameterGroupAndTaskBody.UsingTaskParameters, ParameterGroupAndTaskBody.InlineTaskXmlBody, taskFactoryLoggingHost);
+
+                                            // TaskFactoryParameters will always be null unless specifically created to have runtime and architecture parameters.
+                                            // In case TaskHostFactory is explicitly requested, we will now have a parameter for that.
+                                            bool containsArchOrRuntimeParam = TaskFactoryParameters.Runtime != null
+                                                                              || TaskFactoryParameters.Architecture != null;
+
+                                            if (initialized && containsArchOrRuntimeParam)
+                                            {
+                                                targetLoggingContext.LogWarning(
+                                                    null,
+                                                        new BuildEventFileInfo(elementLocation),
+                                                        "TaskFactoryWillIgnoreTaskFactoryParameters",
+                                                        factory.FactoryName,
+                                                        XMakeAttributes.runtime,
+                                                        XMakeAttributes.architecture,
+                                                    RegisteredName);
+                                            }
+                                        }
+
+                                        // Throw an error if the ITaskFactory did not set the TaskType property.  If the property is null, it can cause NullReferenceExceptions in our code
+                                        if (initialized && factory.TaskType == null)
+                                        {
+                                            throw new InvalidOperationException(AssemblyResources.GetString("TaskFactoryTaskTypeIsNotSet"));
                                         }
                                     }
-
-                                    // Throw an error if the ITaskFactory did not set the TaskType property.  If the property is null, it can cause NullReferenceExceptions in our code
-                                    if (initialized && factory.TaskType == null)
+                                    finally
                                     {
-                                        throw new InvalidOperationException(AssemblyResources.GetString("TaskFactoryTaskTypeIsNotSet"));
-                                    }
-                                }
-                                finally
-                                {
 #if FEATURE_APPDOMAIN
                                     taskFactoryLoggingHost.MarkAsInactive();
 #endif
-                                }
+                                    }
 
-                                if (!initialized)
+                                    if (!initialized)
+                                    {
+                                        _taskFactoryWrapperInstance = null;
+                                        return false;
+                                    }
+                                }
+                                catch (InvalidCastException e)
                                 {
-                                    _taskFactoryWrapperInstance = null;
+                                    string message = String.Empty;
+#if DEBUG
+                                    message += UnhandledFactoryError;
+#endif
+                                    message += e.Message;
+
+                                    // Could get an invalid cast when Creating Instance and UnWrap due to the framework assembly not being the same.
+                                    targetLoggingContext.LogError(
+                                        new BuildEventFileInfo(elementLocation.File, elementLocation.Line, elementLocation.Column),
+                                        "TaskFactoryInstantiationFailureErrorInvalidCast",
+                                        TaskFactoryAttributeName,
+                                        taskFactoryLoadInfo.AssemblyLocation,
+                                        message);
+
                                     return false;
                                 }
-                            }
-                            catch (InvalidCastException e)
-                            {
-                                string message = String.Empty;
+                                catch (Exception e) when (!ExceptionHandling.IsCriticalException(e))
+                                {
+                                    string message =
 #if DEBUG
-                                message += UnhandledFactoryError;
+                                    UnhandledFactoryError +
 #endif
-                                message += e.Message;
+                                    e.Message;
 
-                                // Could get an invalid cast when Creating Instance and UnWrap due to the framework assembly not being the same.
-                                targetLoggingContext.LogError(
-                                    new BuildEventFileInfo(elementLocation.File, elementLocation.Line, elementLocation.Column),
-                                    "TaskFactoryInstantiationFailureErrorInvalidCast",
-                                    TaskFactoryAttributeName,
-                                    taskFactoryLoadInfo.AssemblyLocation,
-                                    message);
-
-                                return false;
+                                    ProjectErrorUtilities.ThrowInvalidProject(elementLocation, "TaskFactoryLoadFailure", TaskFactoryAttributeName, taskFactoryLoadInfo.AssemblyLocation, message);
+                                }
                             }
-                            catch (Exception e) when (!ExceptionHandling.IsCriticalException(e))
+                            finally
                             {
-                                string message =
-#if DEBUG
-                                UnhandledFactoryError +
-#endif
-                                e.Message;
-
-                                ProjectErrorUtilities.ThrowInvalidProject(elementLocation, "TaskFactoryLoadFailure", TaskFactoryAttributeName, taskFactoryLoadInfo.AssemblyLocation, message);
+                                if (resolver != null)
+                                {
+                                    resolver.RemoveHandler();
+                                    resolver = null;
+                                }
                             }
                         }
-                        finally
-                        {
-                            if (resolver != null)
-                            {
-                                resolver.RemoveHandler();
-                                resolver = null;
-                            }
-                        }
-                    }
 
                         _taskFactoryWrapperInstance = new TaskFactoryWrapper(factory, loadedType, RegisteredName, TaskFactoryParameters, ComputeIfCustom(), IsFromNugetCache, TaskFactoryAttributeName);
                     }

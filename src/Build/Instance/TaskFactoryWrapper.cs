@@ -73,9 +73,24 @@ namespace Microsoft.Build.Execution
         private TaskHostParameters _factoryIdentityParameters;
 
         /// <summary>
-        /// An execution statistics holder.
+        /// Whether this task is custom (user-authored, not built-in or from Microsoft).
         /// </summary>
-        internal TaskRegistry.RegisteredTaskRecord.Stats? Statistics { get; private init; }
+        internal bool IsCustom { get; private init; }
+
+        /// <summary>
+        /// Whether this task comes from a NuGet package cache.
+        /// </summary>
+        internal bool IsFromNugetCache { get; private init; }
+
+        /// <summary>
+        /// The name of the task factory (e.g., "AssemblyTaskFactory", "TaskHostFactory", or a custom factory name).
+        /// </summary>
+        internal string TaskFactoryAttributeName { get; private init; }
+
+        /// <summary>
+        /// The target runtime specified for this task (e.g., "CLR4", "NET"), or null if not specified.
+        /// </summary>
+        internal string? TaskFactoryRuntime { get; private init; }
 
         #endregion
 
@@ -89,7 +104,9 @@ namespace Microsoft.Build.Execution
             LoadedType taskFactoryLoadInfo,
             string taskName,
             TaskHostParameters factoryIdentityParameters,
-            TaskRegistry.RegisteredTaskRecord.Stats? statistics = null)
+            bool isCustom,
+            bool isFromNugetCache,
+            string taskFactoryAttributeName)
         {
             ErrorUtilities.VerifyThrowArgumentNull(taskFactory);
             ErrorUtilities.VerifyThrowArgumentLength(taskName);
@@ -98,12 +115,20 @@ namespace Microsoft.Build.Execution
             TaskFactoryLoadedType = taskFactoryLoadInfo;
             _factoryIdentityParameters = factoryIdentityParameters;
             _propertyData = new Lazy<PropertyData>(PopulatePropertyInfo);
-            Statistics = statistics;
+            IsCustom = isCustom;
+            IsFromNugetCache = isFromNugetCache;
+            TaskFactoryAttributeName = taskFactoryAttributeName;
+            TaskFactoryRuntime = factoryIdentityParameters.Runtime;
         }
 
         #endregion
 
         #region Properties
+
+        /// <summary>
+        /// The registered task name (full type name from the UsingTask element).
+        /// </summary>
+        internal string RegisteredTaskName => _taskName;
 
         /// <summary>
         /// Load information about the task factory itself

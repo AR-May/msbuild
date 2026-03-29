@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 #if FEATURE_APARTMENT_STATE
 using System.Diagnostics.CodeAnalysis;
@@ -21,8 +22,10 @@ using Microsoft.Build.Eventing;
 using Microsoft.Build.Exceptions;
 using Microsoft.Build.Execution;
 using Microsoft.Build.Framework;
+using Microsoft.Build.Framework.Telemetry;
 using Microsoft.Build.Shared;
 using Microsoft.Build.Shared.FileSystem;
+using Microsoft.Build.TelemetryInfra;
 using ElementLocation = Microsoft.Build.Construction.ElementLocation;
 using ProjectItemInstanceFactory = Microsoft.Build.Execution.ProjectItemInstance.TaskItem.ProjectItemInstanceFactory;
 using ReservedPropertyNames = Microsoft.Build.Internal.ReservedPropertyNames;
@@ -454,9 +457,13 @@ namespace Microsoft.Build.BackEnd
                     {
                         TaskLoggingContext taskLoggingContext = _targetLoggingContext.LogTaskBatchStarted(_projectFullPath, _targetChildInstance, taskAssemblyLocation);
                         MSBuildEventSource.Log.ExecuteTaskStart(_taskNode?.Name, taskLoggingContext.BuildEventContext.TaskId);
-                        if (_componentHost.BuildParameters.IsTelemetryEnabled)
+                        bool collectTelemetry = _componentHost.BuildParameters.IsTelemetryEnabled && taskFactoryWrapper is not null;
+                        long startTimestamp = 0;
+                        long startMemory = 0;
+                        if (collectTelemetry)
                         {
-                            taskFactoryWrapper?.Statistics?.ExecutionStarted();
+                            startTimestamp = Stopwatch.GetTimestamp();
+                            startMemory = GetMemoryAllocated();
                         }
 
                         _buildRequestEntry.Request.CurrentTaskContext = taskLoggingContext.BuildEventContext;
@@ -507,9 +514,9 @@ namespace Microsoft.Build.BackEnd
 
                             // Flag the completion of the task.
                             taskLoggingContext.LogTaskBatchFinished(_projectFullPath, taskResult.ResultCode == WorkUnitResultCode.Success || taskResult.ResultCode == WorkUnitResultCode.Skipped);
-                            if (_componentHost.BuildParameters.IsTelemetryEnabled)
+                            if (collectTelemetry)
                             {
-                                taskFactoryWrapper?.Statistics?.ExecutionStopped();
+                                ReportTaskTelemetry(taskFactoryWrapper!, startTimestamp, startMemory);
                             }
 
                             if (taskResult.ResultCode == WorkUnitResultCode.Failed && _continueOnError == ContinueOnError.WarnAndContinue)
@@ -1240,5 +1247,45 @@ namespace Microsoft.Build.BackEnd
         }
 
         #endregion
+
+        /// <summary>
+        /// Reports per-invocation task telemetry to the shared telemetry forwarder.
+        /// </summary>
+        /// <remarks>
+        /// Uses stack-local timestamps captured before/after task execution to avoid shared mutable state
+        /// on RegisteredTaskRecord. Each invocation is reported independently and the forwarder aggregates.
+        /// </remarks>
+        private void ReportTaskTelemetry(TaskFactoryWrapper taskFactoryWrapper, long startTimestamp, long startMemory)
+        {
+            long endMemory = GetMemoryAllocated();
+            long endTimestamp = Stopwatch.GetTimestamp();
+            TimeSpan elapsed = new((long)((endTimestamp - startTimestamp) * ((double)TimeSpan.TicksPerSecond / Stopwatch.Frequency)));
+            long memoryDelta = endMemory - startMemory;
+
+            var key = new TaskOrTargetTelemetryKey(
+                taskFactoryWrapper.RegisteredTaskName,
+                taskFactoryWrapper.IsCustom,
+                taskFactoryWrapper.IsFromNugetCache,
+                isFromMetaProject: false);
+
+            WorkerNodeTelemetryData data = new();
+            data.AddTask(key, elapsed, 1, memoryDelta, taskFactoryWrapper.TaskFactoryAttributeName, taskFactoryWrapper.TaskFactoryRuntime);
+
+            ITelemetryForwarder forwarder = ((TelemetryForwarderProvider)_componentHost
+                .GetComponent(BuildComponentType.TelemetryForwarder))?.Instance;
+            forwarder?.MergeWorkerData(data);
+        }
+
+        private static long GetMemoryAllocated()
+        {
+#if NET
+            // Per-thread: not affected by concurrent allocations on other node threads in /mt mode.
+            return GC.GetAllocatedBytesForCurrentThread();
+#else
+            // .NET Framework 4.7.2 lacks GetAllocatedBytesForCurrentThread.
+            // Process-wide approximation — memory deltas may include noise from other threads.
+            return GC.GetTotalMemory(false);
+#endif
+        }
     }
 }

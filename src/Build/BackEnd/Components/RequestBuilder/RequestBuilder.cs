@@ -1324,38 +1324,7 @@ namespace Microsoft.Build.BackEnd
                 telemetryData.AddTarget(key, wasExecuted, skipReason);
             }
 
-            TaskRegistry taskReg = _requestEntry.RequestConfiguration.Project.TaskRegistry;
-            CollectTasksStats(taskReg);
-
             telemetryForwarder.MergeWorkerData(telemetryData);
-
-            void CollectTasksStats(TaskRegistry taskRegistry)
-            {
-                if (taskRegistry == null)
-                {
-                    return;
-                }
-
-                foreach (TaskRegistry.RegisteredTaskRecord registeredTaskRecord in taskRegistry.TaskRegistrations.Values.SelectMany(record => record))
-                {
-                    var key = new TaskOrTargetTelemetryKey(
-                        registeredTaskRecord.TaskIdentity.Name,
-                        registeredTaskRecord.ComputeIfCustom(),
-                        registeredTaskRecord.IsFromNugetCache,
-                        isFromMetaProject: false);
-                    telemetryData.AddTask(
-                        key,
-                        registeredTaskRecord.Statistics.ExecutedTime,
-                        registeredTaskRecord.Statistics.ExecutedCount,
-                        registeredTaskRecord.Statistics.TotalMemoryConsumption,
-                        registeredTaskRecord.TaskFactoryAttributeName,
-                        registeredTaskRecord.TaskFactoryParameters.Runtime);
-
-                    registeredTaskRecord.Statistics.Reset();
-                }
-
-                taskRegistry.Toolset?.InspectInternalTaskRegistry(CollectTasksStats);
-            }
         }
 
         private static bool IsMetaprojTargetPath(string targetPath) => targetPath.EndsWith(".metaproj", StringComparison.OrdinalIgnoreCase);

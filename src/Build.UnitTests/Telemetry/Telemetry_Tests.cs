@@ -60,7 +60,7 @@ namespace Microsoft.Build.Engine.UnitTests
             workerNodeTelemetryData.TargetsExecutionData[buildTargetKey].WasExecuted.ShouldBeTrue();
             workerNodeTelemetryData.TargetsExecutionData.Keys.Count.ShouldBe(1);
 
-            workerNodeTelemetryData.TasksExecutionData.Keys.Count.ShouldBeGreaterThan(2);
+            workerNodeTelemetryData.TasksExecutionData.Keys.Count.ShouldBe(2);
             workerNodeTelemetryData.TasksExecutionData[(TaskOrTargetTelemetryKey)"Microsoft.Build.Tasks.Message"].ExecutionsCount.ShouldBe(2);
             workerNodeTelemetryData.TasksExecutionData[(TaskOrTargetTelemetryKey)"Microsoft.Build.Tasks.Message"].CumulativeExecutionTime.ShouldBeGreaterThan(TimeSpan.Zero);
             workerNodeTelemetryData.TasksExecutionData[(TaskOrTargetTelemetryKey)"Microsoft.Build.Tasks.CreateItem"].ExecutionsCount.ShouldBe(1);
@@ -68,7 +68,7 @@ namespace Microsoft.Build.Engine.UnitTests
 
             workerNodeTelemetryData.TasksExecutionData.Keys.ShouldAllBe(k => !k.IsCustom && !k.IsNuget);
             workerNodeTelemetryData.TasksExecutionData.Values
-                .Count(v => v.CumulativeExecutionTime > TimeSpan.Zero || v.ExecutionsCount > 0).ShouldBe(2);
+                .ShouldAllBe(v => v.CumulativeExecutionTime > TimeSpan.Zero && v.ExecutionsCount > 0);
         }
 
         [Fact]
@@ -134,7 +134,7 @@ namespace Microsoft.Build.Engine.UnitTests
             workerNodeData.TargetsExecutionData[new TaskOrTargetTelemetryKey("NotExecuted", true, false)].WasExecuted.ShouldBeFalse();
             workerNodeData.TargetsExecutionData.Keys.Count.ShouldBe(3);
 
-            workerNodeData.TasksExecutionData.Keys.Count.ShouldBeGreaterThan(2);
+            workerNodeData.TasksExecutionData.Keys.Count.ShouldBe(3);
             workerNodeData.TasksExecutionData[(TaskOrTargetTelemetryKey)"Microsoft.Build.Tasks.Message"].ExecutionsCount.ShouldBe(3);
             workerNodeData.TasksExecutionData[(TaskOrTargetTelemetryKey)"Microsoft.Build.Tasks.Message"].CumulativeExecutionTime.ShouldBeGreaterThan(TimeSpan.Zero);
             workerNodeData.TasksExecutionData[(TaskOrTargetTelemetryKey)"Microsoft.Build.Tasks.CreateItem"].ExecutionsCount.ShouldBe(1);
@@ -143,10 +143,10 @@ namespace Microsoft.Build.Engine.UnitTests
             workerNodeData.TasksExecutionData[new TaskOrTargetTelemetryKey("Task01", true, false)].ExecutionsCount.ShouldBe(2);
             workerNodeData.TasksExecutionData[new TaskOrTargetTelemetryKey("Task01", true, false)].CumulativeExecutionTime.ShouldBeGreaterThan(TimeSpan.Zero);
 
-            workerNodeData.TasksExecutionData[new TaskOrTargetTelemetryKey("Task02", true, false)].ExecutionsCount.ShouldBe(0);
-            workerNodeData.TasksExecutionData[new TaskOrTargetTelemetryKey("Task02", true, false)].CumulativeExecutionTime.ShouldBe(TimeSpan.Zero);
+            // Task02 is registered but never executed — per-invocation telemetry only reports executed tasks
+            workerNodeData.TasksExecutionData.ShouldNotContainKey(new TaskOrTargetTelemetryKey("Task02", true, false));
 
-            workerNodeData.TasksExecutionData.Values.Count(v => v.CumulativeExecutionTime > TimeSpan.Zero || v.ExecutionsCount > 0).ShouldBe(3);
+            workerNodeData.TasksExecutionData.Values.ShouldAllBe(v => v.CumulativeExecutionTime > TimeSpan.Zero && v.ExecutionsCount > 0);
 
             workerNodeData.TasksExecutionData.Keys.ShouldAllBe(k => !k.IsNuget);
         }
