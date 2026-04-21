@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using Microsoft.Build.BackEnd;
 using Microsoft.Build.Execution;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Shared;
@@ -381,7 +382,168 @@ namespace Microsoft.Build.Engine.UnitTests.BackEnd
             logger.FullLog.ShouldContain("TaskWithAttribute executed");
         }
 
+        /// <summary>
+        /// Verifies that TaskRouter.IsKnownProblematicTask returns true for NuGet.Build.Tasks.RestoreTask.
+        /// </summary>
+        [Fact]
+        public void IsKnownProblematicTask_ReturnsTrueForRestoreTask()
+        {
+            TaskRouter.IsKnownProblematicTask(typeof(global::NuGet.Build.Tasks.RestoreTask)).ShouldBeTrue();
+        }
 
+        /// <summary>
+        /// Verifies that TaskRouter.IsKnownProblematicTask returns false for regular tasks.
+        /// </summary>
+        [Fact]
+        public void IsKnownProblematicTask_ReturnsFalseForRegularTask()
+        {
+            TaskRouter.IsKnownProblematicTask(typeof(NonEnlightenedTestTask)).ShouldBeFalse();
+            TaskRouter.IsKnownProblematicTask(typeof(AttributeTestTask)).ShouldBeFalse();
+        }
+
+        /// <summary>
+        /// Verifies that a known problematic task (RestoreTask) is routed to TaskHost
+        /// in multi-threaded mode.
+        /// </summary>
+        [Fact]
+        public void ProblematicTask_RoutedToTaskHost_InMultiThreadedMode()
+        {
+            // Arrange
+            string projectContent = $@"
+<Project>
+    <UsingTask TaskName=""RestoreTask"" AssemblyFile=""{Assembly.GetExecutingAssembly().Location}"" />
+    
+    <Target Name=""TestTarget"">
+        <RestoreTask />
+    </Target>
+</Project>";
+
+            string projectFile = Path.Combine(_testProjectsDir, "RestoreTaskMT.proj");
+            File.WriteAllText(projectFile, projectContent);
+
+            var logger = new MockLogger(_output);
+            var buildParameters = new BuildParameters
+            {
+                MultiThreaded = true,
+                Loggers = new[] { logger },
+                DisableInProcNode = false,
+                EnableNodeReuse = false,
+            };
+
+            var buildRequestData = new BuildRequestData(
+                projectFile,
+                new Dictionary<string, string>(),
+                null,
+                new[] { "TestTarget" },
+                null);
+
+            // Act
+            var buildManager = BuildManager.DefaultBuildManager;
+            var result = buildManager.Build(buildParameters, buildRequestData);
+
+            // Assert
+            result.OverallResult.ShouldBe(BuildResultCode.Success);
+            TaskRouterTestHelper.AssertTaskUsedTaskHost(logger, "RestoreTask");
+            logger.FullLog.ShouldContain("RestoreTask executed");
+        }
+
+        /// <summary>
+        /// Verifies that a known problematic task (RestoreTask) is routed to TaskHost
+        /// when MSBuild server mode is active (even without multi-threaded mode).
+        /// </summary>
+        [Fact]
+        public void ProblematicTask_RoutedToTaskHost_InServerMode()
+        {
+            // Arrange
+            _env.SetEnvironmentVariable(Traits.UseMSBuildServerEnvVarName, "1");
+
+            string projectContent = $@"
+<Project>
+    <UsingTask TaskName=""RestoreTask"" AssemblyFile=""{Assembly.GetExecutingAssembly().Location}"" />
+    
+    <Target Name=""TestTarget"">
+        <RestoreTask />
+    </Target>
+</Project>";
+
+            string projectFile = Path.Combine(_testProjectsDir, "RestoreTaskServer.proj");
+            File.WriteAllText(projectFile, projectContent);
+
+            var logger = new MockLogger(_output);
+            var buildParameters = new BuildParameters
+            {
+                MultiThreaded = false,
+                Loggers = new[] { logger },
+                DisableInProcNode = false,
+                EnableNodeReuse = false,
+            };
+
+            var buildRequestData = new BuildRequestData(
+                projectFile,
+                new Dictionary<string, string>(),
+                null,
+                new[] { "TestTarget" },
+                null);
+
+            // Act
+            var buildManager = BuildManager.DefaultBuildManager;
+            var result = buildManager.Build(buildParameters, buildRequestData);
+
+            // Assert
+            result.OverallResult.ShouldBe(BuildResultCode.Success);
+            TaskRouterTestHelper.AssertTaskUsedTaskHost(logger, "RestoreTask");
+            logger.FullLog.ShouldContain("RestoreTask executed");
+        }
+
+        /// <summary>
+        /// Verifies that a known problematic task (RestoreTask) runs in-process
+        /// when neither multi-threaded mode nor server mode is active.
+        /// </summary>
+        [Fact]
+        public void ProblematicTask_RunsInProcess_WhenNoMTOrServer()
+        {
+            // Arrange
+            _env.SetEnvironmentVariable(Traits.UseMSBuildServerEnvVarName, "0");
+
+            string projectContent = $@"
+<Project>
+    <UsingTask TaskName=""RestoreTask"" AssemblyFile=""{Assembly.GetExecutingAssembly().Location}"" />
+    
+    <Target Name=""TestTarget"">
+        <RestoreTask />
+    </Target>
+</Project>";
+
+            string projectFile = Path.Combine(_testProjectsDir, "RestoreTaskNoMT.proj");
+            File.WriteAllText(projectFile, projectContent);
+
+            var logger = new MockLogger(_output);
+            var buildParameters = new BuildParameters
+            {
+                MultiThreaded = false,
+                Loggers = new[] { logger },
+                DisableInProcNode = false,
+                EnableNodeReuse = false,
+            };
+
+            var buildRequestData = new BuildRequestData(
+                projectFile,
+                new Dictionary<string, string>(),
+                null,
+                new[] { "TestTarget" },
+                null);
+
+            // Act
+            var buildManager = BuildManager.DefaultBuildManager;
+            var result = buildManager.Build(buildParameters, buildRequestData);
+
+            // Assert
+            result.OverallResult.ShouldBe(BuildResultCode.Success);
+
+            // Should run in-process when neither MT nor server mode
+            TaskRouterTestHelper.AssertTaskRanInProcess(logger, "RestoreTask");
+            logger.FullLog.ShouldContain("RestoreTask executed");
+        }
 
         private string CreateTestProject(string taskName, string taskClass)
         {
@@ -481,6 +643,24 @@ namespace Microsoft.Build.Engine.UnitTests.BackEnd
     }
 
     #endregion
+}
+
+// Test task in the NuGet.Build.Tasks namespace to simulate the real RestoreTask for routing tests.
+// TaskRouter identifies problematic tasks by full type name.
+namespace NuGet.Build.Tasks
+{
+    /// <summary>
+    /// Simulates the NuGet RestoreTask for testing task routing workaround.
+    /// Has the same full name (NuGet.Build.Tasks.RestoreTask) that TaskRouter checks.
+    /// </summary>
+    public class RestoreTask : Microsoft.Build.Utilities.Task
+    {
+        public override bool Execute()
+        {
+            Log.LogMessage(MessageImportance.High, "RestoreTask executed");
+            return true;
+        }
+    }
 }
 
 // Custom attribute definition in Microsoft.Build.Framework namespace to match what TaskRouter expects

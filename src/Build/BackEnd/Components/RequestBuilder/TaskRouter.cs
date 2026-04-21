@@ -85,6 +85,48 @@ namespace Microsoft.Build.BackEnd
         }
 
         /// <summary>
+        /// Known task full names that have problematic static singleton state and must not
+        /// run in a sidecar TaskHost (which persists across invocations). Instead, these tasks
+        /// should run in an explicit (transient) TaskHost that terminates after execution,
+        /// ensuring static state is cleaned up.
+        /// This is a temporary workaround until the task authors fix their static state issues.
+        /// See https://github.com/dotnet/msbuild/issues/13315
+        /// </summary>
+        private static readonly string[] s_knownProblematicTaskNames =
+        [
+            "NuGet.Build.Tasks.RestoreTask",
+        ];
+
+        /// <summary>
+        /// Determines if a task is known to have problematic static singleton state that
+        /// makes it unsafe to run in a long-lived sidecar TaskHost process.
+        /// Such tasks should be routed to an explicit (transient) TaskHost that terminates
+        /// after execution, ensuring all static state is cleaned up.
+        /// </summary>
+        /// <param name="taskType">The type of the task to evaluate.</param>
+        /// <returns>True if the task is known to be problematic; false otherwise.</returns>
+        public static bool IsKnownProblematicTask(Type taskType)
+        {
+            ErrorUtilities.VerifyThrowArgumentNull(taskType, nameof(taskType));
+
+            string? fullName = taskType.FullName;
+            if (fullName is null)
+            {
+                return false;
+            }
+
+            foreach (string name in s_knownProblematicTaskNames)
+            {
+                if (string.Equals(fullName, name, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
         /// Clears the thread-safety cache. Used primarily for testing.
         /// </summary>
         internal static void ClearCache()

@@ -348,6 +348,23 @@ namespace Microsoft.Build.BackEnd
                 }
             }
 
+            // Workaround for tasks with problematic static singleton state (e.g., NuGet RestoreTask).
+            // In MT mode or when MSBuild server is active, these tasks must run in a transient (non-sidecar)
+            // TaskHost to ensure static state is cleaned up after each invocation.
+            // See https://github.com/dotnet/msbuild/issues/13315
+            bool forceTransientTaskHost = false;
+            if (_loadedType?.Type != null && TaskRouter.IsKnownProblematicTask(_loadedType.Type))
+            {
+                bool isMultiThreaded = buildComponentHost?.BuildParameters?.MultiThreaded == true;
+                bool isServerMode = Traits.Instance.UseMSBuildServer;
+
+                if (isMultiThreaded || isServerMode)
+                {
+                    useTaskFactory = true;
+                    forceTransientTaskHost = true;
+                }
+            }
+
             taskLoggingContext?.TargetLoggingContext?.ProjectLoggingContext?.ProjectTelemetry?.AddTaskExecution(GetType().FullName, isTaskHost: useTaskFactory);
 
             if (useTaskFactory)
@@ -362,7 +379,8 @@ namespace Microsoft.Build.BackEnd
                 // If the task host factory is explicitly requested, do not act as a sidecar task host.
                 // This is important as customers use task host factories for short lived tasks to release
                 // potential locks.
-                bool useSidecarTaskHost = !(_factoryIdentityParameters.TaskHostFactoryExplicitlyRequested ?? false);
+                // Also disable sidecar for known problematic tasks to ensure static state cleanup.
+                bool useSidecarTaskHost = !forceTransientTaskHost && !(_factoryIdentityParameters.TaskHostFactoryExplicitlyRequested ?? false);
 
                 TaskHostTask task = new(
                     taskLocation,

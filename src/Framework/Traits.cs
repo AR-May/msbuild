@@ -142,6 +142,11 @@ namespace Microsoft.Build.Framework
         public const string UseMSBuildServerEnvVarName = "MSBUILDUSESERVER";
 
         /// <summary>
+        /// Whether MSBuild server mode is enabled via the MSBUILDUSESERVER environment variable.
+        /// </summary>
+        public readonly bool UseMSBuildServer = Environment.GetEnvironmentVariable(UseMSBuildServerEnvVarName) == "1";
+
+        /// <summary>
         /// Name of environment variable for logging arguments (e.g., -bl, -check).
         /// </summary>
         public const string MSBuildLoggingArgsEnvVarName = "MSBUILD_LOGGING_ARGS";
