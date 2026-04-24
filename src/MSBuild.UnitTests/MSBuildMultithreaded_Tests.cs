@@ -125,10 +125,17 @@ namespace Microsoft.Build.Engine.UnitTests
         }
 
         [Theory]
-        [InlineData(true, "/m /nodereuse:false /mt")]
-        [InlineData(false, "/m /nodereuse:false")]
-        public void MSBuildTask_EnvironmentIsolation(bool isMultithreaded, string msbuildArgs)
+        [InlineData(true, "/m /nodereuse:false /mt", null)]
+        [InlineData(false, "/m /nodereuse:false", null)]
+        [InlineData(true, "/m /nodereuse:false", "1")]
+        [InlineData(false, "/m /nodereuse:false", "0")]
+        public void MSBuildTask_EnvironmentIsolation(bool isMultithreaded, string msbuildArgs, string? envVarValue)
         {
+            if (envVarValue is not null)
+            {
+                _env.SetEnvironmentVariable("MSBUILDUSEMULTITHREADEDMODE", envVarValue);
+            }
+
             string project = $@"
 <Project>
     <UsingTask TaskName='EnvironmentIsolationTestTask' AssemblyFile='{typeof(EnvironmentIsolationTestTask).Assembly.Location}' />

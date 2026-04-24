@@ -136,6 +136,11 @@ namespace Microsoft.Build.Framework
         public const string UseMSBuildServerEnvVarName = "MSBUILDUSESERVER";
 
         /// <summary>
+        /// When enabled, MSBuild uses in-proc nodes for parallel build, effectively running the build multi-threaded.
+        /// </summary>
+        public readonly bool UseMultithreadedMode = Environment.GetEnvironmentVariable("MSBUILDUSEMULTITHREADEDMODE") == "1";
+
+        /// <summary>
         /// Name of environment variable for logging arguments (e.g., -bl, -check).
         /// </summary>
         public const string MSBuildLoggingArgsEnvVarName = "MSBUILD_LOGGING_ARGS";
