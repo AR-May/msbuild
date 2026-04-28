@@ -155,6 +155,7 @@ namespace Microsoft.Build.EndToEndTests
         /// </summary>
         [Theory]
         [InlineData(nameof(TestSolutionAssetsFixture.SingleProject), "/m:8 /mt")]
+        [InlineData(nameof(TestSolutionAssetsFixture.ProjectWithDependencies), "/m:8 /mt")]
         public void MultithreadedBuild_BinaryLogging(string testAssetName, string multithreadingArgs)
         {
             BuildWithBinlogAndVerifyReplay(testAssetName, multithreadingArgs);
@@ -180,6 +181,7 @@ namespace Microsoft.Build.EndToEndTests
         /// </summary>
         [WindowsOnlyTheory]
         [InlineData(nameof(TestSolutionAssetsFixture.NonSdkSingleProject), "/m:8 /mt")]
+        [InlineData(nameof(TestSolutionAssetsFixture.NonSdkProjectWithDependencies), "/m:8 /mt")]
         public void MultithreadedBuild_NonSdkStyle_BinaryLogging(string testAssetName, string multithreadingArgs)
         {
             BuildWithBinlogAndVerifyReplay(testAssetName, multithreadingArgs);

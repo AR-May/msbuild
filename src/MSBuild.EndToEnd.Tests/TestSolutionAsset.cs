@@ -8,24 +8,24 @@ namespace Microsoft.Build.EndToEndTests
     /// <summary>
     /// Represents a test solution asset.
     /// </summary>
-    public readonly struct TestSolutionAsset
+    internal readonly struct TestSolutionAsset
     {
         // Solution folder containing the test asset
-        public string SolutionFolder { get; }
+        internal string SolutionFolder { get; }
 
         // Path to main (entry) project file relative to the solution folder
-        public string ProjectRelativePath { get; }
-        
-        public TestSolutionAsset(string solutionFolder, string projectFile)
+        internal string ProjectRelativePath { get; }
+
+        internal TestSolutionAsset(string solutionFolder, string projectFile)
         {
             SolutionFolder = solutionFolder;
             ProjectRelativePath = projectFile;
         }
-        
+
         /// <summary>
         /// Gets the path to the project file. This is relative when used as a test asset definition,
         /// or absolute when used as an isolated test instance (after PrepareIsolatedTestAssets).
         /// </summary>
-        public string ProjectPath => Path.Combine(SolutionFolder, ProjectRelativePath);
+        internal string ProjectPath => Path.Combine(SolutionFolder, ProjectRelativePath);
     }
 }

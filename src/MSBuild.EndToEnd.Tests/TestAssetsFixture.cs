@@ -10,19 +10,20 @@ namespace Microsoft.Build.EndToEndTests
 {
     /// <summary>
     /// Fixture for test solution assets that handles expensive initialization like NuGet restore.
-    /// Restore uses bootstrap MSBuild so it exercises the same code path as the tests themselves,
-    /// which is important when restore-related tasks become multithreadable.
+    /// Restore runs through bootstrap MSBuild, so failures here can surface real regressions
+    /// in the same code paths that the tests exercise.
     /// </summary>
     public class TestSolutionAssetsFixture
     {
-        public string TestAssetDir { get; }
+        internal string TestAssetDir { get; }
 
         // Test solution asset definitions
-        public static readonly TestSolutionAsset SingleProject = new("SingleProject", "SingleProject.csproj");
-        public static readonly TestSolutionAsset ProjectWithDependencies = new("ProjectWithDependencies", "ConsoleApp/ConsoleApp.csproj");
-        public static readonly TestSolutionAsset NonSdkSingleProject = new("NonSdkSingleProject", "NonSdkSingleProject.csproj");
-        public static readonly TestSolutionAsset NonSdkProjectWithDependencies = new("NonSdkProjectWithDependencies", "ConsoleApp/ConsoleApp.csproj");
+        internal static readonly TestSolutionAsset SingleProject = new("SingleProject", "SingleProject.csproj");
+        internal static readonly TestSolutionAsset ProjectWithDependencies = new("ProjectWithDependencies", "ConsoleApp/ConsoleApp.csproj");
+        internal static readonly TestSolutionAsset NonSdkSingleProject = new("NonSdkSingleProject", "NonSdkSingleProject.csproj");
+        internal static readonly TestSolutionAsset NonSdkProjectWithDependencies = new("NonSdkProjectWithDependencies", "ConsoleApp/ConsoleApp.csproj");
 
+        // Non-SDK projects do not require NuGet restore.
         private static readonly TestSolutionAsset[] AssetsToRestore = 
         [
             SingleProject,
