@@ -685,6 +685,15 @@ namespace Microsoft.Build.Construction
         public ElementLocation TreatAsLocalPropertyLocation => GetAttributeLocation(XMakeAttributes.treatAsLocalProperty);
 
         /// <summary>
+        /// Backing field for <see cref="IsExplicitlyLoaded"/>. Written without the cache lock by
+        /// <see cref="MarkAsExplicitlyLoaded"/> and read by <see cref="ProjectRootElementCache.DiscardImplicitReferences"/>.
+        /// Monotonic (only transitions false → true), so <see langword="volatile"/> alone is sufficient:
+        /// it provides the release/acquire ordering, and concurrent writers can only race to set the
+        /// same value.
+        /// </summary>
+        private volatile bool _isExplicitlyLoaded;
+
+        /// <summary>
         /// Has the project root element been explicitly loaded for a build or has it been implicitly loaded
         /// as part of building another project.
         /// </summary>
@@ -692,7 +701,11 @@ namespace Microsoft.Build.Construction
         /// Internal code that wants to set this to true should call <see cref="MarkAsExplicitlyLoaded"/>.
         /// The setter is private to make it more difficult to downgrade an existing PRE to an implicitly loaded state, which should never happen.
         /// </remarks>
-        internal bool IsExplicitlyLoaded { get; private set; }
+        internal bool IsExplicitlyLoaded
+        {
+            get => _isExplicitlyLoaded;
+            private set => _isExplicitlyLoaded = value;
+        }
 
         /// <summary>
         /// Retrieves the root element cache with which this root element is associated.
