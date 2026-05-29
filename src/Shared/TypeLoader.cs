@@ -358,12 +358,6 @@ namespace Microsoft.Build.Shared
         private class AssemblyInfoToLoadedTypes
         {
             /// <summary>
-            /// Lock to prevent two threads from using this object at the same time.
-            /// Since we fill up internal structures with what is in the assembly
-            /// </summary>
-            private readonly LockType _lockObject = new();
-
-            /// <summary>
             /// Type filter to pick the correct types out of an assembly
             /// </summary>
             private Func<Type, object, bool> _isDesiredType;
@@ -379,16 +373,15 @@ namespace Microsoft.Build.Shared
             private ConcurrentDictionary<string, Type> _typeNameToType;
 
             /// <summary>
-            /// List of public types in the assembly which match the type filter and their corresponding types
+            /// Lazily-built list of public types in the assembly which match the type filter and their corresponding types.
+            /// Built using <see cref="LazyThreadSafetyMode.PublicationOnly"/> so that concurrent first-time callers do
+            /// not block one another waiting on a single thread's assembly scan. The factory is idempotent: the CLR
+            /// returns the same Assembly and Type[] instances regardless of which thread invokes it, so racing scans
+            /// produce equivalent dictionaries and the first published one wins.
             /// </summary>
-            private Dictionary<string, Type> _publicTypeNameToType;
+            private readonly Lazy<Dictionary<string, Type>> _publicTypeNameToType;
 
             private ConcurrentDictionary<string, LoadedType> _publicTypeNameToLoadedType;
-
-            /// <summary>
-            /// Have we scanned the public types for this assembly yet.
-            /// </summary>
-            private long _haveScannedPublicTypes;
 
             /// <summary>
             /// Assembly, if any, that we loaded for this type.
@@ -425,8 +418,10 @@ namespace Microsoft.Build.Shared
                 _isDesiredType = typeFilter;
                 _assemblyLoadInfo = loadInfo;
                 _typeNameToType = new(StringComparer.OrdinalIgnoreCase);
-                _publicTypeNameToType = new Dictionary<string, Type>(StringComparer.OrdinalIgnoreCase);
                 _publicTypeNameToLoadedType = new(StringComparer.OrdinalIgnoreCase);
+                _publicTypeNameToType = new Lazy<Dictionary<string, Type>>(
+                    valueFactory: ScanAssemblyForPublicTypes,
+                    mode: LazyThreadSafetyMode.PublicationOnly);
             }
 
             /// <summary>
@@ -493,19 +488,7 @@ namespace Microsoft.Build.Shared
                         }
                     }
 
-                    if (Interlocked.Read(ref _haveScannedPublicTypes) == 0)
-                    {
-                        lock (_lockObject)
-                        {
-                            if (Interlocked.Read(ref _haveScannedPublicTypes) == 0)
-                            {
-                                ScanAssemblyForPublicTypes();
-                                Interlocked.Exchange(ref _haveScannedPublicTypes, ~0);
-                            }
-                        }
-                    }
-
-                    foreach (KeyValuePair<string, Type> desiredTypeInAssembly in _publicTypeNameToType)
+                    foreach (KeyValuePair<string, Type> desiredTypeInAssembly in _publicTypeNameToType.Value)
                     {
                         // if type matches partially on its name
                         if (typeName.Length == 0 || IsPartialTypeNameMatch(desiredTypeInAssembly.Key, typeName))
@@ -683,20 +666,28 @@ namespace Microsoft.Build.Shared
             /// Scan the assembly pointed to by the assemblyLoadInfo for public types. We will use these public types to do partial name matching on
             /// to find tasks, loggers, and task factories.
             /// </summary>
-            private void ScanAssemblyForPublicTypes()
+            /// <remarks>
+            /// Invoked via <see cref="Lazy{T}"/> in <see cref="LazyThreadSafetyMode.PublicationOnly"/> mode, so multiple threads may
+            /// race to execute this factory. That is safe: <see cref="LoadAssembly"/> is cached by the CLR (all racers get the same
+            /// <see cref="Assembly"/> instance), <see cref="Assembly.GetExportedTypes"/> is referentially transparent, and only the
+            /// first dictionary to be published is retained. <see cref="_loadedAssembly"/> is published exactly once via
+            /// <see cref="Interlocked.CompareExchange{T}(ref T, T, T)"/>.
+            /// </remarks>
+            private Dictionary<string, Type> ScanAssemblyForPublicTypes()
             {
-                // we need to search the assembly for the type...
-                _loadedAssembly = LoadAssembly(_assemblyLoadInfo);
+                Dictionary<string, Type> dict = new(StringComparer.OrdinalIgnoreCase);
+                Assembly loaded = LoadAssembly(_assemblyLoadInfo);
+                Interlocked.CompareExchange(ref _loadedAssembly, loaded, null);
 
-                // only look at public types
-                Type[] allPublicTypesInAssembly = _loadedAssembly.GetExportedTypes();
-                foreach (Type publicType in allPublicTypesInAssembly)
+                foreach (Type publicType in loaded.GetExportedTypes())
                 {
                     if (_isDesiredType(publicType, null))
                     {
-                        _publicTypeNameToType.Add(publicType.FullName, publicType);
+                        dict[publicType.FullName] = publicType;
                     }
                 }
+
+                return dict;
             }
         }
     }
