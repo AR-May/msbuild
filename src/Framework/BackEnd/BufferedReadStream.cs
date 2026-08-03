@@ -1,4 +1,4 @@
-// Licensed to the .NET Foundation under one or more agreements.
+﻿// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
@@ -11,24 +11,18 @@ namespace Microsoft.Build.BackEnd
 {
     internal class BufferedReadStream : Stream
     {
-        private const int DefaultBufferSize = 1024;
+        private const int BUFFER_SIZE = 1024;
+        private NamedPipeServerStream _innerStream;
+        private byte[] _buffer;
 
-        private readonly Stream _innerStream;
-        private readonly byte[] _buffer;
-
-        // Bytes read from the underlying stream but not yet consumed.
+        // The number of bytes in the buffer that have been read from the underlying stream but not read by consumers of this stream
         private int _currentlyBufferedByteCount;
         private int _currentIndexInBuffer;
 
         public BufferedReadStream(NamedPipeServerStream innerStream)
-            : this((Stream)innerStream, DefaultBufferSize)
-        {
-        }
-
-        public BufferedReadStream(Stream innerStream, int bufferSize)
         {
             _innerStream = innerStream;
-            _buffer = new byte[bufferSize];
+            _buffer = new byte[BUFFER_SIZE];
 
             _currentlyBufferedByteCount = 0;
         }
@@ -70,7 +64,7 @@ namespace Microsoft.Build.BackEnd
 
         public override int Read(byte[] buffer, int offset, int count)
         {
-            if (count > _buffer.Length)
+            if (count > BUFFER_SIZE)
             {
                 // Trying to read more data than the buffer can hold
                 int alreadyCopied = 0;
@@ -104,7 +98,7 @@ namespace Microsoft.Build.BackEnd
                     _currentlyBufferedByteCount = 0;
                 }
 
-                int innerReadCount = _innerStream.Read(_buffer, 0, _buffer.Length);
+                int innerReadCount = _innerStream.Read(_buffer, 0, BUFFER_SIZE);
                 _currentIndexInBuffer = 0;
                 _currentlyBufferedByteCount = innerReadCount;
 
@@ -129,7 +123,7 @@ namespace Microsoft.Build.BackEnd
 
         public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
         {
-            if (count > _buffer.Length)
+            if (count > BUFFER_SIZE)
             {
                 // Trying to read more data than the buffer can hold
                 int alreadyCopied = CopyToBuffer(buffer, offset);
@@ -153,7 +147,7 @@ namespace Microsoft.Build.BackEnd
                 int alreadyCopied = CopyToBuffer(buffer, offset);
 
 #pragma warning disable CA1835 // Prefer the 'Memory'-based overloads for 'ReadAsync' and 'WriteAsync'
-                int innerReadCount = await _innerStream.ReadAsync(_buffer, 0, _buffer.Length, cancellationToken);
+                int innerReadCount = await _innerStream.ReadAsync(_buffer, 0, BUFFER_SIZE, cancellationToken);
 #pragma warning restore CA1835 // Prefer the 'Memory'-based overloads for 'ReadAsync' and 'WriteAsync'
                 _currentIndexInBuffer = 0;
                 _currentlyBufferedByteCount = innerReadCount;
