@@ -656,10 +656,7 @@ namespace Microsoft.Build.BackEnd
             bool preBufferPacketBody = ChangeWaves.AreFeaturesEnabled(ChangeWaves.Wave18_11);
             MemoryStream readBufferMemoryStream = null;
 
-            // Use 64 KB read-ahead under the change wave; retain the legacy 1 KB size otherwise.
-            BufferedReadStream localReadPipe = preBufferPacketBody
-                ? new BufferedReadStream(localPipe, 64 * 1024)
-                : new BufferedReadStream(localPipe);
+            BufferedReadStream localReadPipe = new BufferedReadStream(localPipe);
 
             byte[] headerByte = new byte[5];
             ITranslator writeTranslator = null;
