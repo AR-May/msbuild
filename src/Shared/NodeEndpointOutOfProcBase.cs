@@ -528,8 +528,12 @@ namespace Microsoft.Build.BackEnd
                 }
             }
 
+            BufferedReadStream readStream = ChangeWaves.AreFeaturesEnabled(ChangeWaves.Wave18_11)
+                ? new BufferedReadStream(_pipeServer, 64 * 1024)
+                : new BufferedReadStream(_pipeServer);
+
             RunReadLoop(
-                new BufferedReadStream(_pipeServer),
+                readStream,
                 _pipeServer,
                 localPacketQueue, localPacketAvailable, localTerminatePacketPump);
 
