@@ -10,7 +10,14 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Xml;
 using System.Xml.Serialization;
+using Microsoft.Build.Framework;
 using Microsoft.Build.Shared.FileSystem;
+
+#if NETFRAMEWORK
+using NewPath = Microsoft.IO.Path;
+#else
+using NewPath = System.IO.Path;
+#endif
 
 #nullable disable
 
@@ -314,13 +321,19 @@ namespace Microsoft.Build.Tasks.Deployment.ManifestUtilities
             {
                 return null;
             }
-            if (Path.IsPathRooted(path))
+            if (NewPath.IsPathFullyQualified(path))
             {
                 if (FileSystems.Default.FileExists(path))
                 {
                     return path;
                 }
                 return null;
+            }
+
+            bool isRooted = Path.IsPathRooted(path);
+            if (isRooted && !ChangeWaves.AreFeaturesEnabled(ChangeWaves.Wave18_13))
+            {
+                return FileSystems.Default.FileExists(path) ? path : null;
             }
 
             if (searchPaths == null)
@@ -331,7 +344,10 @@ namespace Microsoft.Build.Tasks.Deployment.ManifestUtilities
             {
                 if (!String.IsNullOrEmpty(searchPath))
                 {
-                    string resolvedPath = Path.Combine(searchPath, path);
+                    // Rooted Windows paths can still depend on the current drive or per-drive directory.
+                    string resolvedPath = isRooted
+                        ? new AbsolutePath(path, new AbsolutePath(Path.GetFullPath(searchPath))).Value
+                        : Path.Combine(searchPath, path);
                     resolvedPath = Path.GetFullPath(resolvedPath);
                     if (FileSystems.Default.FileExists(resolvedPath))
                     {
